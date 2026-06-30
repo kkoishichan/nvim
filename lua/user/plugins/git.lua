@@ -37,6 +37,32 @@ return {
 			vim.g.lazygit_floating_window_scaling_factor = layout.float_scale
 			vim.g.lazygit_floating_window_winblend = 0
 			setup_neovim_remote()
+
+			-- lazygit centres on `vim.o.lines` (no statusline reservation), so it
+			-- sits one row/col lower-right than the toggleterm float, which subtracts
+			-- 1 from each. Nudge it up-left by 1 so the two overlay exactly. (Resizing
+			-- while open reverts to lazygit's own position until reopened.)
+			vim.api.nvim_create_autocmd("FileType", {
+				group = vim.api.nvim_create_augroup("user_lazygit_pos", { clear = true }),
+				pattern = "lazygit",
+				callback = function(ev)
+					local win = vim.fn.bufwinid(ev.buf)
+					if win == -1 then
+						return
+					end
+					local cfg = vim.api.nvim_win_get_config(win)
+					if cfg.relative == "" then
+						return
+					end
+					local function n(v)
+						return type(v) == "table" and (v[false] or v[1]) or v
+					end
+					cfg.row = math.max(0, n(cfg.row) - 1)
+					cfg.col = math.max(0, n(cfg.col) - 1)
+					pcall(vim.api.nvim_win_set_config, win, cfg)
+					require("user.core.backdrop").open(win)
+				end,
+			})
 		end,
 		keys = {
 			{ "<leader>gg", "<cmd>LazyGit<cr>", desc = "Lazygit" },

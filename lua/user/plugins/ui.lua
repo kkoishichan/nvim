@@ -1,3 +1,5 @@
+local layout = require("user.core.layout")
+
 local function dashboard_header()
 	return [[
 ⠀⠀⠀⠀⠀⠀⠈⠉⠛⠻⠿⣿⣿⣿⣷⣤⣔⡺⢿⣿⣶⣤⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠻⣿⣿⣿⣿⣿⣿⣿
@@ -56,9 +58,16 @@ local function set_float_highlights()
 	vim.api.nvim_set_hl(0, "NormalFloat", { fg = normal.fg, bg = normal.bg })
 	vim.api.nvim_set_hl(0, "FloatBorder", { fg = 0x928374, bg = normal.bg })
 	vim.api.nvim_set_hl(0, "FloatTitle", { fg = 0x928374, bg = normal.bg, bold = true })
-	-- blink.cmp draws into its own groups; align them with the other floats so the
-	-- menu/doc/signature borders are the same grey instead of Pmenu/white. (blink
-	-- sets its groups with default = true, so these explicit links win.)
+	-- Two tiers, by role:
+	--   * Popups that hover over code you're reading (blink completion/doc/signature,
+	--     hover, dict, diagnostics) get the quiet grey FloatBorder so they don't
+	--     compete with the buffer.
+	--   * Big takeover windows that cover most of the buffer (fzf-lua, lazygit,
+	--     scratch) keep a white border (Normal fg) -- they ARE the focus, and white
+	--     also matches lazygit's own white inner panels. Those are left at their
+	--     plugin defaults (link -> Normal) / set via winhighlight, so nothing to do
+	--     here for them.
+	-- blink sets its groups with default = true, so these explicit links win.
 	vim.api.nvim_set_hl(0, "BlinkCmpMenu", { link = "NormalFloat" })
 	vim.api.nvim_set_hl(0, "BlinkCmpMenuBorder", { link = "FloatBorder" })
 	vim.api.nvim_set_hl(0, "BlinkCmpDocBorder", { link = "FloatBorder" })
@@ -353,6 +362,14 @@ return {
 				},
 				dashboard = {
 					wo = { foldcolumn = "0" },
+				},
+				scratch = {
+					-- Big takeover float -> white border (FloatBorder:Normal),
+					-- matching the fzf-lua/lazygit tier instead of the grey popups.
+					-- Size tracks the shared float_scale so it matches lazygit/terminal.
+					width = layout.float_scale,
+					height = layout.float_scale,
+					wo = { winhighlight = "NormalFloat:Normal,FloatBorder:Normal" },
 				},
 			},
 		},

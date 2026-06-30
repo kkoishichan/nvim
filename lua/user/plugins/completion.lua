@@ -39,6 +39,12 @@ return {
 					border = "rounded",
 				},
 			},
+			cmdline = {
+				completion = {
+					-- Pop the candidate menu automatically while typing `:`, like wildmenu.
+					menu = { auto_show = true },
+				},
+			},
 			sources = {
 				default = { "lazydev", "lsp", "path", "snippets", "buffer" },
 				providers = {

@@ -161,7 +161,7 @@ function M.float()
 		state.float = Terminal():new({
 			count = state.float_count,
 			direction = "float",
-			display_name = "float",
+			display_name = "terminal",
 			float_opts = {
 				border = "rounded",
 				width = float_width,
@@ -172,6 +172,9 @@ function M.float()
 		state.float_count = state.float_count + 1
 	end
 	state.float:toggle(nil, "float")
+	if state.float:is_open() then
+		require("user.core.backdrop").open(state.float.window)
+	end
 end
 
 local function set_terminal_keymaps(term)
@@ -221,6 +224,12 @@ return {
 			persist_size = true,
 			shade_terminals = false,
 			shell = vim.o.shell,
+			-- toggleterm links float FloatBorder/NormalFloat to Normal (white) by
+			-- default; point them at the shared grey floats instead.
+			highlights = {
+				FloatBorder = { link = "FloatBorder" },
+				NormalFloat = { link = "NormalFloat" },
+			},
 			size = bottom_size(),
 			start_in_insert = true,
 			terminal_mappings = false,
