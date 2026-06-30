@@ -80,8 +80,15 @@ return {
 				return available
 			end
 
+			local function is_empty_buffer()
+				local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+				return #lines == 0 or (#lines == 1 and lines[1] == "")
+			end
+
 			local function try_lint()
-				if vim.b.bigfile then
+				-- Skip big files and empty/new buffers: some linters flag an empty
+				-- file (e.g. "missing final newline"), which is just noise.
+				if vim.b.bigfile or is_empty_buffer() then
 					return
 				end
 

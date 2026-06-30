@@ -56,6 +56,13 @@ local function set_float_highlights()
 	vim.api.nvim_set_hl(0, "NormalFloat", { fg = normal.fg, bg = normal.bg })
 	vim.api.nvim_set_hl(0, "FloatBorder", { fg = 0x928374, bg = normal.bg })
 	vim.api.nvim_set_hl(0, "FloatTitle", { fg = 0x928374, bg = normal.bg, bold = true })
+	-- blink.cmp draws into its own groups; align them with the other floats so the
+	-- menu/doc/signature borders are the same grey instead of Pmenu/white. (blink
+	-- sets its groups with default = true, so these explicit links win.)
+	vim.api.nvim_set_hl(0, "BlinkCmpMenu", { link = "NormalFloat" })
+	vim.api.nvim_set_hl(0, "BlinkCmpMenuBorder", { link = "FloatBorder" })
+	vim.api.nvim_set_hl(0, "BlinkCmpDocBorder", { link = "FloatBorder" })
+	vim.api.nvim_set_hl(0, "BlinkCmpSignatureHelpBorder", { link = "FloatBorder" })
 end
 
 local function setup_lsp_progress_notifications(notify)
