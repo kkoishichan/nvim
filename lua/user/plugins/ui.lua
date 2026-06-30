@@ -27,53 +27,6 @@ local function dashboard_header()
 ]]
 end
 
-local function set_notify_highlights()
-	local bg = "#282828"
-	local fg = "#ebdbb2"
-	local colors = {
-		ERROR = { border = "#cc241d", accent = "#fb4934" },
-		WARN = { border = "#d65d0e", accent = "#fabd2f" },
-		INFO = { border = "#689d6a", accent = "#b8bb26" },
-		DEBUG = { border = "#458588", accent = "#83a598" },
-		TRACE = { border = "#b16286", accent = "#d3869b" },
-	}
-
-	vim.api.nvim_set_hl(0, "NotifyBackground", { bg = bg })
-	vim.api.nvim_set_hl(0, "NotifyLogTime", { fg = "#928374" })
-	vim.api.nvim_set_hl(0, "NotifyLogTitle", { fg = "#fabd2f", bold = true })
-
-	for level, color in pairs(colors) do
-		vim.api.nvim_set_hl(0, "Notify" .. level .. "Border", { fg = color.border, bg = bg })
-		vim.api.nvim_set_hl(0, "Notify" .. level .. "Icon", { fg = color.accent, bg = bg, bold = true })
-		vim.api.nvim_set_hl(0, "Notify" .. level .. "Title", { fg = color.accent, bg = bg, bold = true })
-		vim.api.nvim_set_hl(0, "Notify" .. level .. "Body", { fg = fg, bg = bg })
-	end
-end
-
--- Floats use no global border (see winborder in core/options); each window that
--- wants one sets border = "rounded" itself. Make the border share the editor
--- background so it never shows an off-colour ring around the float.
-local function set_float_highlights()
-	local normal = vim.api.nvim_get_hl(0, { name = "Normal" })
-	vim.api.nvim_set_hl(0, "NormalFloat", { fg = normal.fg, bg = normal.bg })
-	vim.api.nvim_set_hl(0, "FloatBorder", { fg = 0x928374, bg = normal.bg })
-	vim.api.nvim_set_hl(0, "FloatTitle", { fg = 0x928374, bg = normal.bg, bold = true })
-	-- Two tiers, by role:
-	--   * Popups that hover over code you're reading (blink completion/doc/signature,
-	--     hover, dict, diagnostics) get the quiet grey FloatBorder so they don't
-	--     compete with the buffer.
-	--   * Big takeover windows that cover most of the buffer (fzf-lua, lazygit,
-	--     scratch) keep a white border (Normal fg) -- they ARE the focus, and white
-	--     also matches lazygit's own white inner panels. Those are left at their
-	--     plugin defaults (link -> Normal) / set via winhighlight, so nothing to do
-	--     here for them.
-	-- blink sets its groups with default = true, so these explicit links win.
-	vim.api.nvim_set_hl(0, "BlinkCmpMenu", { link = "NormalFloat" })
-	vim.api.nvim_set_hl(0, "BlinkCmpMenuBorder", { link = "FloatBorder" })
-	vim.api.nvim_set_hl(0, "BlinkCmpDocBorder", { link = "FloatBorder" })
-	vim.api.nvim_set_hl(0, "BlinkCmpSignatureHelpBorder", { link = "FloatBorder" })
-end
-
 local function setup_lsp_progress_notifications(notify)
 	local spinner = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" }
 	local spinner_interval = 120
@@ -249,6 +202,9 @@ return {
 		},
 	},
 	{
+		-- gruvbox is the default + fallback, so it loads eagerly and hosts the
+		-- theme bootstrap: it registers the theme-following UI highlights and then
+		-- applies the persisted colorscheme (which may lazy-load another theme).
 		"ellisonleao/gruvbox.nvim",
 		name = "gruvbox",
 		lazy = false,
@@ -278,18 +234,22 @@ return {
 		config = function(_, opts)
 			vim.o.background = "dark"
 			require("gruvbox").setup(opts)
-			vim.cmd.colorscheme("gruvbox")
-			vim.api.nvim_set_hl(0, "MatchParen", { bg = "#504945", fg = "#fabd2f", bold = true })
-			set_notify_highlights()
-			set_float_highlights()
-			vim.api.nvim_create_autocmd("ColorScheme", {
-				group = vim.api.nvim_create_augroup("user_notify_highlights", { clear = true }),
-				callback = function()
-					set_notify_highlights()
-					set_float_highlights()
-				end,
-			})
+			require("user.core.ui_highlights").setup()
+			require("user.core.theme").apply_saved()
 		end,
+	},
+	{
+		"folke/tokyonight.nvim",
+		lazy = true,
+		priority = 1000,
+		opts = { style = "night" },
+	},
+	{
+		"catppuccin/nvim",
+		name = "catppuccin",
+		lazy = true,
+		priority = 1000,
+		opts = { flavour = "mocha" },
 	},
 	{
 		"folke/snacks.nvim",
@@ -439,7 +399,7 @@ return {
 			top_down = true,
 		},
 		config = function(_, opts)
-			set_notify_highlights()
+			require("user.core.ui_highlights").apply()
 			local notify = require("notify")
 			notify.setup(opts)
 			local function stable_notify(message, level, notify_opts)
@@ -626,6 +586,18 @@ return {
 				},
 			},
 		},
+		config = function(_, opts)
+			local lualine = require("lualine")
+			lualine.setup(opts)
+			-- theme = "auto" only resolves at setup time, so re-run setup on a
+			-- colorscheme switch to refresh the statusline colours live.
+			vim.api.nvim_create_autocmd("ColorScheme", {
+				group = vim.api.nvim_create_augroup("user_lualine_theme", { clear = true }),
+				callback = function()
+					lualine.setup(opts)
+				end,
+			})
+		end,
 	},
 	{
 		"folke/which-key.nvim",

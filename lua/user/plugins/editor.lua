@@ -134,9 +134,12 @@ return {
 		},
 		config = function(_, opts)
 			require("illuminate").configure(opts)
-			vim.api.nvim_set_hl(0, "IlluminatedWordText", { bg = "#3c3836" })
-			vim.api.nvim_set_hl(0, "IlluminatedWordRead", { bg = "#3c3836" })
-			vim.api.nvim_set_hl(0, "IlluminatedWordWrite", { bg = "#504945", underline = true })
+			require("user.core.highlights").on_colorscheme(function()
+				local p = require("user.core.palette").get()
+				vim.api.nvim_set_hl(0, "IlluminatedWordText", { bg = p.subtle })
+				vim.api.nvim_set_hl(0, "IlluminatedWordRead", { bg = p.subtle })
+				vim.api.nvim_set_hl(0, "IlluminatedWordWrite", { bg = p.strong, underline = true })
+			end)
 		end,
 		keys = {
 			{
@@ -192,8 +195,11 @@ return {
 		},
 		config = function(_, opts)
 			require("treesitter-context").setup(opts)
-			vim.api.nvim_set_hl(0, "TreesitterContext", { bg = "#1d2021" })
-			vim.api.nvim_set_hl(0, "TreesitterContextBottom", { underline = true, sp = "#504945" })
+			require("user.core.highlights").on_colorscheme(function()
+				local p = require("user.core.palette").get()
+				vim.api.nvim_set_hl(0, "TreesitterContext", { bg = p.bg })
+				vim.api.nvim_set_hl(0, "TreesitterContextBottom", { underline = true, sp = p.strong })
+			end)
 		end,
 		keys = {
 			{

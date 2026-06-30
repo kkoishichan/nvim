@@ -93,8 +93,11 @@ return {
 		},
 		config = function(_, opts)
 			require("ufo").setup(opts)
-			vim.api.nvim_set_hl(0, "UfoFoldedEllipsis", { fg = "#928374" })
-			vim.api.nvim_set_hl(0, "UfoCursorFoldedLine", { bg = "#3c3836" })
+			require("user.core.highlights").on_colorscheme(function()
+				local p = require("user.core.palette").get()
+				vim.api.nvim_set_hl(0, "UfoFoldedEllipsis", { fg = p.gray })
+				vim.api.nvim_set_hl(0, "UfoCursorFoldedLine", { bg = p.subtle })
+			end)
 		end,
 	},
 }
