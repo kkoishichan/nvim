@@ -42,6 +42,30 @@ map("n", "]Q", "<cmd>clast<cr>zz", { desc = "Last quickfix item" })
 map("n", "[Q", "<cmd>cfirst<cr>zz", { desc = "First quickfix item" })
 map("n", "]l", "<cmd>lnext<cr>zz", { desc = "Next location item" })
 map("n", "[l", "<cmd>lprev<cr>zz", { desc = "Previous location item" })
+map("n", "]L", "<cmd>llast<cr>zz", { desc = "Last location item" })
+map("n", "[L", "<cmd>lfirst<cr>zz", { desc = "First location item" })
+
+local function toggle_qf(kind)
+	local prefix = kind == "loc" and "l" or "c"
+	for _, win in ipairs(vim.fn.getwininfo()) do
+		local open = kind == "loc" and (win.loclist == 1) or (win.quickfix == 1 and win.loclist == 0)
+		if open then
+			vim.cmd(prefix .. "close")
+			return
+		end
+	end
+	local ok = pcall(vim.cmd, (kind == "loc" and "botright lopen" or "botright copen"))
+	if not ok then
+		vim.notify((kind == "loc" and "Location" or "Quickfix") .. " list is empty", vim.log.levels.INFO)
+	end
+end
+
+map("n", "<leader>xc", function()
+	toggle_qf("qf")
+end, { desc = "Quickfix window" })
+map("n", "<leader>xC", function()
+	toggle_qf("loc")
+end, { desc = "Location window" })
 
 map("t", "<Esc><Esc>", "<C-\\><C-n>", { desc = "Leave terminal mode" })
 
