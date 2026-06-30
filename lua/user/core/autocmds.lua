@@ -40,6 +40,16 @@ vim.api.nvim_create_autocmd("VimResized", {
 	command = "tabdo wincmd =",
 })
 
+-- Native spell only for prose. Code spelling is left to typos-lsp, which has far
+-- fewer false positives on identifiers than the dictionary check.
+vim.api.nvim_create_autocmd("FileType", {
+	group = augroup("prose_spell"),
+	pattern = { "markdown", "text", "tex", "plaintex", "typst", "gitcommit", "rst", "asciidoc" },
+	callback = function()
+		vim.opt_local.spell = true
+	end,
+})
+
 -- External file changes (e.g. an AI agent rewriting files during "vibe coding")
 -- are picked up promptly and reconciled safely. Design:
 --   * Detection is both event-driven (focus / buffer / terminal switches give an

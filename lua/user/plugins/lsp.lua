@@ -21,6 +21,7 @@ local servers = {
 	"taplo",
 	"texlab",
 	"tinymist",
+	"typos_lsp",
 	"verible",
 	"vtsls",
 	"vue_ls",
@@ -303,6 +304,13 @@ return {
 					settings = {
 						lineLength = 100,
 					},
+				},
+			})
+
+			vim.lsp.config("typos_lsp", {
+				init_options = {
+					-- Surface typos quietly; they are hints, not errors.
+					diagnosticSeverity = "Hint",
 				},
 			})
 

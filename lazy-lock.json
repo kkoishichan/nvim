@@ -73,6 +73,7 @@
   "undotree": { "branch": "master", "commit": "6fa6b57cda8459e1e4b2ca34df702f55242f4e4d" },
   "vim-illuminate": { "branch": "master", "commit": "0d1e93684da00ab7c057410fecfc24f434698898" },
   "vim-matchup": { "branch": "master", "commit": "055881643e1b37038a572c883de7b1969716db77" },
+  "vim-translator": { "branch": "master", "commit": "6f0639c6d471a3a90ac19db96e1e379c030f74e3" },
   "vimtex": { "branch": "master", "commit": "5e6a06f5cec5ede3dc6ba045ef6eda13b6dccb1f" },
   "which-key.nvim": { "branch": "main", "commit": "3aab2147e74890957785941f0c1ad87d0a44c15a" }
 }

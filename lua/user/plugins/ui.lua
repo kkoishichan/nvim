@@ -605,6 +605,7 @@ return {
 				{ "<leader>gh", group = "hunk" },
 				{ "<leader>gx", group = "conflict" },
 				{ "<leader>j", group = "job" },
+				{ "<leader>k", group = "translate" },
 				{ "<leader>m", group = "markup" },
 				{ "<leader>r", group = "test" },
 				{ "<leader>s", group = "session" },
