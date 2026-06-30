@@ -48,6 +48,16 @@ local function set_notify_highlights()
 	end
 end
 
+-- Floats use no global border (see winborder in core/options); each window that
+-- wants one sets border = "rounded" itself. Make the border share the editor
+-- background so it never shows an off-colour ring around the float.
+local function set_float_highlights()
+	local normal = vim.api.nvim_get_hl(0, { name = "Normal" })
+	vim.api.nvim_set_hl(0, "NormalFloat", { fg = normal.fg, bg = normal.bg })
+	vim.api.nvim_set_hl(0, "FloatBorder", { fg = 0x928374, bg = normal.bg })
+	vim.api.nvim_set_hl(0, "FloatTitle", { fg = 0x928374, bg = normal.bg, bold = true })
+end
+
 local function setup_lsp_progress_notifications(notify)
 	local spinner = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" }
 	local spinner_interval = 120
@@ -255,9 +265,13 @@ return {
 			vim.cmd.colorscheme("gruvbox")
 			vim.api.nvim_set_hl(0, "MatchParen", { bg = "#504945", fg = "#fabd2f", bold = true })
 			set_notify_highlights()
+			set_float_highlights()
 			vim.api.nvim_create_autocmd("ColorScheme", {
 				group = vim.api.nvim_create_augroup("user_notify_highlights", { clear = true }),
-				callback = set_notify_highlights,
+				callback = function()
+					set_notify_highlights()
+					set_float_highlights()
+				end,
 			})
 		end,
 	},
@@ -592,10 +606,11 @@ return {
 	{
 		"folke/which-key.nvim",
 		event = "VeryLazy",
-		opts = {
-			preset = "modern",
-			delay = 300,
-			spec = {
+		opts = function()
+			-- Register every group label for normal AND visual mode, so the leader
+			-- popup shows names in visual mode too (which-key prunes groups that have
+			-- no mappings in the current mode).
+			local groups = {
 				{ "<leader>b", group = "buffer" },
 				{ "<leader>c", group = "code" },
 				{ "<leader>cp", group = "peek" },
@@ -605,7 +620,6 @@ return {
 				{ "<leader>gh", group = "hunk" },
 				{ "<leader>gx", group = "conflict" },
 				{ "<leader>j", group = "job" },
-				{ "<leader>k", group = "translate" },
 				{ "<leader>m", group = "markup" },
 				{ "<leader>r", group = "test" },
 				{ "<leader>s", group = "session" },
@@ -613,7 +627,15 @@ return {
 				{ "<leader>u", group = "ui" },
 				{ "<leader>v", group = "multicursor" },
 				{ "<leader>x", group = "diagnostics" },
-			},
-		},
+			}
+			for _, g in ipairs(groups) do
+				g.mode = { "n", "x" }
+			end
+			return {
+				preset = "modern",
+				delay = 300,
+				spec = groups,
+			}
+		end,
 	},
 }

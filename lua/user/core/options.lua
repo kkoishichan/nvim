@@ -76,7 +76,6 @@ opt.timeoutlen = 400
 opt.undofile = true
 opt.updatetime = 250
 opt.virtualedit = "block"
-opt.winborder = "rounded"
 opt.wrap = false
 
 opt.fillchars = {

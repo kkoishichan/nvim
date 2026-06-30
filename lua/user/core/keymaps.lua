@@ -20,6 +20,13 @@ map("n", "<C-Down>", "<cmd>resize -2<cr>", { desc = "Decrease height" })
 map("n", "<C-Left>", "<cmd>vertical resize -2<cr>", { desc = "Decrease width" })
 map("n", "<C-Right>", "<cmd>vertical resize +2<cr>", { desc = "Increase width" })
 
+map("n", "<leader>k", function()
+	require("user.core.dict").lookup()
+end, { desc = "Translate" })
+map("x", "<leader>k", function()
+	require("user.core.dict").lookup_visual()
+end, { desc = "Translate" })
+
 map("n", "<leader>gD", "<cmd>DiffDisk<cr>", { desc = "Diff disk" })
 map("n", "<leader>mo", "<cmd>PdfOpen<cr>", { desc = "Open PDF" })
 map("n", "<leader>f.", "<cmd>FileDir<cr>", { desc = "File directory" })

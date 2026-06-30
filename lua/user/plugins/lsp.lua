@@ -71,7 +71,9 @@ local function setup_lsp_keymaps()
 				vim.keymap.set(mode, lhs, rhs, { buffer = bufnr, desc = desc })
 			end
 
-			map("n", "K", vim.lsp.buf.hover, "Hover")
+			map("n", "K", function()
+				vim.lsp.buf.hover({ border = "rounded" })
+			end, "Hover")
 			map("n", "gd", "<cmd>Glance definitions<cr>", "Peek definition")
 			map("n", "gD", "<cmd>Glance declarations<cr>", "Peek declaration")
 			map("n", "gi", "<cmd>Glance implementations<cr>", "Peek implementation")

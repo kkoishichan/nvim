@@ -44,24 +44,6 @@ return {
 		},
 	},
 	{
-		"voldikss/vim-translator",
-		cmd = { "Translate", "TranslateW", "TranslateR", "TranslateX" },
-		init = function()
-			-- Engines that need no API key; auto-detects EN <-> ZH direction.
-			vim.g.translator_default_engines = { "google", "bing" }
-			vim.g.translator_target_lang = "zh"
-			vim.g.translator_window_borderchars = { "─", "│", "─", "│", "╭", "╮", "╯", "╰" }
-		end,
-		keys = {
-			{ "<leader>kt", "<Plug>TranslateW", desc = "Translate popup" },
-			{ "<leader>kt", "<Plug>TranslateWV", mode = "x", desc = "Translate selection popup" },
-			{ "<leader>kr", "<Plug>TranslateR", desc = "Translate replace" },
-			{ "<leader>kr", "<Plug>TranslateRV", mode = "x", desc = "Translate selection replace" },
-			{ "<leader>kc", "<Plug>Translate", desc = "Translate echo" },
-			{ "<leader>kc", "<Plug>TranslateV", mode = "x", desc = "Translate selection echo" },
-		},
-	},
-	{
 		"folke/lazydev.nvim",
 		ft = "lua",
 		cmd = "LazyDev",

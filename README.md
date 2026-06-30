@@ -84,21 +84,21 @@ nvim
 `leader` = `<Space>`，`localleader` = `\`。下面是各组入口，完整列表见
 `:WhichKey` 或下方的 cheatsheet。
 
-| 键 | 作用 |
-| --- | --- |
+| 键                | 作用                                                                |
+| ----------------- | ------------------------------------------------------------------- |
 | `<leader><Space>` | 智能查找（文件 / `` ` ``buffer / `@`符号 / `#`工作区符号 / `:N`行） |
-| `<leader>/` | 全局 grep |
-| `<leader>,` | buffer 列表 |
-| `<leader>:` | 命令历史 |
-| `<leader>?` | 键位 cheatsheet |
-| `<leader>f` | 查找组（files / grep / help / keymaps / oldfiles …） |
-| `<leader>g` | Git 组（commits / status …） |
-| `<leader>e` | neo-tree 文件树 |
-| `<leader>E` | oil 编辑项目目录 |
-| `<leader>o` | 符号大纲（outline） |
-| `<leader>t` | 终端组 |
-| `<leader>j` | 任务组（overseer） |
-| `<leader>u` | UI / toggle 组 |
+| `<leader>/`       | 全局 grep                                                           |
+| `<leader>,`       | buffer 列表                                                         |
+| `<leader>:`       | 命令历史                                                            |
+| `<leader>?`       | 键位 cheatsheet                                                     |
+| `<leader>f`       | 查找组（files / grep / help / keymaps / oldfiles …）                |
+| `<leader>g`       | Git 组（commits / status …）                                        |
+| `<leader>e`       | neo-tree 文件树                                                     |
+| `<leader>E`       | oil 编辑项目目录                                                    |
+| `<leader>o`       | 符号大纲（outline）                                                 |
+| `<leader>t`       | 终端组                                                              |
+| `<leader>j`       | 任务组（overseer）                                                  |
+| `<leader>u`       | UI / toggle 组                                                      |
 
 常用单键 / 其他：
 
@@ -112,41 +112,17 @@ nvim
 
 `toggleterm.nvim` 之上自建的多终端管理：
 
-| 键 | 作用 |
-| --- | --- |
-| `<C-/>` | 切换底部终端 |
-| `<leader>tt` | 切换底部终端 |
-| `<leader>tn` | 新建终端 |
-| `<leader>ts` | 分屏新终端 |
-| `<leader>t]` / `<leader>t[` | 下一个 / 上一个终端 |
-| `<leader>tl` | 选择终端（`:TermSelect`） |
-| `<leader>tk` | 关闭当前终端 |
-| `<leader>tr` | 重命名终端 |
-| `<leader>tf` | 浮动终端 |
+| 键                          | 作用                      |
+| --------------------------- | ------------------------- |
+| `<C-/>`                     | 切换底部终端              |
+| `<leader>tt`                | 切换底部终端              |
+| `<leader>tn`                | 新建终端                  |
+| `<leader>ts`                | 分屏新终端                |
+| `<leader>t]` / `<leader>t[` | 下一个 / 上一个终端       |
+| `<leader>tl`                | 选择终端（`:TermSelect`） |
+| `<leader>tk`                | 关闭当前终端              |
+| `<leader>tr`                | 重命名终端                |
+| `<leader>tf`                | 浮动终端                  |
 
 终端模式内：`<Esc><Esc>` 回到普通模式，`<C-hjkl>` / `<C-方向键>` 切换窗口，
 普通模式 `q` 关闭。
-
-## 语言支持
-
-LSP、formatter、linter、DAP 适配器经由 Mason 安装；已配置：
-
-- Lua（`lazydev` 增强）、Python（`dap-python` / `neotest-python`）
-- Go（`dap-go` / `neotest-golang`）、Rust（`rustaceanvim`）
-- JS/TS（`dap-vscode-js` / `neotest-jest` / `neotest-vitest`）
-- LaTeX（`vimtex`）、Typst（`typst-preview`）、Markdown（`markview` / 预览）
-
-## 值得注意的子系统
-
-- **外部改动处理**：文件在磁盘上被外部修改时自动检测并提示重载。
-- **密钥保护**：对 `.env`、`*.pem`、`*.key`、`*/.ssh/*`、`*/.aws/credentials`、
-  以及含 `secret` / `password` / `credentials` 的路径，自动禁用 `undofile`
-  与 `swapfile`，避免敏感内容落盘。
-- **内联 PDF 预览**：基于 kitty graphics + `pdftoppm`，翻页时预热相邻
-  页面以减少黑屏间隔。
-- **dashboard**：`snacks.nvim` 启动页，自定义 braille 头图与最近文件。
-
-## 致谢
-
-构建于 lazy.nvim 生态及众多优秀社区插件之上 —— folke、stevearc、
-ibhagwan、akinsho、nvim-treesitter、neovim/nvim-lspconfig 等作者，感谢。
