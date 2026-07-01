@@ -224,8 +224,7 @@ return {
 			persist_size = true,
 			shade_terminals = false,
 			shell = vim.o.shell,
-			-- toggleterm links float FloatBorder/NormalFloat to Normal (white) by
-			-- default; point them at the shared grey floats instead.
+			-- Float terminal uses the shared accent FloatBorder like every other float.
 			highlights = {
 				FloatBorder = { link = "FloatBorder" },
 				NormalFloat = { link = "NormalFloat" },

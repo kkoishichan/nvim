@@ -37,22 +37,39 @@ end
 local function set_float_highlights()
 	local p = palette.get()
 	vim.api.nvim_set_hl(0, "NormalFloat", { fg = p.fg, bg = p.bg })
-	vim.api.nvim_set_hl(0, "FloatBorder", { fg = p.gray, bg = p.bg })
-	vim.api.nvim_set_hl(0, "FloatTitle", { fg = p.gray, bg = p.bg, bold = true })
-	-- Two tiers, by role:
-	--   * Popups that hover over code you're reading (blink completion/doc/signature,
-	--     hover, dict, diagnostics) get the quiet grey FloatBorder so they don't
-	--     compete with the buffer.
-	--   * Big takeover windows that cover most of the buffer (fzf-lua, lazygit,
-	--     scratch) keep a white border (Normal fg) -- they ARE the focus, and white
-	--     also matches lazygit's own white inner panels. Those are left at their
-	--     plugin defaults (link -> Normal) / set via winhighlight, so nothing to do
-	--     here for them.
-	-- blink sets its groups with default = true, so these explicit links win.
-	vim.api.nvim_set_hl(0, "BlinkCmpMenu", { link = "NormalFloat" })
-	vim.api.nvim_set_hl(0, "BlinkCmpMenuBorder", { link = "FloatBorder" })
-	vim.api.nvim_set_hl(0, "BlinkCmpDocBorder", { link = "FloatBorder" })
-	vim.api.nvim_set_hl(0, "BlinkCmpSignatureHelpBorder", { link = "FloatBorder" })
+	-- Every float shares one accent border (theme-derived). FloatBorder is the
+	-- single source of truth; plugins that draw into their own groups are linked
+	-- back to it below so nothing escapes the scheme (e.g. tokyonight ships its
+	-- own blue FzfLuaBorder, which we override here).
+	vim.api.nvim_set_hl(0, "FloatBorder", { fg = p.accent, bg = p.bg })
+	vim.api.nvim_set_hl(0, "FloatTitle", { fg = p.accent, bg = p.bg, bold = true })
+	-- blink completion menus are borderless background blocks (border = "padded"),
+	-- not framed floats: lift the bg to Pmenu, blend the padding cells into that
+	-- bg (so no visible ring), and use PmenuSel for a strong selected row. These
+	-- high-frequency popups stay quiet instead of flashing the accent border.
+	-- (blink sets its groups with default = true, so these explicit links win.)
+	-- Borderless background blocks: lift the bg to the theme's Pmenu, blend the
+	-- padding cells into it (no visible ring), and use the theme's native PmenuSel
+	-- for the selected row.
+	vim.api.nvim_set_hl(0, "BlinkCmpMenu", { link = "Pmenu" })
+	vim.api.nvim_set_hl(0, "BlinkCmpMenuBorder", { link = "Pmenu" })
+	vim.api.nvim_set_hl(0, "BlinkCmpMenuSelection", { link = "PmenuSel" })
+	vim.api.nvim_set_hl(0, "BlinkCmpDoc", { link = "Pmenu" })
+	vim.api.nvim_set_hl(0, "BlinkCmpDocBorder", { link = "Pmenu" })
+	-- The detail/docs separator line defaults to NormalFloat (editor bg), so its
+	-- row shows through against the Pmenu doc bg. Match the doc bg, grey line.
+	vim.api.nvim_set_hl(0, "BlinkCmpDocSeparator", { fg = p.gray, bg = vim.api.nvim_get_hl(0, { name = "Pmenu" }).bg })
+	vim.api.nvim_set_hl(0, "BlinkCmpSignatureHelp", { link = "Pmenu" })
+	vim.api.nvim_set_hl(0, "BlinkCmpSignatureHelpBorder", { link = "Pmenu" })
+	-- fzf-lua: override the theme's own FzfLua* border/title onto the shared accent.
+	vim.api.nvim_set_hl(0, "FzfLuaBorder", { link = "FloatBorder" })
+	vim.api.nvim_set_hl(0, "FzfLuaPreviewBorder", { link = "FloatBorder" })
+	vim.api.nvim_set_hl(0, "FzfLuaHelpBorder", { link = "FloatBorder" })
+	vim.api.nvim_set_hl(0, "FzfLuaTitle", { link = "FloatTitle" })
+	vim.api.nvim_set_hl(0, "FzfLuaPreviewTitle", { link = "FloatTitle" })
+	-- lazygit (sets its groups with default = true, so these win).
+	vim.api.nvim_set_hl(0, "LazyGitBorder", { link = "FloatBorder" })
+	vim.api.nvim_set_hl(0, "LazyGitFloat", { link = "NormalFloat" })
 end
 
 ---Apply all theme-derived UI highlights from the current colorscheme.

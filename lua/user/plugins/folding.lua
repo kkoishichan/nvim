@@ -18,11 +18,6 @@ return {
 		},
 		opts = {
 			open_fold_hl_timeout = 150,
-			close_fold_kinds_for_ft = {
-				default = { "imports" },
-				markdown = {},
-				typst = {},
-			},
 			close_fold_current_line_for_ft = {
 				default = false,
 			},
@@ -48,7 +43,10 @@ return {
 					return ""
 				end
 
-				return { "treesitter", "indent" }
+				-- LSP folds by the language's logical regions and keeps the closing
+				-- brace as a structural anchor (IDE convention); treesitter fills in
+				-- until the server attaches or where it has no folding support.
+				return { "lsp", "treesitter" }
 			end,
 		},
 		keys = {

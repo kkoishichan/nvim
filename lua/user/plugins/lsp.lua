@@ -72,7 +72,7 @@ local function setup_lsp_keymaps()
 			end
 
 			map("n", "K", function()
-				vim.lsp.buf.hover({ border = "rounded" })
+				vim.lsp.buf.hover()
 			end, "Hover")
 			map("n", "gd", "<cmd>Glance definitions<cr>", "Peek definition")
 			map("n", "gD", "<cmd>Glance declarations<cr>", "Peek declaration")
@@ -182,6 +182,41 @@ return {
 				label = "Declarations",
 			})
 			glance.setup(opts)
+
+			-- Make the peek panels use the completion menu's Pmenu block colours.
+			-- glance sets its groups with default = true, so these explicit
+			-- overrides win; re-applied on every colorscheme switch.
+			require("user.core.highlights").on_colorscheme(function()
+				local palette = require("user.core.palette")
+				local normal = vim.api.nvim_get_hl(0, { name = "Normal" })
+				local pmenu_bg = vim.api.nvim_get_hl(0, { name = "Pmenu" }).bg
+				local fg = normal.fg
+				local dim = vim.api.nvim_get_hl(0, { name = "Comment" }).fg
+				-- Two shades: the Pmenu block and a step toward the editor bg. Assign
+				-- the darker to the preview and the lighter to the list, so the preview
+				-- is reliably the darker panel whichever way the theme's Pmenu leans
+				-- (gruvbox's Pmenu is lighter than the editor, tokyonight/catppuccin's
+				-- darker -- this picks correctly for each instead of a fixed order).
+				local function lum(c)
+					return 0.299 * (math.floor(c / 65536) % 256)
+						+ 0.587 * (math.floor(c / 256) % 256)
+						+ 0.114 * (c % 256)
+				end
+				local a, b = pmenu_bg, palette.blend(pmenu_bg, normal.bg, 0.5)
+				local list_bg, preview_bg = a, b
+				if lum(a) < lum(b) then
+					list_bg, preview_bg = b, a
+				end
+				vim.api.nvim_set_hl(0, "GlanceListNormal", { fg = fg, bg = list_bg })
+				vim.api.nvim_set_hl(0, "GlancePreviewNormal", { fg = fg, bg = preview_bg })
+				vim.api.nvim_set_hl(0, "GlanceListCursorLine", { link = "PmenuSel" })
+				vim.api.nvim_set_hl(0, "GlancePreviewCursorLine", { link = "PmenuSel" })
+				vim.api.nvim_set_hl(0, "GlanceListEndOfBuffer", { fg = list_bg, bg = list_bg })
+				vim.api.nvim_set_hl(0, "GlancePreviewEndOfBuffer", { fg = preview_bg, bg = preview_bg })
+				vim.api.nvim_set_hl(0, "GlanceWinBarFilename", { fg = fg, bg = list_bg, bold = true })
+				vim.api.nvim_set_hl(0, "GlanceWinBarFilepath", { fg = dim, bg = list_bg })
+				vim.api.nvim_set_hl(0, "GlanceWinBarTitle", { fg = fg, bg = list_bg, bold = true })
+			end)
 		end,
 	},
 	{
@@ -221,6 +256,26 @@ return {
 		},
 		config = function()
 			setup_lsp_keymaps()
+
+			-- Style LSP floating previews (hover, etc.) as borderless background
+			-- blocks, matching the completion docs: a space "border" for padding
+			-- (no lines) plus a Pmenu bg via winhighlight, which open_floating_preview
+			-- doesn't expose an option for -- so wrap it and set it on the window.
+			local orig_preview = vim.lsp.util.open_floating_preview
+			-- Left/right padding only (no lines, no top/bottom rows), like blink's
+			-- "padded" border.
+			local pad = { " ", "", "", " ", "", "", " ", " " }
+			function vim.lsp.util.open_floating_preview(contents, syntax, opts, ...)
+				opts = opts or {}
+				if opts.border == nil then
+					opts.border = pad
+				end
+				local bufnr, winid = orig_preview(contents, syntax, opts, ...)
+				if winid and vim.api.nvim_win_is_valid(winid) then
+					vim.wo[winid].winhighlight = "Normal:Pmenu,NormalFloat:Pmenu,FloatBorder:Pmenu"
+				end
+				return bufnr, winid
+			end
 
 			local capabilities = require("blink.cmp").get_lsp_capabilities()
 			capabilities.textDocument.foldingRange = {

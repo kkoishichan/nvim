@@ -214,13 +214,6 @@ return {
 			undercurl = true,
 			underline = true,
 			bold = true,
-			italic = {
-				strings = false,
-				emphasis = true,
-				comments = true,
-				operators = false,
-				folds = true,
-			},
 			strikethrough = true,
 			invert_selection = false,
 			invert_signs = false,
@@ -324,12 +317,12 @@ return {
 					wo = { foldcolumn = "0" },
 				},
 				scratch = {
-					-- Big takeover float -> white border (FloatBorder:Normal),
-					-- matching the fzf-lua/lazygit tier instead of the grey popups.
+					-- Uses the shared accent FloatBorder like every other float; only
+					-- remap NormalFloat to keep the editor background.
 					-- Size tracks the shared float_scale so it matches lazygit/terminal.
 					width = layout.float_scale,
 					height = layout.float_scale,
-					wo = { winhighlight = "NormalFloat:Normal,FloatBorder:Normal" },
+					wo = { winhighlight = "NormalFloat:Normal" },
 				},
 			},
 		},
@@ -631,6 +624,12 @@ return {
 				preset = "modern",
 				delay = 300,
 				spec = groups,
+				icons = {
+					-- which-key's default Space icon is "󱁐 " -- a glyph followed by a
+					-- trailing space, which makes the leader popup title read as the
+					-- symbol plus a stray space. Use a plain space symbol, no trailing space.
+					keys = { Space = "␣" },
+				},
 			}
 		end,
 	},

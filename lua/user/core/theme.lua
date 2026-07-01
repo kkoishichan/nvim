@@ -20,6 +20,7 @@ M.default = "gruvbox"
 local file = vim.fn.stdpath("state") .. "/theme.txt"
 
 local function save(name)
+	pcall(vim.fn.mkdir, vim.fn.fnamemodify(file, ":h"), "p")
 	pcall(vim.fn.writefile, { name }, file)
 end
 

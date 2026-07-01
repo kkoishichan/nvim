@@ -85,12 +85,14 @@ local function open_float(header, body)
 		width = width,
 		height = height,
 		style = "minimal",
-		border = "rounded",
+		-- Borderless background block on a Pmenu bg, matching the completion docs
+		-- and LSP hover. Left/right padding only (no lines), like blink's "padded".
+		border = { " ", "", "", " ", "", "", " ", " " },
 		focusable = false,
 		noautocmd = true,
 	})
 	vim.wo[win].wrap = true
-	vim.wo[win].winhighlight = "NormalFloat:NormalFloat,FloatBorder:FloatBorder"
+	vim.wo[win].winhighlight = "NormalFloat:Pmenu,FloatBorder:Pmenu"
 
 	state.win = win
 	state.autocmd = vim.api.nvim_create_autocmd(
