@@ -22,7 +22,20 @@ return {
 		config = function(_, opts)
 			local fzf_lua = require("fzf-lua")
 			fzf_lua.setup(opts)
-			fzf_lua.register_ui_select()
+			-- Size vim.ui.select to its contents so a 2-3 option prompt (code
+			-- actions, theme picker, ...) isn't a huge mostly-empty window.
+			fzf_lua.register_ui_select(function(ui_opts, items)
+				local height = math.min(math.max(#items + 4, 6), math.floor(vim.o.lines * 0.8))
+				local width = vim.fn.strdisplaywidth(ui_opts.prompt or "Select one of:")
+				for _, item in ipairs(items) do
+					local label = ui_opts.format_item and ui_opts.format_item(item) or tostring(item)
+					width = math.max(width, vim.fn.strdisplaywidth(label))
+				end
+				width = math.min(math.max(width + 8, 30), math.floor(vim.o.columns * 0.8))
+				return {
+					winopts = { height = height, width = width, row = 0.4, col = 0.5 },
+				}
+			end)
 		end,
 		opts = {
 			defaults = {
