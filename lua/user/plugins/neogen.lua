@@ -9,14 +9,10 @@ return {
 		dependencies = { "nvim-treesitter/nvim-treesitter" },
 		opts = {
 			-- Native vim.snippet expansion -> jumpable <param> placeholders without
-			-- pulling in luasnip (this config completes via blink.cmp).
+			-- pulling in luasnip (this config completes via blink.cmp). Each language
+			-- uses its default convention (doxygen for C/C++, jsdoc/tsdoc, google
+			-- docstrings for Python, emmylua for Lua, rustdoc, ...).
 			snippet_engine = "nvim",
-			languages = {
-				-- Emit Javadoc-style /** @brief ... */ blocks (matches the existing
-				-- headers) rather than Neogen's default /// line comments.
-				c = { template = { annotation_convention = "doxygen" } },
-				cpp = { template = { annotation_convention = "doxygen" } },
-			},
 		},
 		keys = {
 			{
@@ -25,6 +21,13 @@ return {
 					require("neogen").generate()
 				end,
 				desc = "Generate doc comment",
+			},
+			{
+				"<leader>cF",
+				function()
+					require("neogen").generate({ type = "file" })
+				end,
+				desc = "Generate file header",
 			},
 		},
 	},
