@@ -46,7 +46,30 @@ return {
 				-- LSP folds by the language's logical regions and keeps the closing
 				-- brace as a structural anchor (IDE convention); treesitter fills in
 				-- until the server attaches or where it has no folding support.
-				return { "lsp", "treesitter" }
+				--
+				-- Returning a custom function (rather than { "lsp", "treesitter" })
+				-- so we can catch UfoFallbackException at every stage and add a
+				-- never-throwing `indent` terminal. ufo's built-in two-slot chain
+				-- has no catch after the fallback: when the fallback provider itself
+				-- throws (e.g. an oil/acwrite buffer that has neither LSP folding
+				-- nor a treesitter parser), the throw escapes as an unhandled
+				-- promise rejection. This chain resolves to indent folds instead.
+				return function()
+					local ufo = require("ufo")
+					local function fallback(err, next_provider)
+						if type(err) == "string" and err:match("UfoFallbackException") then
+							return ufo.getFolds(bufnr, next_provider)
+						end
+						return require("promise").reject(err)
+					end
+					return ufo.getFolds(bufnr, "lsp")
+						:catch(function(err)
+							return fallback(err, "treesitter")
+						end)
+						:catch(function(err)
+							return fallback(err, "indent")
+						end)
+				end
 			end,
 		},
 		keys = {
