@@ -103,14 +103,6 @@ return {
 					size = { width = 0.40 },
 				},
 				{
-					title = "Gemini",
-					ft = "toggleterm",
-					filter = function(buf)
-						return ai_terminal(buf, "gemini")
-					end,
-					size = { width = 0.40 },
-				},
-				{
 					title = "OpenCode",
 					ft = "toggleterm",
 					filter = function(buf)

@@ -11,12 +11,6 @@ local providers = {
 		plugin = "claudecode.nvim",
 		executable = "claude",
 	},
-	gemini = {
-		label = "Gemini",
-		plugin = "gemini-cli.nvim",
-		command = "gemini",
-		count = 201,
-	},
 	opencode = {
 		label = "OpenCode",
 		plugin = "opencode.nvim",
@@ -26,7 +20,7 @@ local providers = {
 	},
 }
 
-local order = { "codex", "claude", "gemini", "opencode" }
+local order = { "codex", "claude", "opencode" }
 local current = vim.g.user_ai_provider or "codex"
 local chat_open = vim.g.user_ai_chat_open == true
 local chat_provider = vim.g.user_ai_chat_provider
@@ -741,9 +735,6 @@ function M.accept()
 	local id = provider()
 	if id == "claude" then
 		vim.cmd("ClaudeCodeDiffAccept")
-	elseif id == "gemini" then
-		load(providers.gemini.plugin)
-		vim.cmd("GeminiDiffAccept")
 	elseif id == "opencode" and has_buffer_keymap("da") then
 		feed_buffer_keymap("da")
 	else
@@ -755,9 +746,6 @@ function M.deny()
 	local id = provider()
 	if id == "claude" then
 		vim.cmd("ClaudeCodeDiffDeny")
-	elseif id == "gemini" then
-		load(providers.gemini.plugin)
-		vim.cmd("GeminiDiffDeny")
 	elseif id == "opencode" and has_buffer_keymap("dr") then
 		feed_buffer_keymap("dr")
 	else
