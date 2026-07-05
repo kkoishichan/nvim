@@ -22,10 +22,10 @@ map("n", "<C-Right>", "<cmd>vertical resize +2<cr>", { desc = "Increase width" }
 
 map("n", "<leader>k", function()
 	require("user.core.dict").lookup()
-end, { desc = "Translate" })
+end, { desc = "Dictionary" })
 map("x", "<leader>k", function()
 	require("user.core.dict").lookup_visual()
-end, { desc = "Translate" })
+end, { desc = "Dictionary" })
 
 map("n", "<leader>gD", "<cmd>DiffDisk<cr>", { desc = "Diff disk" })
 map("n", "<leader>mo", "<cmd>PdfOpen<cr>", { desc = "Open PDF" })

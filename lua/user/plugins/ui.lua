@@ -372,6 +372,102 @@ return {
 		},
 	},
 	{
+		-- Virtual scrollbar that stripes whole-file markers on the right edge,
+		-- the way a modern IDE does: diagnostics, search hits, marks, TODO/FIXME
+		-- keywords, merge conflicts, and git add/change/delete bars (wired to
+		-- gitsigns below -- scrollview has no built-in git). The scrollbar thumb
+		-- already conveys cursor position, so the `cursor` sign is left off.
+		-- Diagnostic signs default to E/W/I/H already, matching diagnostics.lua.
+		"dstein64/nvim-scrollview",
+		event = { "BufReadPost", "BufNewFile" },
+		cmd = { "ScrollViewToggle", "ScrollViewEnable", "ScrollViewDisable" },
+		dependencies = { "lewis6991/gitsigns.nvim" },
+		opts = {
+			mode = "virtual",
+			winblend = 0,
+			signs_on_startup = { "diagnostics", "search", "marks", "keywords", "conflicts" },
+			excluded_filetypes = {
+				"neo-tree",
+				"oil",
+				"snacks_dashboard",
+				"snacks_picker_input",
+				"snacks_picker_list",
+				"snacks_notif",
+				"notify",
+				"TelescopePrompt",
+				"fzf",
+				"qf",
+				"lazy",
+				"mason",
+				"help",
+				"trouble",
+			},
+		},
+		config = function(_, opts)
+			local scrollview = require("scrollview")
+			scrollview.setup(opts)
+
+			-- Git change bars. scrollview ships no gitsigns integration, so register
+			-- a custom sign group that mirrors gitsigns' hunks as the coloured
+			-- add/change/delete stripes an IDE draws down the scrollbar.
+			local group = "gitsigns"
+			scrollview.register_sign_group(group)
+			local names = {}
+			for kind, spec in pairs({
+				add = { symbol = "│", highlight = "GitSignsAdd" },
+				change = { symbol = "│", highlight = "GitSignsChange" },
+				delete = { symbol = "▁", highlight = "GitSignsDelete" },
+			}) do
+				names[kind] = scrollview.register_sign_spec({
+					group = group,
+					symbol = spec.symbol,
+					highlight = spec.highlight,
+					priority = 60,
+				}).name
+			end
+
+			scrollview.set_sign_group_callback(group, function()
+				local ok, gitsigns = pcall(require, "gitsigns")
+				if not ok then
+					return
+				end
+				for _, winid in ipairs(scrollview.get_sign_eligible_windows()) do
+					local bufnr = vim.api.nvim_win_get_buf(winid)
+					local add, change, delete = {}, {}, {}
+					local hunks = gitsigns.get_hunks(bufnr)
+					for _, hunk in ipairs(hunks or {}) do
+						local start = hunk.added.start
+						if hunk.type == "delete" then
+							delete[#delete + 1] = start
+						else
+							local bucket = hunk.type == "add" and add or change
+							for ln = start, start + math.max(hunk.added.count - 1, 0) do
+								bucket[#bucket + 1] = ln
+							end
+						end
+					end
+					vim.b[bufnr][names.add] = add
+					vim.b[bufnr][names.change] = change
+					vim.b[bufnr][names.delete] = delete
+				end
+			end)
+			scrollview.set_sign_group_state(group, true)
+
+			vim.api.nvim_create_autocmd("User", {
+				pattern = "GitSignsUpdate",
+				group = vim.api.nvim_create_augroup("user_scrollview_git", { clear = true }),
+				callback = function()
+					if scrollview.is_sign_group_active(group) then
+						vim.cmd("silent! ScrollViewRefresh")
+					end
+				end,
+			})
+		end,
+		keys = {
+			{ "<leader>uv", "<cmd>ScrollViewToggle<cr>", desc = "Toggle scrollbar" },
+		},
+	},
+	{
 		"rcarriga/nvim-notify",
 		event = "VeryLazy",
 		cmd = "Notifications",

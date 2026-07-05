@@ -104,51 +104,12 @@ local function open_float(header, body)
 	)
 end
 
--- Online machine translation (auto direction -> Chinese) for phrases/sentences.
-local function translate_online(text, cb)
-	local url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=zh&dt=t"
-	vim.system(
-		{ "curl", "-sG", "--max-time", "8", "--data-urlencode", "q=" .. text, url },
-		{ text = true },
-		function(res)
-			local out
-			if res.code == 0 and res.stdout and res.stdout ~= "" then
-				local ok, decoded = pcall(vim.json.decode, res.stdout)
-				if ok and type(decoded) == "table" and type(decoded[1]) == "table" then
-					local parts = {}
-					for _, seg in ipairs(decoded[1]) do
-						if type(seg) == "table" and seg[1] then
-							parts[#parts + 1] = seg[1]
-						end
-					end
-					out = table.concat(parts)
-				end
-			end
-			vim.schedule(function()
-				cb(out)
-			end)
-		end
-	)
-end
-
----Translate text. A single word hits the offline ECDICT dictionary (instant);
----anything with whitespace (phrase/sentence) goes through online translation.
+---Look up a word in the offline ECDICT dictionary. Purely local (queries the
+---local sqlite database) -- no network, nothing leaves the machine. Multi-word
+---selections have no entry and simply report "No translation".
 function M.lookup(text)
 	text = vim.trim(text or vim.fn.expand("<cword>") or "")
 	if text == "" then
-		return
-	end
-
-	if text:find("%s") then
-		open_float(nil, "翻译中…")
-		translate_online(text, function(result)
-			if result and result ~= "" then
-				open_float(nil, result)
-			else
-				close()
-				vim.notify("Translation failed (offline?): " .. text, vim.log.levels.WARN)
-			end
-		end)
 		return
 	end
 

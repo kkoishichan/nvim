@@ -55,6 +55,47 @@ return {
 		end,
 	},
 	{
+		"saecki/crates.nvim",
+		tag = "stable",
+		event = { "BufRead Cargo.toml" },
+		opts = {
+			completion = {
+				crates = { enabled = true },
+			},
+			-- Expose crates as a fake LSP so blink.cmp picks up version/feature
+			-- completion, hover docs, and code actions through the existing "lsp"
+			-- source -- no blink.compat shim needed.
+			lsp = {
+				enabled = true,
+				actions = true,
+				completion = true,
+				hover = true,
+			},
+		},
+		config = function(_, opts)
+			local crates = require("crates")
+			crates.setup(opts)
+
+			vim.api.nvim_create_autocmd("BufRead", {
+				group = vim.api.nvim_create_augroup("user_crates_keys", { clear = true }),
+				pattern = "Cargo.toml",
+				callback = function(event)
+					local function map(lhs, rhs, desc)
+						vim.keymap.set("n", lhs, rhs, { buffer = event.buf, desc = desc, silent = true })
+					end
+
+					map("<leader>ct", crates.toggle, "Crates toggle")
+					map("<leader>cv", crates.show_versions_popup, "Crate versions")
+					map("<leader>cf", crates.show_features_popup, "Crate features")
+					map("<leader>cd", crates.show_dependencies_popup, "Crate dependencies")
+					map("<leader>cu", crates.update_crate, "Crate update")
+					map("<leader>cU", crates.upgrade_crate, "Crate upgrade")
+					map("<leader>cA", crates.upgrade_all_crates, "Crates upgrade all")
+				end,
+			})
+		end,
+	},
+	{
 		"OXY2DEV/markview.nvim",
 		ft = { "markdown", "quarto", "rmd", "typst", "tex", "plaintex", "latex" },
 		dependencies = { "saghen/blink.cmp" },

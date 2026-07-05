@@ -237,13 +237,14 @@ return {
 			"MasonToolsUpdate",
 			"MasonToolsUpdateSync",
 		},
-		event = "VeryLazy",
+		-- No event/VeryLazy: tool installation is a manual, on-demand step
+		-- (:MasonToolsInstall) rather than part of every startup, so a slow or
+		-- offline network never blocks/backgrounds work at launch.
 		dependencies = { "mason-org/mason.nvim" },
 		opts = {
 			ensure_installed = tools,
 			auto_update = false,
-			run_on_start = true,
-			start_delay = 3000,
+			run_on_start = false,
 		},
 	},
 	{
@@ -260,21 +261,27 @@ return {
 			-- Style LSP floating previews (hover, etc.) as borderless background
 			-- blocks, matching the completion docs: a space "border" for padding
 			-- (no lines) plus a Pmenu bg via winhighlight, which open_floating_preview
-			-- doesn't expose an option for -- so wrap it and set it on the window.
-			local orig_preview = vim.lsp.util.open_floating_preview
-			-- Left/right padding only (no lines, no top/bottom rows), like blink's
-			-- "padded" border.
-			local pad = { " ", "", "", " ", "", "", " ", " " }
-			function vim.lsp.util.open_floating_preview(contents, syntax, opts, ...)
-				opts = opts or {}
-				if opts.border == nil then
-					opts.border = pad
+			-- doesn't expose an option for -- so wrap the (public) API and set it on
+			-- the window. Guarded by a global flag so re-running this config (e.g.
+			-- :Lazy reload) wraps exactly once instead of stacking wrappers, which
+			-- would otherwise compound the padding on every reload.
+			if not vim.g.user_lsp_preview_patched then
+				vim.g.user_lsp_preview_patched = true
+				local orig_preview = vim.lsp.util.open_floating_preview
+				-- Left/right padding only (no lines, no top/bottom rows), like blink's
+				-- "padded" border.
+				local pad = { " ", "", "", " ", "", "", " ", " " }
+				function vim.lsp.util.open_floating_preview(contents, syntax, opts, ...)
+					opts = opts or {}
+					if opts.border == nil then
+						opts.border = pad
+					end
+					local bufnr, winid = orig_preview(contents, syntax, opts, ...)
+					if winid and vim.api.nvim_win_is_valid(winid) then
+						vim.wo[winid].winhighlight = "Normal:Pmenu,NormalFloat:Pmenu,FloatBorder:Pmenu"
+					end
+					return bufnr, winid
 				end
-				local bufnr, winid = orig_preview(contents, syntax, opts, ...)
-				if winid and vim.api.nvim_win_is_valid(winid) then
-					vim.wo[winid].winhighlight = "Normal:Pmenu,NormalFloat:Pmenu,FloatBorder:Pmenu"
-				end
-				return bufnr, winid
 			end
 
 			local capabilities = require("blink.cmp").get_lsp_capabilities()

@@ -249,6 +249,9 @@ return {
 			})
 			require("mini.pairs").setup()
 			require("mini.surround").setup()
+			-- gaip= aligns a paragraph on "=", gA opens the interactive
+			-- preview (pick delimiter, justification, etc.).
+			require("mini.align").setup()
 		end,
 	},
 	{

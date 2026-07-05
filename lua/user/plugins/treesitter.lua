@@ -108,11 +108,17 @@ return {
 	{
 		"nvim-treesitter/nvim-treesitter",
 		branch = "main",
-		event = { "BufReadPre", "BufNewFile" },
+		-- The main branch does not support lazy-loading (per its README): load at
+		-- startup so parsers and queries never desync from the plugin version.
+		lazy = false,
 		build = function()
 			local treesitter = require("nvim-treesitter")
 			treesitter.setup({ install_dir = install_dir })
-			treesitter.install(languages):wait(300000)
+			-- update() force-(re)installs the given list: installs anything missing
+			-- on a fresh machine AND refreshes already-installed parsers on a plugin
+			-- bump. Plain install() skips parsers that already exist, so it would
+			-- never update them -- that was the stale-parser risk.
+			treesitter.update(languages):wait(300000)
 		end,
 		opts = {
 			install_dir = install_dir,

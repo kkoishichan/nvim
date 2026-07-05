@@ -139,7 +139,10 @@ return {
 		},
 		opts = {
 			outline_window = {
-				position = "right",
+				-- Docked on the left below the file tree (edgy stacks them), the
+				-- way JetBrains keeps Structure and VSCode keeps Outline in the
+				-- explorer sidebar. edgy governs the final width/height.
+				position = "left",
 				width = 25,
 				relative_width = true,
 				auto_close = false,

@@ -134,15 +134,44 @@ return {
 				handlers = {},
 			})
 
+			-- Mason installs adapters asynchronously; if a session starts before the
+			-- binary exists (first run, install pending, or offline) surface a clear
+			-- notification instead of a cryptic adapter failure. Checked at launch
+			-- (function adapter), so there are no false alarms while mason is still
+			-- installing during startup.
+			local function mason_bin(name)
+				return vim.fn.stdpath("data") .. "/mason/bin/" .. name
+			end
+			local function ensure_executable(path, label)
+				if vim.fn.executable(path) == 1 then
+					return true
+				end
+				vim.notify(
+					("DAP adapter %q not found at:\n%s\nInstall it with :MasonToolsInstall (or :Mason)."):format(
+						label,
+						path
+					),
+					vim.log.levels.ERROR,
+					{ title = "DAP" }
+				)
+				return false
+			end
+
 			-- codelldb adapter (path provided by mason).
-			dap.adapters.codelldb = {
-				type = "server",
-				port = "${port}",
-				executable = {
-					command = vim.fn.stdpath("data") .. "/mason/bin/codelldb",
-					args = { "--port", "${port}" },
-				},
-			}
+			dap.adapters.codelldb = function(callback, _)
+				local cmd = mason_bin("codelldb")
+				if not ensure_executable(cmd, "codelldb") then
+					return
+				end
+				callback({
+					type = "server",
+					port = "${port}",
+					executable = {
+						command = cmd,
+						args = { "--port", "${port}" },
+					},
+				})
+			end
 
 			local cpp = {
 				{

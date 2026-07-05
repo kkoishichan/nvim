@@ -30,8 +30,12 @@ vim.api.nvim_create_autocmd({ "BufReadPre", "BufNewFile" }, {
 		"*credentials*",
 	},
 	callback = function()
+		-- Keep the secret file's contents from lingering: no undofile/swapfile on
+		-- disk, and no in-memory undo history to hold the plaintext either. All
+		-- buffer-local -- scoped to this buffer, nothing session-wide.
 		vim.opt_local.undofile = false
 		vim.opt_local.swapfile = false
+		vim.opt_local.undolevels = -1
 	end,
 })
 

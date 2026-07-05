@@ -76,11 +76,14 @@ return {
 				},
 			},
 			files = {
+				-- Respect .gitignore by default so file search never surfaces
+				-- secrets (.env), credentials, or build/vendor dirs. `hidden`
+				-- still shows non-ignored dotfiles (.github, .config, ...). Use
+				-- <leader>fF ("find all") to include ignored files on demand.
 				hidden = true,
 				follow = false,
-				no_ignore = true,
-				fd_opts = "--color=never --type f --type l --hidden --no-ignore --exclude .git --exclude .jj",
-				rg_opts = '--color=never --files --hidden --no-ignore -g "!.git" -g "!.jj"',
+				fd_opts = "--color=never --type f --type l --hidden --exclude .git --exclude .jj",
+				rg_opts = '--color=never --files --hidden -g "!.git" -g "!.jj"',
 			},
 			grep = {
 				rg_opts = table.concat({
@@ -154,6 +157,14 @@ return {
 					fzf().files()
 				end,
 				desc = "Find files",
+			},
+			{
+				"<leader>fF",
+				function()
+					-- Escape hatch: include .gitignored files (secrets, build, vendor).
+					fzf().files({ no_ignore = true, hidden = true })
+				end,
+				desc = "Find all files (incl. ignored)",
 			},
 			{
 				"<leader>fg",
