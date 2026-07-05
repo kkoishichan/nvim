@@ -696,6 +696,7 @@ return {
 			-- popup shows names in visual mode too (which-key prunes groups that have
 			-- no mappings in the current mode).
 			local groups = {
+				{ "<leader>a", group = "ai" },
 				{ "<leader>b", group = "buffer" },
 				{ "<leader>c", group = "code" },
 				{ "<leader>cp", group = "peek" },
