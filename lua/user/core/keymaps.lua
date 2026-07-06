@@ -76,6 +76,27 @@ end, { desc = "Location window" })
 
 map("t", "<Esc><Esc>", "<C-\\><C-n>", { desc = "Leave terminal mode" })
 
+local function open_external_terminal(dir)
+	-- Spawn a detached external terminal (kitty by default) at `dir`.
+	local term = (vim.env.TERMINAL and vim.env.TERMINAL ~= "") and vim.env.TERMINAL or "kitty"
+	if vim.fn.executable(term) == 0 then
+		vim.notify("Terminal not found: " .. term, vim.log.levels.ERROR)
+		return
+	end
+	vim.fn.jobstart({ term, "--directory", dir }, { detach = true })
+end
+
+map("n", "<leader>te", function()
+	-- Current file's directory, falling back to cwd for unnamed/scratch buffers.
+	local file = vim.api.nvim_buf_get_name(0)
+	local dir = (file ~= "" and vim.fn.filereadable(file) == 1) and vim.fn.fnamemodify(file, ":p:h") or vim.fn.getcwd()
+	open_external_terminal(dir)
+end, { desc = "External terminal here" })
+
+map("n", "<leader>tE", function()
+	open_external_terminal(vim.fn.getcwd())
+end, { desc = "External terminal cwd" })
+
 map("n", "<leader>ul", function()
 	vim.opt.relativenumber = not vim.opt.relativenumber:get()
 end, { desc = "Toggle relative line numbers" })

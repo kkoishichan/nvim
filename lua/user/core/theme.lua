@@ -13,9 +13,14 @@ M.themes = {
 	catppuccin = { plugin = "catppuccin", colorscheme = "catppuccin" },
 }
 
--- Display order in the picker.
-M.order = { "gruvbox", "tokyonight", "catppuccin" }
-M.default = "gruvbox"
+M.default = "catppuccin"
+
+-- Theme names sorted alphabetically, for the picker.
+local function sorted_names()
+	local names = vim.tbl_keys(M.themes)
+	table.sort(names)
+	return names
+end
 
 local file = vim.fn.stdpath("state") .. "/theme.txt"
 
@@ -59,7 +64,7 @@ end
 
 ---Pick a theme interactively and persist the choice.
 function M.pick()
-	vim.ui.select(M.order, {
+	vim.ui.select(sorted_names(), {
 		prompt = "Colorscheme",
 		format_item = function(name)
 			-- Prefix match: catppuccin reports colors_name as "catppuccin-mocha".
