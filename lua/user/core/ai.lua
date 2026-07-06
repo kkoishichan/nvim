@@ -22,7 +22,7 @@ local providers = {
 	},
 }
 
-local order = { "codex", "claude", "opencode" }
+local order = { "claude", "codex", "opencode" }
 
 -- Persist the picked provider across restarts (same pattern as core/theme.lua:
 -- a one-line state file). vim.g still wins within a running session.
