@@ -170,11 +170,23 @@ local function terminal_visible(term)
 	return type(winid) == "number" and vim.api.nvim_win_is_valid(winid)
 end
 
+-- Windows across every tabpage, not just the current one: chat detection must
+-- see a panel even when it lives on another tab.
+local function all_windows()
+	local wins = {}
+	for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
+		for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(tab)) do
+			wins[#wins + 1] = winid
+		end
+	end
+	return wins
+end
+
 local function visible_buffer(bufnr)
 	if type(bufnr) ~= "number" or not vim.api.nvim_buf_is_valid(bufnr) then
 		return false
 	end
-	for _, winid in ipairs(vim.api.nvim_list_wins()) do
+	for _, winid in ipairs(all_windows()) do
 		if vim.api.nvim_win_is_valid(winid) and vim.api.nvim_win_get_buf(winid) == bufnr then
 			return true
 		end
@@ -221,7 +233,7 @@ local function terminal_command(bufnr)
 end
 
 local function visible_command(cmd)
-	for _, winid in ipairs(vim.api.nvim_list_wins()) do
+	for _, winid in ipairs(all_windows()) do
 		if vim.api.nvim_win_is_valid(winid) then
 			local bufnr = vim.api.nvim_win_get_buf(winid)
 			if command_matches(terminal_command(bufnr), cmd) then
@@ -230,6 +242,40 @@ local function visible_command(cmd)
 		end
 	end
 	return false
+end
+
+-- Channel of a live terminal buffer running this provider's CLI, if any (used
+-- to send an interrupt to terminal-backed agents like Codex).
+local function provider_terminal_channel(id)
+	local p = providers[id]
+	local cmd = p and (p.command or p.executable)
+	if not cmd then
+		return nil
+	end
+	for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+		if vim.api.nvim_buf_is_valid(bufnr) and command_matches(terminal_command(bufnr), cmd) then
+			local ok, chan = pcall(vim.api.nvim_get_option_value, "channel", { buf = bufnr })
+			if ok and type(chan) == "number" and chan > 0 then
+				return chan
+			end
+		end
+	end
+	return nil
+end
+
+-- Best-effort interrupt of a provider's in-flight generation, so switching away
+-- does not leave the previous agent working in the background.
+local function stop_generation(id)
+	if id == "claude" then
+		pcall(vim.cmd, "ClaudeCodeStop")
+	elseif id == "opencode" then
+		opencode_command("session.interrupt")
+	elseif id == "codex" then
+		local chan = provider_terminal_channel(id)
+		if chan then
+			pcall(vim.api.nvim_chan_send, chan, "\003")
+		end
+	end
 end
 
 local function cli_term(id)
@@ -592,14 +638,22 @@ function M.pick()
 
 		if open_provider and id ~= open_provider then
 			local previous = current
+			-- Stop the outgoing agent's in-flight work, then close its panel
+			-- before opening the new one so only one panel exists at a time.
+			stop_generation(open_provider)
+			close_chat(open_provider)
+			if provider_chat_visible(open_provider) then
+				notify(("Could not close %s panel"):format(providers[open_provider].label), vim.log.levels.WARN)
+			end
+			set_chat_state(false)
 			if not open_chat(id, true) then
+				-- Reopen the previous agent so a failed switch is atomic.
 				current = previous
 				vim.g.user_ai_provider = previous
-				set_chat_state(true, open_provider)
+				open_chat(open_provider, true)
 				notify(("Could not switch to %s"):format(providers[id].label), vim.log.levels.ERROR)
 				return
 			end
-			close_chat(open_provider)
 		end
 
 		current = id
@@ -613,19 +667,17 @@ function M.pick()
 end
 
 function M.toggle()
-	local id = provider()
-	local was_open = route_chat_visible(id)
-	local ok = true
-	if id == "codex" then
-		ok = pcall(vim.cmd, "Codex")
-	elseif id == "claude" then
-		ok = pcall(vim.cmd, "ClaudeCode")
-	elseif is_cli(id) then
-		ok = cli_terminal(id, false) ~= nil
+	-- Close whichever panel is actually visible (even if it is not `current`)
+	-- rather than blindly toggling `current` and stacking a second panel.
+	local visible = active_chat_provider()
+	if visible then
+		close_chat(visible)
+		if not provider_chat_visible(visible) then
+			set_chat_state(false)
+		end
+		return
 	end
-	if ok then
-		set_chat_state(not was_open, id)
-	end
+	open_chat(provider(), false)
 end
 
 function M.focus()
