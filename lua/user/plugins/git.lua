@@ -151,7 +151,7 @@ return {
 				map("n", "[h", function()
 					gs.nav_hunk("prev")
 				end, "Previous hunk")
-				map("n", "<leader>ghs", gs.stage_hunk, "Stage hunk")
+				map("n", "<leader>ghs", gs.stage_hunk, "Stage/unstage hunk")
 				map("n", "<leader>ghr", gs.reset_hunk, "Reset hunk")
 				map("v", "<leader>ghs", function()
 					gs.stage_hunk({ vim.fn.line("."), vim.fn.line("v") })
@@ -160,7 +160,7 @@ return {
 					gs.reset_hunk({ vim.fn.line("."), vim.fn.line("v") })
 				end, "Reset hunk")
 				map("n", "<leader>ghS", gs.stage_buffer, "Stage buffer")
-				map("n", "<leader>ghu", gs.undo_stage_hunk, "Undo stage hunk")
+				-- No undo_stage_hunk map: deprecated upstream; stage_hunk toggles.
 				map("n", "<leader>ghp", gs.preview_hunk, "Preview hunk")
 				map("n", "<leader>ghb", function()
 					gs.blame_line({ full = true })

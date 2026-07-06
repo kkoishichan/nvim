@@ -62,7 +62,8 @@ function M.pick()
 	vim.ui.select(M.order, {
 		prompt = "Colorscheme",
 		format_item = function(name)
-			local active = M.themes[name].colorscheme == vim.g.colors_name
+			-- Prefix match: catppuccin reports colors_name as "catppuccin-mocha".
+			local active = vim.startswith(vim.g.colors_name or "", M.themes[name].colorscheme)
 			return active and (name .. "  (current)") or name
 		end,
 	}, function(choice)

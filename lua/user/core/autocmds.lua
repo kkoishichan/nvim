@@ -7,7 +7,7 @@ require("user.core.pdf")
 vim.api.nvim_create_autocmd("TextYankPost", {
 	group = augroup("highlight_yank"),
 	callback = function()
-		vim.highlight.on_yank({ timeout = 180 })
+		vim.hl.on_yank({ timeout = 180 })
 	end,
 })
 
@@ -96,11 +96,17 @@ vim.api.nvim_create_autocmd("FocusGained", {
 	end,
 })
 
+-- 5s: the poll is only a fallback for "focused but idle" -- any interaction
+-- (focus/buffer/terminal switch) already triggers an instant event-driven
+-- check above, so a shorter interval buys nothing perceptible while costing
+-- constant wakeups (each tick stats every loaded buffer).
+local poll_interval_ms = 5000
+
 local poll_timer = vim.uv.new_timer()
 if poll_timer then
 	poll_timer:start(
-		2000,
-		2000,
+		poll_interval_ms,
+		poll_interval_ms,
 		vim.schedule_wrap(function()
 			if poll_focused then
 				check_external_changes()
@@ -216,8 +222,9 @@ vim.api.nvim_create_autocmd("FileType", {
 -- not a reader: image.nvim's inline rendering flickers ("black flash") on page
 -- and zoom changes because it clears and redraws across redraw ticks. That is
 -- accepted here. For real reading use the external viewer (o / <leader>mo /
--- :PdfOpen -> zathura). No prefetch: warming the cache does not shorten the
--- flash, so pages are rendered on demand only.
+-- :PdfOpen -> zathura). Adjacent pages are prefetched into the PNG cache
+-- after each render so page flips skip the pdftoppm wait -- the prefetch does
+-- not shorten image.nvim's redraw flash, only the conversion delay.
 local pdf_base_dpi = 144
 local pdf_min_zoom = 50
 local pdf_max_zoom = 300
@@ -735,7 +742,8 @@ local function setup_pdf_preview_keymaps(bufnr, file)
 			pan(0, pan_columns)
 		end, "Pan PDF right")
 	end
-	for _, lhs in ipairs({ "<PageDown>", "<Space>" }) do
+	-- No <Space> here: it is the global leader and must stay usable in this buffer.
+	for _, lhs in ipairs({ "<PageDown>" }) do
 		map(lhs, function()
 			pan(math.max(1, math.floor(vim.api.nvim_win_get_height(0) / 2)), 0)
 		end, "Scroll PDF down")

@@ -326,10 +326,6 @@ return {
 				},
 			},
 		},
-		config = function(_, opts)
-			require("snacks").setup(opts)
-			Snacks.input.enable()
-		end,
 		keys = {
 			{
 				"<leader>.",

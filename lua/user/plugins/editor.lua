@@ -210,7 +210,12 @@ return {
 			{
 				"[c",
 				function()
-					require("treesitter-context").go_to_context(vim.v.count1)
+					-- In a diff window keep the built-in "previous change" jump.
+					if vim.wo.diff then
+						vim.cmd.normal({ "[c", bang = true })
+					else
+						require("treesitter-context").go_to_context(vim.v.count1)
+					end
 				end,
 				desc = "Goto sticky context",
 			},

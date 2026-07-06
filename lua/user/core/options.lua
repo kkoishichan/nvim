@@ -9,9 +9,6 @@ vim.filetype.add({
 	},
 })
 
-vim.cmd("filetype plugin indent on")
-vim.cmd("syntax enable")
-
 local mason_bin = vim.fn.stdpath("data") .. "/mason/bin"
 local path_sep = vim.fn.has("win32") == 1 and ";" or ":"
 local path = vim.env.PATH or ""
@@ -60,7 +57,6 @@ opt.shiftround = true
 opt.shiftwidth = 2
 opt.shortmess:append({ W = true, I = true, c = true, C = true })
 opt.showmode = false
-opt.showtabline = 2
 opt.sidescrolloff = 8
 opt.signcolumn = "yes"
 opt.smartcase = true

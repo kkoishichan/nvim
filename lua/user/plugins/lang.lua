@@ -84,13 +84,15 @@ return {
 						vim.keymap.set("n", lhs, rhs, { buffer = event.buf, desc = desc, silent = true })
 					end
 
-					map("<leader>ct", crates.toggle, "Crates toggle")
-					map("<leader>cv", crates.show_versions_popup, "Crate versions")
-					map("<leader>cf", crates.show_features_popup, "Crate features")
-					map("<leader>cd", crates.show_dependencies_popup, "Crate dependencies")
-					map("<leader>cu", crates.update_crate, "Crate update")
-					map("<leader>cU", crates.upgrade_crate, "Crate upgrade")
-					map("<leader>cA", crates.upgrade_all_crates, "Crates upgrade all")
+					-- localleader: buffer-local crate actions must not shadow the global
+					-- <leader>c code maps (<leader>cf Format, <leader>cd diagnostics, ...).
+					map("<localleader>t", crates.toggle, "Crates toggle")
+					map("<localleader>v", crates.show_versions_popup, "Crate versions")
+					map("<localleader>f", crates.show_features_popup, "Crate features")
+					map("<localleader>d", crates.show_dependencies_popup, "Crate dependencies")
+					map("<localleader>u", crates.update_crate, "Crate update")
+					map("<localleader>U", crates.upgrade_crate, "Crate upgrade")
+					map("<localleader>A", crates.upgrade_all_crates, "Crates upgrade all")
 				end,
 			})
 		end,

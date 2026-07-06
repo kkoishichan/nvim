@@ -58,7 +58,7 @@ return {
 				verilog = { "verible" },
 				vue = { "prettier" },
 				yaml = { "prettier" },
-				zsh = { "shfmt" },
+				-- No zsh: shfmt parses bash and can mangle zsh-specific syntax.
 			},
 			formatters = {
 				biome = {

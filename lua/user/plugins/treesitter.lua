@@ -89,6 +89,7 @@ local filetypes = {
 	"vue",
 	"verilog",
 	"yaml",
+	"zsh",
 }
 
 local function enable_treesitter(event)
@@ -125,7 +126,8 @@ return {
 		},
 		config = function(_, opts)
 			require("nvim-treesitter").setup(opts)
-			pcall(vim.treesitter.language.register, "bash", { "bash", "sh", "zsh" })
+			-- zsh has its own parser (installed above), so it is not routed to bash.
+			pcall(vim.treesitter.language.register, "bash", { "bash", "sh" })
 			pcall(vim.treesitter.language.register, "asm", "riscv")
 
 			vim.api.nvim_create_autocmd("FileType", {

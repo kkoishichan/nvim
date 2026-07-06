@@ -31,7 +31,7 @@ local function set_notify_highlights()
 	end
 end
 
--- Floats use no global border (see winborder in core/options); each window that
+-- No global 'winborder' is set (floats default to borderless); each window that
 -- wants one sets border = "rounded" itself. Make the border share the editor
 -- background so it never shows an off-colour ring around the float.
 local function set_float_highlights()

@@ -15,13 +15,34 @@ local providers = {
 		label = "OpenCode",
 		plugin = "opencode.nvim",
 		command = "opencode",
-		terminal = "opencode --port",
+		-- --port 0 (the CLI default) = listen on a random port so opencode.nvim
+		-- can attach; explicit because a bare "--port" is ambiguous.
+		terminal = "opencode --port 0",
 		count = 202,
 	},
 }
 
 local order = { "codex", "claude", "opencode" }
-local current = vim.g.user_ai_provider or "codex"
+
+-- Persist the picked provider across restarts (same pattern as core/theme.lua:
+-- a one-line state file). vim.g still wins within a running session.
+local state_file = vim.fn.stdpath("state") .. "/ai-provider.txt"
+
+local function saved_provider()
+	local ok, lines = pcall(vim.fn.readfile, state_file)
+	local name = ok and lines and lines[1]
+	if name and providers[name] then
+		return name
+	end
+	return nil
+end
+
+local function save_provider(name)
+	pcall(vim.fn.mkdir, vim.fn.fnamemodify(state_file, ":h"), "p")
+	pcall(vim.fn.writefile, { name }, state_file)
+end
+
+local current = vim.g.user_ai_provider or saved_provider() or "claude"
 local chat_open = vim.g.user_ai_chat_open == true
 local chat_provider = vim.g.user_ai_chat_provider
 local cli_terms = {}
@@ -37,7 +58,7 @@ local tree_filetypes = {
 
 local function provider()
 	if not providers[current] then
-		current = "codex"
+		current = "claude"
 	end
 	vim.g.user_ai_provider = current
 	return current, providers[current]
@@ -583,6 +604,7 @@ function M.pick()
 
 		current = id
 		vim.g.user_ai_provider = id
+		save_provider(id)
 		notify("Current AI: " .. providers[id].label)
 		if open_provider then
 			set_chat_state(true, id)

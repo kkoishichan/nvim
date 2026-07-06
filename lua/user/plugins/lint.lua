@@ -60,7 +60,7 @@ return {
 				systemverilog = { "verible" },
 				verilog = { "verible" },
 				yaml = { "yamllint" },
-				zsh = { "shellcheck" },
+				-- No zsh: shellcheck only supports sh/bash/dash/ksh.
 			}
 
 			local function available_linters(names)

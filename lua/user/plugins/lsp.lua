@@ -298,10 +298,6 @@ return {
 				filetypes = { "asm", "riscv", "vmasm" },
 			})
 
-			vim.lsp.config("bashls", {
-				filetypes = { "bash", "sh", "zsh" },
-			})
-
 			vim.lsp.config("clangd", {
 				cmd = {
 					"clangd",
