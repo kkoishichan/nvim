@@ -31,7 +31,10 @@ Neovim 打磨成接近 IDE 的日常工作流。
 - `kitty` 终端（内联图片 / PDF 预览基于 kitty graphics）
 - `poppler`（`pdftoppm`，PDF 预览渲染）
 - `lazygit`、`node` + `yarn`（markdown / typst 预览）、`latexmk`、`tinymist`
-- `sqlite3` 与 ECDICT 数据库 `~/.local/share/trans/ultimate.db`（离线词典）
+- `sqlite3` 与 [ECDICT-ultimate](https://github.com/skywind3000/ECDICT-ultimate)
+  数据库 `~/.local/share/trans/ultimate.db`（离线词典）。下载 Release 里的
+  [`ecdict-ultimate-sqlite.zip`](https://github.com/skywind3000/ECDICT-ultimate/releases/download/1.0.0/ecdict-ultimate-sqlite.zip)
+  解压到该目录，或用 `./deploy.sh --dict` 自动安装（解压后约 1.2GB）
 
 语言服务器会在相应文件首次打开时由 Mason 检查安装；formatter / linter 通过
 `:MasonToolsInstall` 按需批量安装，DAP 适配器可用 `:DapInstall` 或 `:Mason` 安装。
@@ -68,9 +71,27 @@ Selene、Stylelint、golangci-lint 仅在项目存在对应配置时运行，避
 │       ├── git.lua  media.lua  lang.lua  tools.lua  performance.lua
 ```
 
+## 部署
+
+新机器上一条命令完成（安装依赖 + 克隆配置 + 无头安装插件）：
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/koishi510/nvim/main/deploy.sh)
+```
+
+或已克隆仓库时直接 `./deploy.sh`。支持 Arch / Debian·Ubuntu / Fedora /
+openSUSE / macOS(Homebrew)；发行版仓库里的 Neovim 过旧时会自动从官方
+Release 安装到 `~/.local`。已有的 `~/.config/nvim` 会先备份为
+`nvim.bak.<时间戳>`；如果它本身就是本仓库则改为 `git pull`。
+
+常用选项：`--ssh`（SSH 克隆）、`--with-extras`（lazygit / node / poppler
+等可选依赖）、`--mason`（批量预装 formatter / linter）、`--dict`（下载
+ECDICT-ultimate 离线词典）、`--no-deps`、`--no-sync`。详见
+`./deploy.sh --help`。
+
 ## 首次启动
 
-把配置放到 `~/.config/nvim`，然后：
+把配置放到 `~/.config/nvim`（或使用上面的 `deploy.sh`），然后：
 
 ```bash
 nvim
