@@ -89,7 +89,7 @@ Selene、Stylelint、golangci-lint 仅在项目存在对应配置时运行，避
 新机器上一条命令完成（安装依赖 + 克隆配置 + 无头安装插件）：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/koishi510/nvim/main/deploy.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/kkoishichan/nvim/main/deploy.sh)
 ```
 
 或已克隆仓库时直接 `./deploy.sh`。支持 Arch / Debian·Ubuntu / Fedora /

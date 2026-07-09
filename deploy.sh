@@ -2,7 +2,7 @@
 # Deploy this Neovim configuration across machines.
 #
 # On a new machine (without cloning the repository first):
-#   bash <(curl -fsSL https://raw.githubusercontent.com/koishi510/nvim/main/deploy.sh)
+#   bash <(curl -fsSL https://raw.githubusercontent.com/kkoishichan/nvim/main/deploy.sh)
 #
 # Or from an existing clone:
 #   ./deploy.sh
@@ -13,8 +13,8 @@
 
 set -euo pipefail
 
-REPO_HTTPS="https://github.com/koishi510/nvim.git"
-REPO_SSH="git@github.com:koishi510/nvim.git"
+REPO_HTTPS="https://github.com/kkoishichan/nvim.git"
+REPO_SSH="git@github.com:kkoishichan/nvim.git"
 NVIM_MIN_MINOR=11 # Require nvim >= 0.11
 
 # Offline dictionary used by lua/user/core/dict.lua. The configuration expects
@@ -216,7 +216,7 @@ deploy_config() {
 		local origin
 		origin=$(git -C "$CONFIG_DIR" remote get-url origin 2>/dev/null || true)
 		case "$origin" in
-		*koishi510/nvim* | "$repo_url")
+		*kkoishichan/nvim* | "$repo_url")
 			info "Existing configuration repository detected; running git pull"
 			git -C "$CONFIG_DIR" pull --ff-only || warn "git pull failed, possibly because of local changes; leaving it unchanged"
 			return
