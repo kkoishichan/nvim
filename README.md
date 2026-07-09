@@ -57,6 +57,7 @@ Selene、Stylelint、golangci-lint 仅在项目存在对应配置时运行，避
 │   │   ├── commands.lua      -- 自定义命令
 │   │   ├── autocmds.lua      -- 自动命令（外部改动 / 密钥保护 / PDF 预览）
 │   │   ├── diagnostics.lua   -- 诊断 UI
+│   │   ├── statuscolumn.lua  -- IDE 风格 gutter 排布
 │   │   ├── layout.lua        -- 窗口布局工具
 │   │   ├── panels.lua        -- 侧边面板尺寸常量
 │   │   └── pdf.lua           -- PDF 预览状态

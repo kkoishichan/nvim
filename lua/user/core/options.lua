@@ -39,7 +39,7 @@ opt.confirm = true
 opt.cursorline = true
 opt.expandtab = true
 opt.foldenable = true
-opt.foldcolumn = "1"
+opt.foldcolumn = "auto:1"
 opt.foldlevel = 99
 opt.foldlevelstart = 99
 opt.foldmethod = "manual"
@@ -62,6 +62,9 @@ opt.shortmess:append({ W = true, I = true, c = true, C = true })
 opt.showmode = false
 opt.sidescrolloff = 8
 opt.signcolumn = "yes"
+-- IDE-like gutter order: action/diagnostic signs, hybrid line number, fold
+-- control, then a dedicated Git change lane directly beside the source text.
+opt.statuscolumn = [[%s%=%l%C%{%v:lua.require("user.core.statuscolumn").git()%}]]
 opt.smartcase = true
 opt.smartindent = true
 opt.spelllang = { "en", "cjk" }
