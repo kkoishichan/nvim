@@ -1,0 +1,24 @@
+-- Neovim 0.12's Lua markdown ftplugin replaces the old normal-mode heading
+-- motions, but not their visual-mode counterparts. The legacy Vimscript maps
+-- are disabled globally to avoid duplicate undo entries during FileType replay,
+-- so restore visual selection-to-heading with the modern Tree-sitter helper.
+if vim.g.no_markdown_maps ~= 1 then
+	return
+end
+
+local function select_to_heading(count)
+	vim.cmd("normal! gv")
+	require("vim.treesitter._headings").jump({ count = count })
+end
+
+vim.keymap.set("x", "]]", function()
+	select_to_heading(1)
+end, { buffer = true, desc = "Select to next heading" })
+
+vim.keymap.set("x", "[[", function()
+	select_to_heading(-1)
+end, { buffer = true, desc = "Select to previous heading" })
+
+vim.b.undo_ftplugin = (vim.b.undo_ftplugin or "")
+	.. "\n lua pcall(vim.keymap.del, 'x', ']]', { buffer = true });"
+	.. " pcall(vim.keymap.del, 'x', '[[', { buffer = true })"

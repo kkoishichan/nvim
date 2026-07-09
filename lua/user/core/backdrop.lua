@@ -5,7 +5,15 @@
 
 local M = {}
 
-vim.api.nvim_set_hl(0, "UserBackdrop", { bg = "#000000" })
+local function define_highlight()
+	vim.api.nvim_set_hl(0, "UserBackdrop", { bg = "#000000" })
+end
+
+define_highlight()
+vim.api.nvim_create_autocmd("ColorScheme", {
+	group = vim.api.nvim_create_augroup("user_backdrop_highlight", { clear = true }),
+	callback = define_highlight,
+})
 
 ---Open a backdrop behind `target`. It resizes with the editor and closes itself
 ---when `target` is closed, so callers don't have to track it.

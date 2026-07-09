@@ -2,6 +2,79 @@ local augroup = function(name)
 	return vim.api.nvim_create_augroup("user_" .. name, { clear = true })
 end
 
+-- Keep libuv resources owned by this module in a persistent lifecycle object.
+-- Sourcing the module again first tears down the previous generation, instead
+-- of leaving poll timers and file watchers alive with stale Lua closures.
+local lifecycle_key = "_user_core_autocmds_lifecycle"
+local previous_lifecycle = rawget(vim, lifecycle_key)
+if type(previous_lifecycle) == "table" and type(previous_lifecycle.cleanup) == "function" then
+	pcall(previous_lifecycle.cleanup)
+end
+
+local lifecycle = {
+	closed = false,
+	cleanup_callbacks = {},
+	handles = {},
+}
+rawset(vim, lifecycle_key, lifecycle)
+
+local function close_uv_handle(handle)
+	if not handle then
+		return
+	end
+	pcall(function()
+		handle:stop()
+	end)
+	local ok, closing = pcall(function()
+		return handle:is_closing()
+	end)
+	if not ok or not closing then
+		pcall(function()
+			handle:close()
+		end)
+	end
+end
+
+local function track_uv_handle(handle)
+	if handle then
+		lifecycle.handles[handle] = true
+	end
+	return handle
+end
+
+local function release_uv_handle(handle)
+	close_uv_handle(handle)
+	lifecycle.handles[handle] = nil
+end
+
+local function add_cleanup(callback)
+	table.insert(lifecycle.cleanup_callbacks, callback)
+end
+
+local function cleanup_lifecycle()
+	if lifecycle.closed then
+		return
+	end
+	lifecycle.closed = true
+
+	for index = #lifecycle.cleanup_callbacks, 1, -1 do
+		pcall(lifecycle.cleanup_callbacks[index])
+	end
+	for handle in pairs(lifecycle.handles) do
+		close_uv_handle(handle)
+	end
+	lifecycle.cleanup_callbacks = {}
+	lifecycle.handles = {}
+end
+
+lifecycle.cleanup = cleanup_lifecycle
+
+vim.api.nvim_create_autocmd("VimLeavePre", {
+	group = augroup("lifecycle"),
+	once = true,
+	callback = cleanup_lifecycle,
+})
+
 require("user.core.pdf")
 
 vim.api.nvim_create_autocmd("TextYankPost", {
@@ -39,9 +112,77 @@ vim.api.nvim_create_autocmd({ "BufReadPre", "BufNewFile" }, {
 	end,
 })
 
+local panel_filetypes = {
+	["neo-tree"] = true,
+	Outline = true,
+	OverseerList = true,
+	OverseerOutput = true,
+	qf = true,
+	toggleterm = true,
+	trouble = true,
+}
+
+local function is_fixed_panel(win)
+	local buf = vim.api.nvim_win_get_buf(win)
+	local buftype = vim.bo[buf].buftype
+	local filetype = vim.bo[buf].filetype
+	return vim.wo[win].winfixwidth
+		or vim.wo[win].winfixheight
+		or buftype == "help"
+		or buftype == "prompt"
+		or buftype == "quickfix"
+		or buftype == "terminal"
+		or panel_filetypes[filetype]
+		or filetype:match("^dap") ~= nil
+		or vim.w[win].edgy_width ~= nil
+		or vim.w[win].edgy_height ~= nil
+end
+
+local function equalize_tab_splits(tab)
+	if not vim.api.nvim_tabpage_is_valid(tab) then
+		return
+	end
+
+	local anchor
+	local fixed = {}
+	for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tab)) do
+		if vim.api.nvim_win_get_config(win).relative == "" then
+			anchor = anchor or win
+			if is_fixed_panel(win) then
+				table.insert(fixed, {
+					win = win,
+					width = vim.wo[win].winfixwidth,
+					height = vim.wo[win].winfixheight,
+				})
+				vim.wo[win].winfixwidth = true
+				vim.wo[win].winfixheight = true
+			end
+		end
+	end
+
+	if anchor then
+		-- nvim_win_call enters an inactive tab without changing the user's
+		-- current tab/window after the callback returns.
+		pcall(vim.api.nvim_win_call, anchor, function()
+			vim.cmd("wincmd =")
+		end)
+	end
+
+	for _, item in ipairs(fixed) do
+		if vim.api.nvim_win_is_valid(item.win) then
+			vim.wo[item.win].winfixwidth = item.width
+			vim.wo[item.win].winfixheight = item.height
+		end
+	end
+end
+
 vim.api.nvim_create_autocmd("VimResized", {
 	group = augroup("resize_splits"),
-	command = "tabdo wincmd =",
+	callback = function()
+		for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
+			equalize_tab_splits(tab)
+		end
+	end,
 })
 
 -- Native spell only for prose. Code spelling is left to typos-lsp, which has far
@@ -102,13 +243,13 @@ vim.api.nvim_create_autocmd("FocusGained", {
 -- constant wakeups (each tick stats every loaded buffer).
 local poll_interval_ms = 5000
 
-local poll_timer = vim.uv.new_timer()
+local poll_timer = track_uv_handle(vim.uv.new_timer())
 if poll_timer then
 	poll_timer:start(
 		poll_interval_ms,
 		poll_interval_ms,
 		vim.schedule_wrap(function()
-			if poll_focused then
+			if not lifecycle.closed and poll_focused then
 				check_external_changes()
 			end
 		end)
@@ -146,10 +287,13 @@ vim.api.nvim_create_autocmd("FileChangedShell", {
 -- Coalesce reload notices: a multi-file rewrite becomes a single summary.
 local reloaded = {}
 local reloaded_count = 0
-local notice_timer = vim.uv.new_timer()
+local notice_timer = track_uv_handle(vim.uv.new_timer())
 vim.api.nvim_create_autocmd("FileChangedShellPost", {
 	group = external_changes,
 	callback = function(event)
+		if lifecycle.closed then
+			return
+		end
 		local name = vim.fn.fnamemodify(event.match, ":~:.")
 		if not reloaded[name] then
 			reloaded[name] = true
@@ -164,6 +308,9 @@ vim.api.nvim_create_autocmd("FileChangedShellPost", {
 			250,
 			0,
 			vim.schedule_wrap(function()
+				if lifecycle.closed then
+					return
+				end
 				local first = next(reloaded)
 				local count = reloaded_count
 				reloaded = {}
@@ -218,6 +365,54 @@ vim.api.nvim_create_autocmd("FileType", {
 	end,
 })
 
+-- `.v` is shared by Verilog and the V language. Native content detection gets
+-- non-empty files right, but an initially empty file falls back to V. Mark only
+-- that ambiguous empty-buffer case, then re-run the detector after an insert
+-- session or normal-mode edit. Existing non-empty V files never pay this cost.
+local ambiguous_v_filetype = augroup("ambiguous_v_filetype")
+local function mark_empty_ambiguous_v(bufnr)
+	local name = vim.api.nvim_buf_get_name(bufnr):lower()
+	if
+		name:match("%.v$")
+		and vim.bo[bufnr].filetype == "v"
+		and vim.api.nvim_buf_line_count(bufnr) == 1
+		and vim.api.nvim_buf_get_lines(bufnr, 0, 1, false)[1] == ""
+	then
+		vim.b[bufnr].user_detect_ambiguous_v = true
+	end
+end
+
+vim.api.nvim_create_autocmd("FileType", {
+	group = ambiguous_v_filetype,
+	pattern = "v",
+	callback = function(event)
+		mark_empty_ambiguous_v(event.buf)
+	end,
+})
+for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+	if vim.api.nvim_buf_is_loaded(bufnr) then
+		mark_empty_ambiguous_v(bufnr)
+	end
+end
+vim.api.nvim_create_autocmd({ "InsertLeave", "TextChanged" }, {
+	group = ambiguous_v_filetype,
+	pattern = "*.v",
+	callback = function(event)
+		if not vim.b[event.buf].user_detect_ambiguous_v then
+			return
+		end
+		if vim.bo[event.buf].filetype ~= "v" then
+			vim.b[event.buf].user_detect_ambiguous_v = nil
+			return
+		end
+		local detected = vim.filetype.match({ buf = event.buf })
+		if detected == "verilog" then
+			vim.b[event.buf].user_detect_ambiguous_v = nil
+			vim.bo[event.buf].filetype = detected
+		end
+	end,
+})
+
 -- Quick inline PDF preview via image.nvim. This is a lightweight glance tool,
 -- not a reader: image.nvim's inline rendering flickers ("black flash") on page
 -- and zoom changes because it clears and redraws across redraw ticks. That is
@@ -235,7 +430,24 @@ local pdf_min_scroll_columns = 500
 local active_pdf_preview_images = {}
 local pending_pdf_conversions = {}
 
+local function pdf_buffer_loaded(bufnr)
+	return vim.api.nvim_buf_is_valid(bufnr)
+		and vim.api.nvim_buf_is_loaded(bufnr)
+		and type(vim.b[bufnr].pdf_preview_file) == "string"
+end
+
+local function get_pdf_buffer_var(bufnr, name)
+	if not vim.api.nvim_buf_is_valid(bufnr) then
+		return nil
+	end
+	local ok, value = pcall(vim.api.nvim_buf_get_var, bufnr, name)
+	return ok and value or nil
+end
+
 local function refresh_pdf_statusline()
+	if lifecycle.closed then
+		return
+	end
 	pcall(vim.cmd.redrawstatus)
 
 	local lualine = package.loaded["lualine"]
@@ -254,6 +466,9 @@ local function load_pdf_statusline()
 
 	pdf_lualine_loading = true
 	vim.schedule(function()
+		if lifecycle.closed then
+			return
+		end
 		pcall(function()
 			require("lazy").load({ plugins = { "lualine.nvim" } })
 		end)
@@ -269,6 +484,9 @@ local function load_pdf_image_plugin()
 
 	pdf_image_loading = true
 	vim.schedule(function()
+		if lifecycle.closed then
+			return
+		end
 		pcall(function()
 			require("lazy").load({ plugins = { "image.nvim" } })
 		end)
@@ -346,6 +564,10 @@ local function convert_pdf_preview(file, page, zoom, png, callback, opts)
 		output_base,
 	}, { text = true }, function(result)
 		vim.schedule(function()
+			if lifecycle.closed then
+				pending_pdf_conversions[png] = nil
+				return
+			end
 			local pending = pending_pdf_conversions[png] or { callbacks = {}, notify_on_error = notify_on_error }
 			pending_pdf_conversions[png] = nil
 
@@ -385,9 +607,11 @@ local function clear_pdf_image_set(images, ids)
 end
 
 local function clear_pdf_preview_images(bufnr)
-	clear_pdf_image_set(active_pdf_preview_images[bufnr], vim.b[bufnr].pdf_preview_image_ids)
+	clear_pdf_image_set(active_pdf_preview_images[bufnr], get_pdf_buffer_var(bufnr, "pdf_preview_image_ids"))
 	active_pdf_preview_images[bufnr] = nil
-	vim.b[bufnr].pdf_preview_image_ids = nil
+	if vim.api.nvim_buf_is_valid(bufnr) then
+		pcall(vim.api.nvim_buf_del_var, bufnr, "pdf_preview_image_ids")
+	end
 end
 
 local function pdf_preview_scroll_size()
@@ -452,7 +676,7 @@ end
 -- Warm the cache for the neighbouring pages so flipping has no pdftoppm wait.
 -- Only fills the PNG cache (no draw), deduped via convert_pdf_preview.
 local function prefetch_pdf_adjacent(bufnr, file, page, zoom)
-	if not vim.api.nvim_buf_is_valid(bufnr) then
+	if lifecycle.closed or not pdf_buffer_loaded(bufnr) then
 		return
 	end
 	local pages = tonumber(vim.b[bufnr].pdf_preview_pages)
@@ -468,7 +692,7 @@ end
 
 local function render_pdf_preview(bufnr, opts)
 	opts = opts or {}
-	if not vim.api.nvim_buf_is_valid(bufnr) or #vim.api.nvim_list_uis() == 0 then
+	if lifecycle.closed or not pdf_buffer_loaded(bufnr) or #vim.api.nvim_list_uis() == 0 then
 		return
 	end
 
@@ -501,7 +725,8 @@ local function render_pdf_preview(bufnr, opts)
 	local pages = tonumber(vim.b[bufnr].pdf_preview_pages)
 	convert_pdf_preview(file, page, zoom, png, function(png_file)
 		if
-			not vim.api.nvim_buf_is_valid(bufnr)
+			lifecycle.closed
+			or not pdf_buffer_loaded(bufnr)
 			or vim.b[bufnr].pdf_preview_file ~= file
 			or vim.b[bufnr].pdf_preview_page ~= page
 			or vim.b[bufnr].pdf_preview_zoom ~= zoom
@@ -561,7 +786,8 @@ local function render_pdf_preview(bufnr, opts)
 		refresh_pdf_statusline()
 		vim.defer_fn(function()
 			if
-				vim.api.nvim_buf_is_valid(bufnr)
+				not lifecycle.closed
+				and pdf_buffer_loaded(bufnr)
 				and vim.b[bufnr].pdf_preview_file == file
 				and vim.b[bufnr].pdf_preview_zoom == zoom
 			then
@@ -572,6 +798,9 @@ local function render_pdf_preview(bufnr, opts)
 end
 
 local function request_pdf_page_count(bufnr, file)
+	if lifecycle.closed or not pdf_buffer_loaded(bufnr) then
+		return
+	end
 	vim.b[bufnr].pdf_preview_pages = nil
 	refresh_pdf_statusline()
 
@@ -584,7 +813,8 @@ local function request_pdf_page_count(bufnr, file)
 	vim.system({ "pdfinfo", file }, { text = true }, function(result)
 		vim.schedule(function()
 			if
-				not vim.api.nvim_buf_is_valid(bufnr)
+				lifecycle.closed
+				or not pdf_buffer_loaded(bufnr)
 				or vim.b[bufnr].pdf_preview_file ~= file
 				or vim.b[bufnr].pdf_preview_page_count_token ~= token
 			then
@@ -617,7 +847,7 @@ local function request_pdf_page_count(bufnr, file)
 end
 
 local function set_pdf_page(bufnr, page)
-	if not vim.api.nvim_buf_is_valid(bufnr) then
+	if not pdf_buffer_loaded(bufnr) then
 		return
 	end
 
@@ -631,7 +861,7 @@ local function set_pdf_page(bufnr, page)
 end
 
 local function prompt_pdf_page(bufnr)
-	if not vim.api.nvim_buf_is_valid(bufnr) then
+	if not pdf_buffer_loaded(bufnr) then
 		return
 	end
 
@@ -653,7 +883,7 @@ local function prompt_pdf_page(bufnr)
 end
 
 local function set_pdf_zoom(bufnr, zoom)
-	if not vim.api.nvim_buf_is_valid(bufnr) then
+	if not pdf_buffer_loaded(bufnr) then
 		return
 	end
 
@@ -802,12 +1032,7 @@ local pdf_watch_pending = {}
 local function stop_pdf_watcher(bufnr)
 	local handle = pdf_file_watchers[bufnr]
 	if handle then
-		pcall(function()
-			handle:stop()
-		end)
-		pcall(function()
-			handle:close()
-		end)
+		release_uv_handle(handle)
 		pdf_file_watchers[bufnr] = nil
 	end
 	pdf_watch_pending[bufnr] = nil
@@ -815,15 +1040,18 @@ end
 
 local function watch_pdf_file(bufnr, file)
 	stop_pdf_watcher(bufnr)
+	if lifecycle.closed or not pdf_buffer_loaded(bufnr) then
+		return
+	end
 
-	local handle = vim.uv.new_fs_event()
+	local handle = track_uv_handle(vim.uv.new_fs_event())
 	if not handle then
 		return
 	end
 	pdf_file_watchers[bufnr] = handle
 
 	local function on_change()
-		if not vim.api.nvim_buf_is_valid(bufnr) or vim.b[bufnr].pdf_preview_file ~= file then
+		if lifecycle.closed or not pdf_buffer_loaded(bufnr) or vim.b[bufnr].pdf_preview_file ~= file then
 			stop_pdf_watcher(bufnr)
 			return
 		end
@@ -838,7 +1066,7 @@ local function watch_pdf_file(bufnr, file)
 			file,
 			{},
 			vim.schedule_wrap(function(err)
-				if err then
+				if lifecycle.closed or err then
 					stop_pdf_watcher(bufnr)
 					return
 				end
@@ -849,6 +1077,10 @@ local function watch_pdf_file(bufnr, file)
 				pdf_watch_pending[bufnr] = true
 				vim.defer_fn(function()
 					pdf_watch_pending[bufnr] = nil
+					if lifecycle.closed or not pdf_buffer_loaded(bufnr) then
+						stop_pdf_watcher(bufnr)
+						return
+					end
 					on_change()
 				end, 200)
 			end)
@@ -892,7 +1124,9 @@ vim.api.nvim_create_autocmd("BufReadCmd", {
 		watch_pdf_file(bufnr, file)
 
 		vim.schedule(function()
-			render_pdf_preview(bufnr)
+			if pdf_buffer_loaded(bufnr) then
+				render_pdf_preview(bufnr)
+			end
 		end)
 	end,
 })
@@ -902,9 +1136,11 @@ vim.api.nvim_create_autocmd({ "BufWinEnter", "VimResized" }, {
 	callback = function(event)
 		if event.event == "VimResized" then
 			for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-				if type(vim.b[bufnr].pdf_preview_file) == "string" then
+				if pdf_buffer_loaded(bufnr) then
 					vim.schedule(function()
-						render_pdf_preview(bufnr)
+						if pdf_buffer_loaded(bufnr) then
+							render_pdf_preview(bufnr)
+						end
 					end)
 				end
 			end
@@ -916,18 +1152,56 @@ vim.api.nvim_create_autocmd({ "BufWinEnter", "VimResized" }, {
 			bufnr = vim.api.nvim_get_current_buf()
 		end
 
-		if type(vim.b[bufnr].pdf_preview_file) == "string" then
+		if pdf_buffer_loaded(bufnr) then
 			vim.schedule(function()
-				render_pdf_preview(bufnr)
+				if pdf_buffer_loaded(bufnr) then
+					render_pdf_preview(bufnr)
+				end
 			end)
 		end
 	end,
 })
 
-vim.api.nvim_create_autocmd("BufWipeout", {
+local function cleanup_pdf_buffer(bufnr)
+	clear_pdf_preview_images(bufnr)
+	stop_pdf_watcher(bufnr)
+end
+
+vim.api.nvim_create_autocmd({ "BufUnload", "BufDelete", "BufWipeout" }, {
 	group = augroup("pdf_preview_clear"),
 	callback = function(event)
-		clear_pdf_preview_images(event.buf)
-		stop_pdf_watcher(event.buf)
+		cleanup_pdf_buffer(event.buf)
 	end,
 })
+
+add_cleanup(function()
+	for bufnr in pairs(active_pdf_preview_images) do
+		clear_pdf_preview_images(bufnr)
+	end
+	for bufnr in pairs(pdf_file_watchers) do
+		stop_pdf_watcher(bufnr)
+	end
+	pending_pdf_conversions = {}
+end)
+
+-- Re-sourcing this module deliberately tears down the previous generation's
+-- handles and image objects. Rehydrate any PDF buffers that survived that
+-- cleanup so their keymaps, page count, watcher, and visible preview all point
+-- at the new generation's closures and lifecycle.
+for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+	if pdf_buffer_loaded(bufnr) then
+		local file = vim.b[bufnr].pdf_preview_file
+		load_pdf_statusline()
+		load_pdf_image_plugin()
+		setup_pdf_preview_keymaps(bufnr, file)
+		request_pdf_page_count(bufnr, file)
+		watch_pdf_file(bufnr, file)
+		if #vim.fn.win_findbuf(bufnr) > 0 then
+			vim.schedule(function()
+				if pdf_buffer_loaded(bufnr) then
+					render_pdf_preview(bufnr)
+				end
+			end)
+		end
+	end
+end

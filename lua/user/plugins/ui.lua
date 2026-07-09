@@ -1,4 +1,6 @@
 local layout = require("user.core.layout")
+local theme = require("user.core.theme")
+local active_theme = theme.saved()
 
 local function dashboard_header()
 	return [[
@@ -27,14 +29,65 @@ local function dashboard_header()
 ]]
 end
 
-local function setup_lsp_progress_notifications(notify)
+local function setup_lsp_progress_notifications(notify, dismiss_notifications)
+	local lifecycle_key = "_user_lsp_progress_cleanup"
+	local previous_cleanup = rawget(vim, lifecycle_key)
+	if type(previous_cleanup) == "function" then
+		pcall(previous_cleanup)
+	end
+
 	local spinner = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" }
 	local spinner_interval = 120
 	local frame = 1
 	local progress = {}
 	local records = {}
+	local record_versions = {}
+	local client_names = {}
 	local timer = vim.uv.new_timer()
 	local spinner_running = false
+	local closed = false
+
+	local function cleanup()
+		if closed then
+			return
+		end
+		closed = true
+		spinner_running = false
+		-- nvim-notify only exposes a public all-windows dismiss operation.
+		-- Use it only when this generation still owns a progress notification;
+		-- this prevents timeout=false windows from surviving a plugin reload.
+		local owns_notification = next(records) ~= nil
+		if not owns_notification then
+			for _, items in pairs(progress) do
+				if #items > 0 then
+					owns_notification = true
+					break
+				end
+			end
+		end
+		if owns_notification and dismiss_notifications then
+			pcall(dismiss_notifications)
+		end
+		pcall(function()
+			timer:stop()
+		end)
+		local ok, closing = pcall(function()
+			return timer:is_closing()
+		end)
+		if not ok or not closing then
+			pcall(function()
+				timer:close()
+			end)
+		end
+		progress = {}
+		records = {}
+		record_versions = {}
+		client_names = {}
+		if rawget(vim, lifecycle_key) == cleanup then
+			rawset(vim, lifecycle_key, nil)
+		end
+	end
+	rawset(vim, lifecycle_key, cleanup)
 
 	local function has_active_progress()
 		for _, items in pairs(progress) do
@@ -54,6 +107,9 @@ local function setup_lsp_progress_notifications(notify)
 	end
 
 	local function notify_client_progress(client, items, done_items)
+		if closed then
+			return
+		end
 		local active = #items > 0
 		local message = progress_message(active and items or done_items)
 
@@ -61,23 +117,43 @@ local function setup_lsp_progress_notifications(notify)
 			return
 		end
 
-		records[client.id] = notify(message, vim.log.levels.INFO, {
+		record_versions[client.id] = (record_versions[client.id] or 0) + 1
+		local version = record_versions[client.id]
+		local record
+		record = notify(message, vim.log.levels.INFO, {
 			title = client.name,
 			icon = active and spinner[frame] or " ",
 			replace = records[client.id],
 			timeout = active and false or 1200,
 			hide_from_history = active,
 			animate = records[client.id] == nil,
+			on_close = function()
+				-- Replacement callbacks may arrive after a newer request has
+				-- claimed this client. Clear only this exact record generation.
+				if not closed and record_versions[client.id] == version and records[client.id] == record then
+					records[client.id] = nil
+					record_versions[client.id] = nil
+				end
+			end,
 		})
+		records[client.id] = record
 
 		if not active then
+			-- Keep the completion record around long enough for nvim-notify to
+			-- close it, but do not let an older completion clear a newer request.
 			vim.defer_fn(function()
-				records[client.id] = nil
+				if not closed and record_versions[client.id] == version and records[client.id] == record then
+					records[client.id] = nil
+					record_versions[client.id] = nil
+				end
 			end, 1300)
 		end
 	end
 
 	local function redraw_spinner()
+		if closed then
+			return
+		end
 		frame = frame % #spinner + 1
 
 		for client_id, items in pairs(progress) do
@@ -85,6 +161,15 @@ local function setup_lsp_progress_notifications(notify)
 				local client = vim.lsp.get_client_by_id(client_id)
 				if client then
 					notify_client_progress(client, items, items)
+				else
+					-- A client may exit without sending an `end` event. Finish its
+					-- notification and remove its work so the spinner timer can stop.
+					progress[client_id] = nil
+					notify_client_progress({
+						id = client_id,
+						name = client_names[client_id] or "LSP",
+					}, {}, items)
+					client_names[client_id] = nil
 				end
 			end
 		end
@@ -96,7 +181,7 @@ local function setup_lsp_progress_notifications(notify)
 	end
 
 	local function start_spinner()
-		if spinner_running then
+		if closed or spinner_running then
 			return
 		end
 
@@ -104,8 +189,9 @@ local function setup_lsp_progress_notifications(notify)
 		timer:start(0, spinner_interval, vim.schedule_wrap(redraw_spinner))
 	end
 
+	local progress_group = vim.api.nvim_create_augroup("user_lsp_progress_notify", { clear = true })
 	vim.api.nvim_create_autocmd("LspProgress", {
-		group = vim.api.nvim_create_augroup("user_lsp_progress_notify", { clear = true }),
+		group = progress_group,
 		callback = function(event)
 			local client = vim.lsp.get_client_by_id(event.data.client_id)
 			local params = event.data.params
@@ -113,6 +199,7 @@ local function setup_lsp_progress_notifications(notify)
 			if not client or type(value) ~= "table" then
 				return
 			end
+			client_names[client.id] = client.name
 
 			local client_progress = progress[client.id] or {}
 			progress[client.id] = client_progress
@@ -147,8 +234,11 @@ local function setup_lsp_progress_notifications(notify)
 				end
 			end
 
-			progress[client.id] = active_items
+			progress[client.id] = #active_items > 0 and active_items or nil
 			notify_client_progress(client, active_items, done_items)
+			if #active_items == 0 then
+				client_names[client.id] = nil
+			end
 
 			if has_active_progress() then
 				start_spinner()
@@ -157,6 +247,11 @@ local function setup_lsp_progress_notifications(notify)
 				spinner_running = false
 			end
 		end,
+	})
+	vim.api.nvim_create_autocmd("VimLeavePre", {
+		group = progress_group,
+		once = true,
+		callback = cleanup,
 	})
 end
 
@@ -202,12 +297,9 @@ return {
 		},
 	},
 	{
-		-- gruvbox is the default + fallback, so it loads eagerly and hosts the
-		-- theme bootstrap: it registers the theme-following UI highlights and then
-		-- applies the persisted colorscheme (which may lazy-load another theme).
 		"ellisonleao/gruvbox.nvim",
 		name = "gruvbox",
-		lazy = false,
+		lazy = active_theme ~= "gruvbox",
 		priority = 1001,
 		opts = {
 			terminal_colors = true,
@@ -218,31 +310,36 @@ return {
 			invert_selection = false,
 			invert_signs = false,
 			invert_tabline = false,
-			invert_intend_guides = false,
 			inverse = true,
 			contrast = "hard",
 			dim_inactive = false,
 			transparent_mode = false,
 		},
 		config = function(_, opts)
-			vim.o.background = "dark"
 			require("gruvbox").setup(opts)
-			require("user.core.ui_highlights").setup()
-			require("user.core.theme").apply_saved()
+			theme.bootstrap()
 		end,
 	},
 	{
 		"folke/tokyonight.nvim",
-		lazy = true,
+		lazy = active_theme ~= "tokyonight",
 		priority = 1000,
 		opts = { style = "night" },
+		config = function(_, opts)
+			require("tokyonight").setup(opts)
+			theme.bootstrap()
+		end,
 	},
 	{
 		"catppuccin/nvim",
 		name = "catppuccin",
-		lazy = true,
+		lazy = active_theme ~= "catppuccin",
 		priority = 1000,
 		opts = { flavour = "mocha" },
+		config = function(_, opts)
+			require("catppuccin").setup(opts)
+			theme.bootstrap()
+		end,
 	},
 	{
 		"folke/snacks.nvim",
@@ -472,7 +569,7 @@ return {
 			fps = 60,
 			level = vim.log.levels.INFO,
 			max_width = function()
-				return math.min(math.max(math.floor(vim.o.columns * 0.38), 42), 72)
+				return math.min(math.max(math.floor(vim.o.columns * 0.38), 44), 72)
 			end,
 			max_height = function()
 				return math.min(math.max(math.floor(vim.o.lines * 0.5), 10), 20)
@@ -486,6 +583,13 @@ return {
 		config = function(_, opts)
 			require("user.core.ui_highlights").apply()
 			local notify = require("notify")
+			-- Tear down the previous generation while its nvim-notify service is
+			-- still current. notify.setup() replaces that service, after which its
+			-- timeout=false progress windows could no longer be dismissed publicly.
+			local previous_cleanup = rawget(vim, "_user_lsp_progress_cleanup")
+			if type(previous_cleanup) == "function" then
+				pcall(previous_cleanup)
+			end
 			notify.setup(opts)
 			local function stable_notify(message, level, notify_opts)
 				if notify_opts and notify_opts.replace and notify_opts.animate == nil then
@@ -496,7 +600,9 @@ return {
 			end
 
 			vim.notify = stable_notify
-			setup_lsp_progress_notifications(stable_notify)
+			setup_lsp_progress_notifications(stable_notify, function()
+				notify.dismiss({ pending = true, silent = true })
+			end)
 		end,
 		keys = {
 			{ "<leader>n", "<cmd>Notifications<cr>", desc = "Notifications" },

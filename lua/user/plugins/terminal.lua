@@ -31,19 +31,38 @@ local function Terminal()
 	return require("toggleterm.terminal").Terminal
 end
 
+local function next_available_count(start)
+	local terminals = require("toggleterm.terminal")
+	local count = start
+	while terminals.get(count) do
+		count = count + 1
+	end
+	return count
+end
+
 local function forget(term)
+	local removed
 	for index, t in ipairs(state.bottom) do
 		if t.id == term.id then
 			table.remove(state.bottom, index)
+			removed = index
 			break
 		end
 	end
-	if state.active > #state.bottom then
-		state.active = math.max(1, #state.bottom)
+	if not removed then
+		return
+	end
+	if #state.bottom == 0 then
+		state.active = 1
+	elseif removed < state.active then
+		state.active = state.active - 1
+	elseif removed == state.active then
+		state.active = math.min(removed, #state.bottom)
 	end
 end
 
 local function make_bottom()
+	state.next_count = next_available_count(state.next_count)
 	local term = Terminal():new({
 		count = state.next_count,
 		direction = "horizontal",
@@ -76,7 +95,17 @@ local function close_all()
 	end
 end
 
+local function close_float()
+	if state.float and state.float:is_open() then
+		state.float:close()
+	end
+end
+
 local function show(term, keep_others)
+	-- toggleterm treats every terminal window (including a float) as a split
+	-- anchor. Close our float first so opening a bottom terminal never attempts
+	-- to split the floating window.
+	close_float()
 	if not keep_others then
 		close_all()
 	end
@@ -91,6 +120,11 @@ end
 local M = {}
 
 function M.toggle()
+	if state.float and state.float:is_open() and state.float:is_focused() then
+		close_float()
+		show(state.bottom[state.active] or make_bottom(), false)
+		return
+	end
 	if any_open() then
 		close_all()
 		return
@@ -127,7 +161,31 @@ function M.prev()
 end
 
 function M.select()
-	vim.cmd("TermSelect")
+	if #state.bottom == 0 then
+		M.new()
+		return
+	end
+
+	local choices = vim.list_slice(state.bottom)
+	vim.ui.select(choices, {
+		prompt = "Terminal",
+		format_item = function(term)
+			local current = state.bottom[state.active]
+			local marker = current and current.id == term.id and "  (current)" or ""
+			return ("%s  (#%d)%s"):format(term.display_name or "terminal", term.id, marker)
+		end,
+	}, function(term)
+		if not term then
+			return
+		end
+		for index, candidate in ipairs(state.bottom) do
+			if candidate.id == term.id then
+				state.active = index
+				show(candidate, false)
+				return
+			end
+		end
+	end)
 end
 
 function M.kill()
@@ -158,6 +216,7 @@ end
 
 function M.float()
 	if not state.float then
+		state.float_count = next_available_count(state.float_count)
 		state.float = Terminal():new({
 			count = state.float_count,
 			direction = "float",

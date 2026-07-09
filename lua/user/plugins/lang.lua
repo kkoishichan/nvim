@@ -57,7 +57,7 @@ return {
 	{
 		"saecki/crates.nvim",
 		tag = "stable",
-		event = { "BufRead Cargo.toml" },
+		event = { "BufRead Cargo.toml", "BufNewFile Cargo.toml" },
 		opts = {
 			completion = {
 				crates = { enabled = true },
@@ -76,25 +76,49 @@ return {
 			local crates = require("crates")
 			crates.setup(opts)
 
-			vim.api.nvim_create_autocmd("BufRead", {
+			local function is_cargo_toml(bufnr)
+				return vim.fn.fnamemodify(vim.api.nvim_buf_get_name(bufnr), ":t") == "Cargo.toml"
+			end
+
+			local function map_crates_keys(bufnr)
+				if not is_cargo_toml(bufnr) then
+					return
+				end
+
+				local function map(lhs, rhs, desc)
+					vim.keymap.set("n", lhs, rhs, { buffer = bufnr, desc = desc, silent = true })
+				end
+
+				-- localleader: buffer-local crate actions must not shadow the global
+				-- <leader>c code maps (<leader>cf Format, <leader>cd diagnostics, ...).
+				map("<localleader>t", crates.toggle, "Crates toggle")
+				map("<localleader>v", crates.show_versions_popup, "Crate versions")
+				map("<localleader>f", crates.show_features_popup, "Crate features")
+				map("<localleader>d", crates.show_dependencies_popup, "Crate dependencies")
+				map("<localleader>u", crates.update_crate, "Crate update")
+				map("<localleader>U", crates.upgrade_crate, "Crate upgrade")
+				map("<localleader>A", crates.upgrade_all_crates, "Crates upgrade all")
+			end
+
+			vim.api.nvim_create_autocmd({ "BufReadPost", "BufNewFile" }, {
 				group = vim.api.nvim_create_augroup("user_crates_keys", { clear = true }),
 				pattern = "Cargo.toml",
 				callback = function(event)
-					local function map(lhs, rhs, desc)
-						vim.keymap.set("n", lhs, rhs, { buffer = event.buf, desc = desc, silent = true })
+					if event.event == "BufNewFile" then
+						-- crates.nvim's own autoload callback currently listens only
+						-- to BufRead. Replay that callback group for new files so every
+						-- Cargo.toml gets its cache, fake LSP, and completion support.
+						vim.api.nvim_exec_autocmds("BufRead", {
+							group = "Crates",
+							buffer = event.buf,
+						})
 					end
-
-					-- localleader: buffer-local crate actions must not shadow the global
-					-- <leader>c code maps (<leader>cf Format, <leader>cd diagnostics, ...).
-					map("<localleader>t", crates.toggle, "Crates toggle")
-					map("<localleader>v", crates.show_versions_popup, "Crate versions")
-					map("<localleader>f", crates.show_features_popup, "Crate features")
-					map("<localleader>d", crates.show_dependencies_popup, "Crate dependencies")
-					map("<localleader>u", crates.update_crate, "Crate update")
-					map("<localleader>U", crates.upgrade_crate, "Crate upgrade")
-					map("<localleader>A", crates.upgrade_all_crates, "Crates upgrade all")
+					map_crates_keys(event.buf)
 				end,
 			})
+
+			-- The event that loaded the plugin has already fired before config runs.
+			map_crates_keys(vim.api.nvim_get_current_buf())
 		end,
 	},
 	{

@@ -253,7 +253,16 @@ return {
 				},
 			})
 			require("mini.pairs").setup()
-			require("mini.surround").setup()
+			require("mini.surround").setup({
+				mappings = {
+					add = "gsa",
+					delete = "gsd",
+					find = "gsf",
+					find_left = "gsF",
+					highlight = "gsh",
+					replace = "gsr",
+				},
+			})
 			-- gaip= aligns a paragraph on "=", gA opens the interactive
 			-- preview (pick delimiter, justification, etc.).
 			require("mini.align").setup()
@@ -267,7 +276,7 @@ return {
 	{
 		"folke/todo-comments.nvim",
 		event = { "BufReadPost", "BufNewFile" },
-		dependencies = { "nvim-lua/plenary.nvim", "ibhagwan/fzf-lua" },
+		dependencies = { "nvim-lua/plenary.nvim" },
 		opts = {
 			signs = true,
 		},

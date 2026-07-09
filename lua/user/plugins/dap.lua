@@ -4,7 +4,11 @@ return {
 		dependencies = {
 			{ "rcarriga/nvim-dap-ui", dependencies = { "nvim-neotest/nvim-nio" } },
 			"theHamsta/nvim-dap-virtual-text",
-			{ "jay-babu/mason-nvim-dap.nvim", dependencies = { "mason-org/mason.nvim" } },
+			{
+				"jay-babu/mason-nvim-dap.nvim",
+				cmd = { "DapInstall", "DapUninstall" },
+				dependencies = { "mason-org/mason.nvim" },
+			},
 			"leoluz/nvim-dap-go",
 			"mfussenegger/nvim-dap-python",
 			"mxsdev/nvim-dap-vscode-js",
@@ -130,8 +134,10 @@ return {
 
 			require("mason-nvim-dap").setup({
 				ensure_installed = { "codelldb", "delve", "js", "python" },
-				automatic_installation = true,
-				handlers = {},
+				-- Adapters and configurations below are deliberately set up by their
+				-- dedicated plugins/manual definitions. Leaving handlers nil prevents
+				-- mason-nvim-dap from adding a second set of defaults.
+				automatic_installation = false,
 			})
 
 			-- Mason installs adapters asynchronously; if a session starts before the
@@ -142,14 +148,15 @@ return {
 			local function mason_bin(name)
 				return vim.fn.stdpath("data") .. "/mason/bin/" .. name
 			end
-			local function ensure_executable(path, label)
+			local function ensure_executable(path, adapter)
 				if vim.fn.executable(path) == 1 then
 					return true
 				end
 				vim.notify(
-					("DAP adapter %q not found at:\n%s\nInstall it with :MasonToolsInstall (or :Mason)."):format(
-						label,
-						path
+					("DAP adapter %q not found at:\n%s\nInstall it with :DapInstall %s (or :Mason)."):format(
+						adapter,
+						path,
+						adapter
 					),
 					vim.log.levels.ERROR,
 					{ title = "DAP" }
@@ -204,9 +211,9 @@ return {
 				adapters = { "pwa-node", "pwa-chrome", "pwa-msedge", "node-terminal", "pwa-extensionHost" },
 			})
 
-			local js = {
+			local node_launch = {
 				{
-					name = "Launch current file",
+					name = "Launch current JavaScript file",
 					type = "pwa-node",
 					request = "launch",
 					program = "${file}",
@@ -214,14 +221,18 @@ return {
 					sourceMaps = true,
 					console = "integratedTerminal",
 				},
+			}
+			local node_attach = {
 				{
-					name = "Attach to process",
+					name = "Attach to Node process",
 					type = "pwa-node",
 					request = "attach",
 					processId = require("dap.utils").pick_process,
 					cwd = "${workspaceFolder}",
 					sourceMaps = true,
 				},
+			}
+			local browser_attach = {
 				{
 					name = "Attach Chrome on :9222",
 					type = "pwa-chrome",
@@ -232,15 +243,18 @@ return {
 				},
 			}
 
-			for _, filetype in ipairs({
-				"javascript",
-				"javascriptreact",
-				"typescript",
-				"typescriptreact",
-				"vue",
-			}) do
-				dap.configurations[filetype] = js
-			end
+			-- Node cannot execute raw TypeScript or Vue SFCs. Offer direct launch
+			-- only for JavaScript; TypeScript can attach to its actual runner, while
+			-- browser-oriented files attach through their generated source maps.
+			local javascript = vim.list_extend(vim.deepcopy(node_launch), vim.deepcopy(node_attach))
+			vim.list_extend(javascript, vim.deepcopy(browser_attach))
+			dap.configurations.javascript = javascript
+
+			local attach_only = vim.list_extend(vim.deepcopy(node_attach), vim.deepcopy(browser_attach))
+			dap.configurations.javascriptreact = vim.deepcopy(attach_only)
+			dap.configurations.typescript = vim.deepcopy(attach_only)
+			dap.configurations.typescriptreact = vim.deepcopy(attach_only)
+			dap.configurations.vue = vim.deepcopy(browser_attach)
 
 			dapui.setup()
 			require("nvim-dap-virtual-text").setup({ commented = true })

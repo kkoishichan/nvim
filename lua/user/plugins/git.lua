@@ -109,6 +109,52 @@ return {
 				current = "DiffText",
 			},
 		},
+		config = function(_, opts)
+			-- git-conflict still reads the deprecated `vim.highlight.priorities`
+			-- table while its module is loaded. Neovim exposes the same public data
+			-- at `vim.hl.priorities`; substitute it only for that require so the
+			-- compatibility workaround cannot affect other plugins.
+			local legacy_highlight = rawget(vim, "highlight")
+			local modern_validate = vim.validate
+			rawset(vim, "highlight", vim.hl)
+			local ok, git_conflict = pcall(require, "git-conflict")
+			rawset(vim, "highlight", legacy_highlight)
+
+			if not ok then
+				error(git_conflict)
+			end
+
+			-- Its colour helper also uses the removed table form of vim.validate.
+			-- Wrap that helper so later ColorScheme callbacks get the same isolated
+			-- compatibility path without replacing vim.validate between calls.
+			local type_alias = { b = "boolean", f = "function", n = "number", s = "string", t = "table" }
+			local function compat_validate(name, value, validator, optional, message)
+				if type(name) ~= "table" then
+					return modern_validate(name, value, validator, optional, message)
+				end
+				for field, spec in pairs(name) do
+					local expected = type(spec[2]) == "string" and (type_alias[spec[2]] or spec[2]) or spec[2]
+					modern_validate(field, spec[1], expected, spec[3], spec[4])
+				end
+			end
+
+			local colors = require("git-conflict.colors")
+			if not colors.user_validate_compat then
+				local shade_color = colors.shade_color
+				colors.shade_color = function(...)
+					local previous_validate = vim.validate
+					vim.validate = compat_validate
+					local shade_ok, result = pcall(shade_color, ...)
+					vim.validate = previous_validate
+					if not shade_ok then
+						error(result)
+					end
+					return result
+				end
+				colors.user_validate_compat = true
+			end
+			git_conflict.setup(opts)
+		end,
 		keys = {
 			{ "]x", "<Plug>(git-conflict-next-conflict)", desc = "Next conflict" },
 			{ "[x", "<Plug>(git-conflict-prev-conflict)", desc = "Previous conflict" },

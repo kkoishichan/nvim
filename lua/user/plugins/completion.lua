@@ -34,6 +34,10 @@ return {
 				},
 				menu = {
 					border = "padded",
+					-- Blink places the scrollbar in the padded border column, where it
+					-- can collide with the documentation window. Its public switch is
+					-- preferable to patching private geometry modules.
+					scrollbar = false,
 				},
 			},
 			signature = {
@@ -66,29 +70,5 @@ return {
 			},
 		},
 		opts_extend = { "sources.default" },
-		config = function(_, opts)
-			-- With a "padded" menu, blink puts the scrollbar at `width + 1` -- the
-			-- exact column the documentation window's left edge lands on -- so they
-			-- overlap. Nudge only the menu's scrollbar one column left (into the
-			-- menu's right padding) to clear it; the docs' own scrollbar is untouched.
-			local ok_geo, geo = pcall(require, "blink.cmp.lib.window.scrollbar.geometry")
-			if ok_geo then
-				local get_geometry = geo.get_geometry
-				geo.get_geometry = function(target_win)
-					local g = get_geometry(target_win)
-					local ok_menu, menu = pcall(require, "blink.cmp.completion.windows.menu")
-					if ok_menu and menu.win and menu.win:get_win() == target_win then
-						if g.thumb then
-							g.thumb.col = g.thumb.col - 1
-						end
-						if g.gutter then
-							g.gutter.col = g.gutter.col - 1
-						end
-					end
-					return g
-				end
-			end
-			require("blink.cmp").setup(opts)
-		end,
 	},
 }

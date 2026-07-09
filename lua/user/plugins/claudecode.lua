@@ -8,17 +8,25 @@ return {
 		init = function()
 			-- claudecode's native provider opens its terminal with `enew`, which
 			-- leaves the buffer `buflisted` — so it shows up in the bufferline
-			-- unlike the codex/opencode terminals. Unlist it to match them.
+			-- unlike the codex/opencode terminals. Ask the provider for its exact
+			-- managed buffer instead of matching a command-line substring (which
+			-- would also catch an unrelated `:term echo claude`).
 			vim.api.nvim_create_autocmd("TermOpen", {
 				group = vim.api.nvim_create_augroup("user_claudecode_unlist", { clear = true }),
 				callback = function(args)
-					if vim.bo[args.buf].buftype ~= "terminal" then
-						return
-					end
-					local name = vim.api.nvim_buf_get_name(args.buf)
-					if name:match("//%d+:.*claude") then
-						vim.bo[args.buf].buflisted = false
-					end
+					vim.schedule(function()
+						if not vim.api.nvim_buf_is_valid(args.buf) or vim.bo[args.buf].buftype ~= "terminal" then
+							return
+						end
+						local terminal = package.loaded["claudecode.terminal"]
+						if not terminal then
+							return
+						end
+						local ok, managed = pcall(terminal.get_active_terminal_bufnr)
+						if ok and managed == args.buf then
+							vim.bo[args.buf].buflisted = false
+						end
+					end)
 				end,
 			})
 		end,

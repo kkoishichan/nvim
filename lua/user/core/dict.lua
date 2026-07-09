@@ -6,7 +6,15 @@ local M = {}
 
 local DB = vim.fn.expand("~/.local/share/trans/ultimate.db")
 local ns = vim.api.nvim_create_namespace("user_dict")
-local state = { win = nil, autocmd = nil }
+local state = { win = nil, autocmd = nil, notices = {} }
+
+local function notify_once(key, message)
+	if state.notices[key] then
+		return
+	end
+	state.notices[key] = true
+	vim.notify(message, vim.log.levels.ERROR, { title = "Dictionary" })
+end
 
 local function close()
 	if state.autocmd then
@@ -20,14 +28,31 @@ end
 
 -- Returns phonetic, translation (translation may contain embedded newlines).
 local function query(word)
+	if vim.fn.executable("sqlite3") == 0 then
+		return nil, nil, "sqlite3", "Offline dictionary unavailable: sqlite3 is not installed"
+	end
+
+	local stat = vim.uv.fs_stat(DB)
+	if not stat or stat.type ~= "file" then
+		return nil, nil, "database", "Offline dictionary unavailable: database not found at " .. DB
+	end
+
 	word = vim.trim(word):gsub("'", "''")
 	if word == "" then
 		return nil
 	end
 	local sql = ("SELECT phonetic, translation FROM stardict WHERE word = '%s' COLLATE NOCASE LIMIT 1;"):format(word)
-	local res = vim.system({ "sqlite3", "-separator", "\t", DB, sql }, { text = true }):wait()
+	local ok, process = pcall(vim.system, { "sqlite3", "-separator", "\t", DB, sql }, { text = true })
+	if not ok then
+		return nil, nil, "query", "Could not start offline dictionary query"
+	end
+	local res = process:wait()
 	if res.code ~= 0 then
-		return nil
+		local detail = vim.trim(res.stderr or "")
+		return nil,
+			nil,
+			"query",
+			detail ~= "" and ("Offline dictionary query failed: " .. detail) or "Offline dictionary query failed"
 	end
 	local out = vim.trim(res.stdout or "")
 	if out == "" then
@@ -113,7 +138,11 @@ function M.lookup(text)
 		return
 	end
 
-	local phonetic, translation = query(text)
+	local phonetic, translation, error_key, error_message = query(text)
+	if error_message then
+		notify_once(error_key, error_message)
+		return
+	end
 	if not translation then
 		vim.notify("No translation: " .. text, vim.log.levels.INFO)
 		return

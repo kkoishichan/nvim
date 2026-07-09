@@ -10,7 +10,7 @@
 --     already mirrors VSCode's: variables/watches/stacks/breakpoints on a side
 --     column, repl/console at the bottom), so edgy leaves it alone.
 --   * oil opens full-window (in-place directory editing), no IDE analogue.
---   * pickers / Glance / which-key / notifications stay floating overlays.
+--   * pickers / which-key / notifications stay floating overlays.
 --
 -- laststatus=3 and splitkeep=screen (edgy prerequisites) are already set in
 -- core/options.lua.

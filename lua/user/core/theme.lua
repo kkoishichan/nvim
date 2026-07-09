@@ -15,6 +15,8 @@ M.themes = {
 
 M.default = "catppuccin"
 
+local bootstrapped = false
+
 -- Theme names sorted alphabetically, for the picker.
 local function sorted_names()
 	local names = vim.tbl_keys(M.themes)
@@ -60,6 +62,18 @@ end
 ---Apply the persisted theme (used at startup).
 function M.apply_saved()
 	M.set(M.saved(), false)
+end
+
+---Set up theme-following highlights and apply the startup theme exactly once.
+---Called by whichever colorscheme plugin is selected for eager loading.
+function M.bootstrap()
+	if bootstrapped then
+		return
+	end
+	bootstrapped = true
+	vim.o.background = "dark"
+	require("user.core.ui_highlights").setup()
+	M.apply_saved()
 end
 
 ---Pick a theme interactively and persist the choice.

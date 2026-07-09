@@ -53,14 +53,23 @@ map("n", "]L", "<cmd>llast<cr>zz", { desc = "Last location item" })
 map("n", "[L", "<cmd>lfirst<cr>zz", { desc = "First location item" })
 
 local function toggle_qf(kind)
-	local prefix = kind == "loc" and "l" or "c"
-	for _, win in ipairs(vim.fn.getwininfo()) do
-		local open = kind == "loc" and (win.loclist == 1) or (win.quickfix == 1 and win.loclist == 0)
-		if open then
-			vim.cmd(prefix .. "close")
-			return
-		end
+	local info
+	if kind == "loc" then
+		-- Location lists belong to a window. Querying the current window also
+		-- works while focused in its location-list window.
+		info = vim.fn.getloclist(0, { winid = 0 })
+	else
+		-- getqflist({ winid = 0 }) only reports the quickfix window in the
+		-- current tab, so a list displayed in another tab is left untouched.
+		info = vim.fn.getqflist({ winid = 0 })
 	end
+
+	local winid = type(info) == "table" and tonumber(info.winid) or 0
+	if winid and winid > 0 and vim.api.nvim_win_is_valid(winid) then
+		vim.cmd(kind == "loc" and "lclose" or "cclose")
+		return
+	end
+
 	local ok = pcall(vim.cmd, (kind == "loc" and "botright lopen" or "botright copen"))
 	if not ok then
 		vim.notify((kind == "loc" and "Location" or "Quickfix") .. " list is empty", vim.log.levels.INFO)
@@ -76,14 +85,120 @@ end, { desc = "Location window" })
 
 map("t", "<Esc><Esc>", "<C-\\><C-n>", { desc = "Leave terminal mode" })
 
+-- Parse $TERMINAL into argv without invoking a shell. Supports the quoting and
+-- backslash escaping normally needed for terminal options, but intentionally
+-- performs no expansion or command substitution.
+local function command_argv(command)
+	local argv = {}
+	local current = {}
+	local quote
+	local escaped = false
+	local started = false
+
+	for index = 1, #command do
+		local char = command:sub(index, index)
+		if escaped then
+			table.insert(current, char)
+			escaped = false
+			started = true
+		elseif quote then
+			if char == quote then
+				quote = nil
+			elseif char == "\\" and quote == '"' then
+				escaped = true
+			else
+				table.insert(current, char)
+			end
+		elseif char == "'" or char == '"' then
+			quote = char
+			started = true
+		elseif char == "\\" then
+			escaped = true
+			started = true
+		elseif char:match("%s") then
+			if started then
+				table.insert(argv, table.concat(current))
+				current = {}
+				started = false
+			end
+		else
+			table.insert(current, char)
+			started = true
+		end
+	end
+
+	if escaped or quote then
+		return nil
+	end
+	if started then
+		table.insert(argv, table.concat(current))
+	end
+	return argv
+end
+
 local function open_external_terminal(dir)
-	-- Spawn a detached external terminal (kitty by default) at `dir`.
-	local term = (vim.env.TERMINAL and vim.env.TERMINAL ~= "") and vim.env.TERMINAL or "kitty"
-	if vim.fn.executable(term) == 0 then
-		vim.notify("Terminal not found: " .. term, vim.log.levels.ERROR)
+	local configured = vim.env.TERMINAL
+	local argv
+	if configured and configured ~= "" then
+		local parsed = command_argv(configured)
+		if not parsed or #parsed == 0 then
+			vim.notify("Invalid $TERMINAL: " .. configured, vim.log.levels.ERROR)
+			return
+		end
+		argv = parsed
+	else
+		for _, candidate in ipairs({
+			"kitty",
+			"wezterm",
+			"alacritty",
+			"footclient",
+			"foot",
+			"gnome-terminal",
+			"konsole",
+			"xfce4-terminal",
+			"xterm",
+		}) do
+			if vim.fn.executable(candidate) == 1 then
+				argv = { candidate }
+				break
+			end
+		end
+	end
+
+	if not argv or vim.fn.executable(argv[1]) == 0 then
+		vim.notify("Terminal not found: " .. (argv and argv[1] or "no supported terminal"), vim.log.levels.ERROR)
 		return
 	end
-	vim.fn.jobstart({ term, "--directory", dir }, { detach = true })
+
+	dir = vim.fs.normalize(dir)
+	local executable = vim.fn.fnamemodify(argv[1], ":t"):lower():gsub("%.exe$", "")
+	local cwd_args = {
+		alacritty = { "--working-directory", dir },
+		foot = { "--working-directory=" .. dir },
+		footclient = { "--working-directory=" .. dir },
+		["gnome-terminal"] = { "--working-directory=" .. dir },
+		kitty = { "--directory", dir },
+		konsole = { "--workdir", dir },
+		["xfce4-terminal"] = { "--working-directory", dir },
+	}
+
+	if executable == "wezterm" then
+		if #argv == 1 then
+			vim.list_extend(argv, { "start", "--cwd", dir })
+		elseif vim.tbl_contains(argv, "start") then
+			vim.list_extend(argv, { "--cwd", dir })
+		end
+	elseif cwd_args[executable] then
+		vim.list_extend(argv, cwd_args[executable])
+	end
+
+	-- `cwd` is a safe, terminal-agnostic fallback (and also covers terminals
+	-- such as xterm); known terminals additionally receive their native flag
+	-- for single-instance/server modes that may not inherit the child cwd.
+	local ok, job = pcall(vim.fn.jobstart, argv, { cwd = dir, detach = true })
+	if not ok or type(job) ~= "number" or job <= 0 then
+		vim.notify("Failed to start terminal: " .. argv[1], vim.log.levels.ERROR)
+	end
 end
 
 map("n", "<leader>te", function()

@@ -74,19 +74,19 @@ local function setup_lsp_keymaps()
 			map("n", "K", function()
 				vim.lsp.buf.hover()
 			end, "Hover")
-			map("n", "gd", "<cmd>Glance definitions<cr>", "Peek definition")
-			map("n", "gD", "<cmd>Glance declarations<cr>", "Peek declaration")
-			map("n", "gi", "<cmd>Glance implementations<cr>", "Peek implementation")
-			map("n", "gy", "<cmd>Glance type_definitions<cr>", "Peek type definition")
-			map("n", "gr", "<cmd>Glance references<cr>", "Peek references")
+			map("n", "gd", "<cmd>FzfLua lsp_definitions<cr>", "Definitions")
+			map("n", "gD", "<cmd>FzfLua lsp_declarations<cr>", "Declarations")
+			map("n", "gi", "<cmd>FzfLua lsp_implementations<cr>", "Implementations")
+			map("n", "gy", "<cmd>FzfLua lsp_typedefs<cr>", "Type definitions")
+			map("n", "gr", "<cmd>FzfLua lsp_references<cr>", "References")
 			map("n", "<leader>ca", vim.lsp.buf.code_action, "Code action")
 			map("n", "<leader>ci", "<cmd>FzfLua lsp_incoming_calls<cr>", "Incoming calls")
 			map("n", "<leader>co", "<cmd>FzfLua lsp_outgoing_calls<cr>", "Outgoing calls")
-			map("n", "<leader>cpD", "<cmd>Glance declarations<cr>", "Peek declaration")
-			map("n", "<leader>cpd", "<cmd>Glance definitions<cr>", "Peek definition")
-			map("n", "<leader>cpi", "<cmd>Glance implementations<cr>", "Peek implementation")
-			map("n", "<leader>cpr", "<cmd>Glance references<cr>", "Peek references")
-			map("n", "<leader>cpt", "<cmd>Glance type_definitions<cr>", "Peek type definition")
+			map("n", "<leader>cpD", "<cmd>FzfLua lsp_declarations<cr>", "Declarations")
+			map("n", "<leader>cpd", "<cmd>FzfLua lsp_definitions<cr>", "Definitions")
+			map("n", "<leader>cpi", "<cmd>FzfLua lsp_implementations<cr>", "Implementations")
+			map("n", "<leader>cpr", "<cmd>FzfLua lsp_references<cr>", "References")
+			map("n", "<leader>cpt", "<cmd>FzfLua lsp_typedefs<cr>", "Type definitions")
 			map("n", "<leader>cs", "<cmd>FzfLua lsp_document_symbols<cr>", "Document symbols")
 			map("n", "<leader>cS", "<cmd>FzfLua lsp_workspace_symbols<cr>", "Workspace symbols")
 
@@ -125,99 +125,6 @@ return {
 			float = { enabled = false },
 			status_text = { enabled = false },
 		},
-	},
-	{
-		"dnlhc/glance.nvim",
-		cmd = "Glance",
-		opts = function()
-			local actions = require("glance").actions
-
-			return {
-				height = 18,
-				preserve_win_context = true,
-				detached = function(winid)
-					return vim.api.nvim_win_get_width(winid) < 110
-				end,
-				border = {
-					enable = false,
-				},
-				list = {
-					position = "right",
-					width = 0.34,
-				},
-				preview_win_opts = {
-					cursorline = true,
-					number = true,
-					wrap = false,
-				},
-				theme = {
-					enable = true,
-					mode = "auto",
-				},
-				folds = {
-					fold_closed = "",
-					fold_open = "",
-					folded = true,
-				},
-				mappings = {
-					list = {
-						["<Esc>"] = actions.close,
-						q = actions.close,
-						Q = actions.close,
-					},
-					preview = {
-						["<Esc>"] = actions.close,
-						q = actions.close,
-						Q = actions.close,
-					},
-				},
-			}
-		end,
-		config = function(_, opts)
-			local glance = require("glance")
-
-			glance.register_method({
-				method = "textDocument/declaration",
-				name = "declarations",
-				label = "Declarations",
-			})
-			glance.setup(opts)
-
-			-- Make the peek panels use the completion menu's Pmenu block colours.
-			-- glance sets its groups with default = true, so these explicit
-			-- overrides win; re-applied on every colorscheme switch.
-			require("user.core.highlights").on_colorscheme(function()
-				local palette = require("user.core.palette")
-				local normal = vim.api.nvim_get_hl(0, { name = "Normal" })
-				local pmenu_bg = vim.api.nvim_get_hl(0, { name = "Pmenu" }).bg
-				local fg = normal.fg
-				local dim = vim.api.nvim_get_hl(0, { name = "Comment" }).fg
-				-- Two shades: the Pmenu block and a step toward the editor bg. Assign
-				-- the darker to the preview and the lighter to the list, so the preview
-				-- is reliably the darker panel whichever way the theme's Pmenu leans
-				-- (gruvbox's Pmenu is lighter than the editor, tokyonight/catppuccin's
-				-- darker -- this picks correctly for each instead of a fixed order).
-				local function lum(c)
-					return 0.299 * (math.floor(c / 65536) % 256)
-						+ 0.587 * (math.floor(c / 256) % 256)
-						+ 0.114 * (c % 256)
-				end
-				local a, b = pmenu_bg, palette.blend(pmenu_bg, normal.bg, 0.5)
-				local list_bg, preview_bg = a, b
-				if lum(a) < lum(b) then
-					list_bg, preview_bg = b, a
-				end
-				vim.api.nvim_set_hl(0, "GlanceListNormal", { fg = fg, bg = list_bg })
-				vim.api.nvim_set_hl(0, "GlancePreviewNormal", { fg = fg, bg = preview_bg })
-				vim.api.nvim_set_hl(0, "GlanceListCursorLine", { link = "PmenuSel" })
-				vim.api.nvim_set_hl(0, "GlancePreviewCursorLine", { link = "PmenuSel" })
-				vim.api.nvim_set_hl(0, "GlanceListEndOfBuffer", { fg = list_bg, bg = list_bg })
-				vim.api.nvim_set_hl(0, "GlancePreviewEndOfBuffer", { fg = preview_bg, bg = preview_bg })
-				vim.api.nvim_set_hl(0, "GlanceWinBarFilename", { fg = fg, bg = list_bg, bold = true })
-				vim.api.nvim_set_hl(0, "GlanceWinBarFilepath", { fg = dim, bg = list_bg })
-				vim.api.nvim_set_hl(0, "GlanceWinBarTitle", { fg = fg, bg = list_bg, bold = true })
-			end)
-		end,
 	},
 	{
 		"mason-org/mason.nvim",
@@ -301,6 +208,7 @@ return {
 			vim.lsp.config("clangd", {
 				cmd = {
 					"clangd",
+					"--log=error",
 					"--background-index",
 					"--clang-tidy",
 					"--completion-style=detailed",
@@ -351,7 +259,7 @@ return {
 
 			vim.lsp.config("basedpyright", {
 				settings = {
-					python = {
+					basedpyright = {
 						analysis = {
 							autoImportCompletions = true,
 						},

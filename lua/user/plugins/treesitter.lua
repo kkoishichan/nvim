@@ -102,7 +102,15 @@ local function enable_treesitter(event)
 		return
 	end
 
-	vim.bo[event.buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+	-- A parser does not imply that the language ships an indentation query.
+	-- Calling nvim-treesitter's indentexpr without one falls back badly (for
+	-- example, SystemVerilog gets flattened by `=`). Keep the filetype's native
+	-- indentation unless an `indents` query is actually available.
+	local lang = vim.treesitter.language.get_lang(vim.bo[event.buf].filetype)
+	local has_query, query = pcall(vim.treesitter.query.get, lang, "indents")
+	if has_query and query then
+		vim.bo[event.buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+	end
 end
 
 return {

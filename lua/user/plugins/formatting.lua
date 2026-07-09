@@ -64,6 +64,9 @@ return {
 				biome = {
 					require_cwd = true,
 				},
+				ruff_format = {
+					append_args = { "--line-length", "100" },
+				},
 			},
 			format_on_save = function(bufnr)
 				if vim.g.disable_autoformat or vim.b[bufnr].disable_autoformat or vim.b[bufnr].bigfile then

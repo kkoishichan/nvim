@@ -1,10 +1,13 @@
+-- Neovim 0.12 also supplies Tree-sitter markdown motions in markdown.lua.
+-- Disable the older Vimscript copies so FileType replay cannot append duplicate
+-- unmap commands to b:undo_ftplugin (which otherwise leaves E31 in v:errmsg).
+if #vim.api.nvim_get_runtime_file("ftplugin/markdown.lua", false) > 0 then
+	vim.g.no_markdown_maps = 1
+end
+
 vim.filetype.add({
 	extension = {
-		asm = "riscv",
 		riscv = "riscv",
-		s = "riscv",
-		S = "riscv",
-		v = "verilog",
 		vh = "verilog",
 	},
 })
