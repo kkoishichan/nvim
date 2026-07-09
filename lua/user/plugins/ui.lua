@@ -815,6 +815,7 @@ return {
 				{ "<leader>u", group = "ui" },
 				{ "<leader>v", group = "multicursor" },
 				{ "<leader>x", group = "diagnostics" },
+				{ "gs", group = "surround" },
 			}
 			for _, g in ipairs(groups) do
 				g.mode = { "n", "x" }
