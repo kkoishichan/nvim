@@ -45,31 +45,43 @@ Selene、Stylelint、golangci-lint 仅在项目存在对应配置时运行，避
 ```text
 ~/.config/nvim
 ├── init.lua              -- 入口：leader、加载 core 与 lazy
+├── deploy.sh             -- 跨设备部署脚本
 ├── lazy-lock.json
 ├── selene.toml           -- 本配置的 Selene 规则
 ├── neovim.yml            -- Selene 的 Neovim 标准库声明
 ├── after/ftplugin        -- 少量内置 ftplugin 兼容补丁
-├── lua/user
-│   ├── lazy.lua          -- lazy.nvim bootstrap 与 setup
-│   ├── core
-│   │   ├── options.lua       -- vim 选项
-│   │   ├── keymaps.lua       -- 全局非插件键位
-│   │   ├── commands.lua      -- 自定义命令
-│   │   ├── autocmds.lua      -- 自动命令（外部改动 / 密钥保护 / PDF 预览）
-│   │   ├── diagnostics.lua   -- 诊断 UI
-│   │   ├── statuscolumn.lua  -- IDE 风格 gutter 排布
-│   │   ├── layout.lua        -- 窗口布局工具
-│   │   ├── panels.lua        -- 侧边面板尺寸常量
-│   │   └── pdf.lua           -- PDF 预览状态
-│   └── plugins               -- 每个文件一组插件 spec
-│       ├── ui.lua            -- dashboard / lualine / bufferline / notify / which-key
-│       ├── navigation.lua    -- oil / neo-tree / outline / flash
-│       ├── picker.lua        -- fzf-lua
-│       ├── terminal.lua      -- toggleterm 多终端管理
-│       ├── lsp.lua  completion.lua  formatting.lua  lint.lua
-│       ├── dap.lua  test.lua  tasks.lua
-│       ├── treesitter.lua  folding.lua  editor.lua  multicursor.lua
-│       ├── git.lua  media.lua  lang.lua  tools.lua  performance.lua
+├── spell                 -- 拼写检查词表
+└── lua/user
+    ├── lazy.lua          -- lazy.nvim bootstrap 与 setup
+    ├── core
+    │   ├── options.lua       -- vim 选项
+    │   ├── keymaps.lua       -- 全局非插件键位
+    │   ├── commands.lua      -- 自定义命令
+    │   ├── autocmds.lua      -- 自动命令（外部改动 / 密钥保护 / PDF 预览）
+    │   ├── diagnostics.lua   -- 诊断 UI
+    │   ├── statuscolumn.lua  -- IDE 风格 gutter 排布
+    │   ├── theme.lua         -- 主题切换与持久化
+    │   ├── palette.lua       -- 从当前主题推导语义色
+    │   ├── highlights.lua    -- 换主题后重放高亮覆盖的 helper
+    │   ├── ui_highlights.lua -- 跟随主题的 UI 高亮（浮窗 / 通知等）
+    │   ├── backdrop.lua      -- 浮窗后的调暗背景
+    │   ├── dict.lua          -- ECDICT 离线词典浮窗
+    │   ├── ai.lua            -- AI CLI（codex / claude / opencode）面板管理
+    │   ├── layout.lua        -- 窗口布局工具
+    │   ├── panels.lua        -- 侧边面板尺寸常量
+    │   └── pdf.lua           -- PDF 预览状态
+    └── plugins               -- 每个文件一组插件 spec
+        ├── ui.lua            -- dashboard / lualine / bufferline / notify / which-key
+        ├── edgy.lua          -- 辅助窗口固定停靠布局
+        ├── navigation.lua    -- oil / neo-tree / outline / flash
+        ├── picker.lua        -- fzf-lua
+        ├── terminal.lua      -- toggleterm 多终端管理
+        ├── neogen.lua        -- 文档注释生成
+        ├── lsp.lua  completion.lua  formatting.lua  lint.lua
+        ├── dap.lua  test.lua  tasks.lua
+        ├── treesitter.lua  folding.lua  editor.lua  multicursor.lua
+        ├── git.lua  media.lua  lang.lua  tools.lua  performance.lua
+        └── claudecode.lua  codex.lua  opencode.lua   -- AI CLI 集成
 ```
 
 ## 部署
