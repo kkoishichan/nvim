@@ -43,6 +43,13 @@ jobs:
           ln -s "$GITHUB_WORKSPACE" "$HOME/.config/nvim"
           nvim --headless "+Lazy! restore" +qa
 
+      - name: Install test parsers
+        run: |
+          nvim --headless \
+            "+lua require('nvim-treesitter').install({ \
+              'c_sharp', 'kotlin' }):wait(300000)" \
+            +qa
+
       - name: Install check tools
         run: >-
           nvim --headless
