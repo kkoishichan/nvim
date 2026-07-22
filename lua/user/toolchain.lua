@@ -2,6 +2,8 @@ local M = {}
 
 -- Mason packages are deliberately pinned. Opening a file never installs this
 -- list; :MasonToolsInstall is the explicit, reproducible restore operation.
+-- This list contains only servers enabled by the shared LSP setup; specialized
+-- Java and Rust servers are managed by their own plugins and remain pinned below.
 M.lsp_servers = {
 	"asm_lsp",
 	"autotools_ls",
@@ -14,7 +16,6 @@ M.lsp_servers = {
 	"emmet_language_server",
 	"gopls",
 	"html",
-	"jdtls",
 	"jsonls",
 	"kotlin_lsp",
 	"lua_ls",
@@ -22,7 +23,6 @@ M.lsp_servers = {
 	"neocmake",
 	"ruff",
 	"roslyn_ls",
-	"rust_analyzer",
 	"sqlls",
 	"tailwindcss",
 	"taplo",
@@ -92,7 +92,7 @@ local packages = {
 	{ "typstyle", version = "v0.14.4" },
 	{ "yamllint", version = "1.38.0" },
 
-	-- Debug adapters and Java test bundles.
+	-- Debug adapters and test support.
 	{ "codelldb", version = "v1.12.2" },
 	{ "debugpy", version = "1.8.21" },
 	{ "delve", version = "v1.27.0" },

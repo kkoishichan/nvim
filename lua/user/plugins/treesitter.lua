@@ -1,123 +1,5 @@
 local install_dir = vim.fn.stdpath("data") .. "/site"
-
-local languages = {
-	"asm",
-	"bash",
-	"c",
-	"cmake",
-	"comment",
-	"cpp",
-	"c_sharp",
-	"css",
-	"diff",
-	"dockerfile",
-	"doxygen",
-	"git_config",
-	"gitcommit",
-	"gitignore",
-	"go",
-	"gomod",
-	"gosum",
-	"gowork",
-	"html",
-	"hyprlang",
-	"java",
-	"javascript",
-	"json",
-	"kotlin",
-	"latex",
-	"lua",
-	"luadoc",
-	"make",
-	"markdown",
-	"markdown_inline",
-	"nasm",
-	"python",
-	"query",
-	"rust",
-	"sql",
-	"systemverilog",
-	"toml",
-	"tsx",
-	"typescript",
-	"typst",
-	"vim",
-	"vimdoc",
-	"vue",
-	"yaml",
-	"zsh",
-}
-
-local filetypes = {
-	"asm",
-	"bash",
-	"c",
-	"cmake",
-	"cpp",
-	"cs",
-	"css",
-	"diff",
-	"dockerfile",
-	"gitcommit",
-	"gitconfig",
-	"gitignore",
-	"go",
-	"gomod",
-	"gosum",
-	"gowork",
-	"html",
-	"hyprlang",
-	"java",
-	"javascript",
-	"javascriptreact",
-	"json",
-	"jsonc",
-	"kotlin",
-	"latex",
-	"lua",
-	"make",
-	"markdown",
-	"nasm",
-	"python",
-	"query",
-	"riscv",
-	"rust",
-	"sh",
-	"sql",
-	"systemverilog",
-	"tex",
-	"toml",
-	"typescript",
-	"typescriptreact",
-	"typst",
-	"vim",
-	"vimdoc",
-	"vue",
-	"verilog",
-	"yaml",
-	"zsh",
-}
-
-local function enable_treesitter(event)
-	if vim.b[event.buf].bigfile then
-		return
-	end
-
-	local ok = pcall(vim.treesitter.start, event.buf)
-	if not ok then
-		return
-	end
-
-	-- A parser does not imply that the language ships an indentation query.
-	-- Calling nvim-treesitter's indentexpr without one falls back badly (for
-	-- example, SystemVerilog gets flattened by `=`). Keep the filetype's native
-	-- indentation unless an `indents` query is actually available.
-	local lang = vim.treesitter.language.get_lang(vim.bo[event.buf].filetype)
-	local has_query, query = pcall(vim.treesitter.query.get, lang, "indents")
-	if has_query and query then
-		vim.bo[event.buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
-	end
-end
+local treesitter_config = require("user.core.treesitter")
 
 return {
 	{
@@ -127,19 +9,13 @@ return {
 		-- startup so parsers and queries never desync from the plugin version.
 		lazy = false,
 		build = function()
-			-- CI installs only the parsers exercised by its integration tests in a
-			-- separate, verified step instead of downloading the complete catalog.
-			if vim.env.NVIM_SKIP_TREESITTER_INSTALL == "1" then
-				return
-			end
-
 			local treesitter = require("nvim-treesitter")
 			treesitter.setup({ install_dir = install_dir })
 			-- install() supplies parsers missing on a fresh machine; update() then
 			-- refreshes parsers whose pinned grammar revision changed. update() alone
 			-- deliberately ignores missing parsers on nvim-treesitter's main branch.
-			assert(treesitter.install(languages):wait(300000), "failed to install Tree-sitter parsers")
-			assert(treesitter.update(languages):wait(300000), "failed to update Tree-sitter parsers")
+			assert(treesitter.install(treesitter_config.parsers):wait(300000), "failed to install Tree-sitter parsers")
+			assert(treesitter.update(treesitter_config.parsers):wait(300000), "failed to update Tree-sitter parsers")
 		end,
 		opts = {
 			install_dir = install_dir,
@@ -152,8 +28,8 @@ return {
 
 			vim.api.nvim_create_autocmd("FileType", {
 				group = vim.api.nvim_create_augroup("user_treesitter", { clear = true }),
-				pattern = filetypes,
-				callback = enable_treesitter,
+				pattern = treesitter_config.filetypes,
+				callback = treesitter_config.enable,
 			})
 		end,
 	},

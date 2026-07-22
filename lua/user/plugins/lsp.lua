@@ -84,34 +84,6 @@ return {
 				border = "rounded",
 			},
 		},
-		init = function()
-			local function install_command(name, package_names, description)
-				vim.api.nvim_create_user_command(name, function()
-					require("lazy").load({ plugins = { "mason.nvim" } })
-					local packages = {}
-					for _, package_name in ipairs(package_names) do
-						table.insert(packages, ("%s@%s"):format(package_name, toolchain.version(package_name)))
-					end
-					vim.cmd("MasonInstall " .. table.concat(packages, " "))
-				end, { desc = description, force = true })
-			end
-
-			install_command(
-				"MasonCSharpInstall",
-				{ "roslyn-language-server", "csharpier", "netcoredbg" },
-				"Install the pinned C# toolchain"
-			)
-			install_command(
-				"MasonJavaInstall",
-				{ "jdtls", "java-debug-adapter", "java-test" },
-				"Install the pinned Java toolchain"
-			)
-			install_command(
-				"MasonKotlinInstall",
-				{ "kotlin-lsp", "ktlint", "kotlin-debug-adapter" },
-				"Install the pinned Kotlin toolchain"
-			)
-		end,
 	},
 	{
 		"WhoIsSethDaniel/mason-tool-installer.nvim",
@@ -368,27 +340,25 @@ return {
 			}
 			local enabled_servers = {}
 			for _, server in ipairs(servers) do
-				if server ~= "jdtls" and server ~= "rust_analyzer" then
-					local requirements_met = true
-					for _, requirement in ipairs(server_requirements[server] or {}) do
-						if not toolchain.executable(requirement) then
-							requirements_met = false
-							break
-						end
+				local requirements_met = true
+				for _, requirement in ipairs(server_requirements[server] or {}) do
+					if not toolchain.executable(requirement) then
+						requirements_met = false
+						break
 					end
-					local config = vim.lsp.config[server]
-					local cmd = config and config.cmd
-					if requirements_met and type(cmd) == "table" and type(cmd[1]) == "string" then
-						local resolved = toolchain.executable(cmd[1])
-						if resolved then
-							cmd = vim.deepcopy(cmd)
-							cmd[1] = resolved
-							vim.lsp.config(server, { cmd = cmd })
-							table.insert(enabled_servers, server)
-						end
-					elseif requirements_met and type(cmd) == "function" then
+				end
+				local config = vim.lsp.config[server]
+				local cmd = config and config.cmd
+				if requirements_met and type(cmd) == "table" and type(cmd[1]) == "string" then
+					local resolved = toolchain.executable(cmd[1])
+					if resolved then
+						cmd = vim.deepcopy(cmd)
+						cmd[1] = resolved
+						vim.lsp.config(server, { cmd = cmd })
 						table.insert(enabled_servers, server)
 					end
+				elseif requirements_met and type(cmd) == "function" then
+					table.insert(enabled_servers, server)
 				end
 			end
 

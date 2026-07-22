@@ -21,18 +21,23 @@ NVIM_MIN_MINOR=12 # Require nvim >= 0.12
 # it under ~/.local/share.
 DICT_URL="https://github.com/skywind3000/ECDICT-ultimate/releases/download/1.0.0/ecdict-ultimate-sqlite.zip"
 DICT_DB="$HOME/.local/share/trans/ultimate.db"
+DOTNET_INSTALL_URL="https://dot.net/v1/dotnet-install.sh"
 
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/nvim"
 LOCAL_BIN="$HOME/.local/bin"
 LOCAL_OPT="$HOME/.local/opt"
+DOTNET_DIR="$LOCAL_OPT/dotnet"
 
 repo_url="$REPO_HTTPS"
 skip_deps=0
 with_extras=0
-with_java=0
 skip_sync=0
-run_mason=0
+with_toolchain=0
 with_dict=0
+
+# Logical capabilities required to install or run the complete pinned Mason
+# catalog. Package names remain distribution-specific in install_deps().
+toolchain_prerequisites=(node npm python pip go cargo java dotnet perl)
 
 usage() {
 	cat <<'EOF'
@@ -42,8 +47,7 @@ Usage: ./scripts/deploy.sh [options]
   --repo <url>    Use a custom repository URL
   --no-deps       Skip system dependency installation
   --with-extras   Install optional dependencies (lazygit, Node.js, ImageMagick, poppler, etc.)
-  --java          Install JDK 21+ and Java tooling (also used by Kotlin tools)
-  --mason         Install tool runtimes and restore the pinned Mason toolchain
+  --mason         Install the pinned Mason toolchain and its prerequisites
   --dict          Download ECDICT-ultimate (~300 MB archive, ~1.2 GB extracted)
   --no-sync       Skip headless plugin installation and defer it to first launch
   -h, --help      Show this help message
@@ -59,8 +63,7 @@ while [ $# -gt 0 ]; do
 		;;
 	--no-deps) skip_deps=1 ;;
 	--with-extras) with_extras=1 ;;
-	--java) with_java=1 ;;
-	--mason) run_mason=1 ;;
+	--mason) with_toolchain=1 ;;
 	--dict) with_dict=1 ;;
 	--no-sync) skip_sync=1 ;;
 	-h | --help)
@@ -122,48 +125,206 @@ pkg_install() {
 	esac
 }
 
+ensure_local_bin_path() {
+	mkdir -p "$LOCAL_BIN"
+	case ":$PATH:" in
+	*":$LOCAL_BIN:"*) ;;
+	*) warn "$LOCAL_BIN is not in PATH; add it to your shell configuration" ;;
+	esac
+	case "$PATH:" in
+	"$LOCAL_BIN:"*) ;;
+	*) export PATH="$LOCAL_BIN:$PATH" ;;
+	esac
+	hash -r
+}
+
+python_runtime() {
+	local name python
+	for name in python3 python; do
+		if python=$(command -v "$name" 2>/dev/null); then
+			if "$python" -c 'import sys; raise SystemExit(sys.version_info < (3, 9))' >/dev/null 2>&1; then
+				printf '%s\n' "$python"
+				return 0
+			fi
+		fi
+	done
+	return 1
+}
+
+python_runtime_available() {
+	python_runtime >/dev/null
+}
+
+pip_runtime_available() {
+	local python
+	python=$(python_runtime) || return 1
+	"$python" -m pip --version >/dev/null 2>&1
+}
+
+java_runtime_available() {
+	command -v java >/dev/null || return 1
+	command -v javac >/dev/null || return 1
+	local output version major
+	output=$(java -version 2>&1) || return 1
+	version=$(printf '%s\n' "$output" | sed -n '1s/.*version "\([^"]*\)".*/\1/p')
+	[ -n "$version" ] ||
+		version=$(printf '%s\n' "$output" | sed -n '1s/^openjdk[[:space:]][[:space:]]*\([^[:space:]]*\).*/\1/p')
+	case "$version" in
+	1.*)
+		major=${version#1.}
+		major=${major%%.*}
+		;;
+	*) major=${version%%[._+-]*} ;;
+	esac
+	case "$major" in
+	"" | *[!0-9]*) return 1 ;;
+	esac
+	[ "$major" -ge 21 ]
+}
+
+dotnet_sdk_available() {
+	command -v dotnet >/dev/null && [ -n "$(dotnet --list-sdks 2>/dev/null)" ]
+}
+
+prerequisite_available() {
+	case "$1" in
+	python) python_runtime_available ;;
+	pip) pip_runtime_available ;;
+	java) java_runtime_available ;;
+	dotnet) dotnet_sdk_available ;;
+	*) command -v "$1" >/dev/null ;;
+	esac
+}
+
+prerequisite_label() {
+	case "$1" in
+	python) printf 'Python 3.9+' ;;
+	java) printf 'JDK 21+' ;;
+	dotnet) printf '.NET SDK' ;;
+	*) printf '%s' "$1" ;;
+	esac
+}
+
+validate_toolchain_prerequisites() {
+	local prerequisite label joined
+	local missing=()
+	for prerequisite in "${toolchain_prerequisites[@]}"; do
+		if ! prerequisite_available "$prerequisite"; then
+			label=$(prerequisite_label "$prerequisite")
+			missing+=("$label")
+		fi
+	done
+	if [ "${#missing[@]}" -gt 0 ]; then
+		printf -v joined '%s, ' "${missing[@]}"
+		warn "Missing Mason toolchain prerequisites: ${joined%, }"
+	fi
+}
+
+activate_brew_jdk() {
+	[ "$PKG_MGR" = brew ] || return 0
+	local prefix java_home
+	if ! prefix=$(brew --prefix openjdk@21 2>/dev/null); then
+		return 0
+	fi
+	java_home="$prefix/libexec/openjdk.jdk/Contents/Home"
+	[ -x "$java_home/bin/java" ] || return 0
+	export JAVA_HOME="$java_home"
+	case ":$PATH:" in
+	*":$java_home/bin:"*) ;;
+	*)
+		export PATH="$java_home/bin:$PATH"
+		warn "$java_home/bin was added for this deployment only; configure JAVA_HOME in your shell to keep using JDK 21+"
+		;;
+	esac
+	hash -r
+}
+
+# Distribution repositories do not expose one portable .NET SDK package name.
+# Use Microsoft's non-root installer as the single user-local fallback.
+install_dotnet_sdk() {
+	if dotnet_sdk_available; then
+		info ".NET SDK: $(dotnet --version)"
+		return
+	fi
+	if ! command -v curl >/dev/null; then
+		warn "curl is unavailable; cannot install the .NET SDK"
+		return 1
+	fi
+
+	local installer
+	installer=$(mktemp)
+	info "Installing the latest .NET LTS SDK to $DOTNET_DIR"
+	if ! curl -fL --progress-bar "$DOTNET_INSTALL_URL" -o "$installer"; then
+		rm -f "$installer"
+		warn "Could not download the official .NET installer"
+		return 1
+	fi
+	mkdir -p "$DOTNET_DIR" "$LOCAL_BIN"
+	if ! bash "$installer" --channel LTS --install-dir "$DOTNET_DIR" --no-path; then
+		rm -f "$installer"
+		warn ".NET SDK installation failed"
+		return 1
+	fi
+	rm -f "$installer"
+	ln -sf "$DOTNET_DIR/dotnet" "$LOCAL_BIN/dotnet"
+	export DOTNET_ROOT="$DOTNET_DIR"
+	ensure_local_bin_path
+	if ! dotnet_sdk_available; then
+		warn ".NET was installed, but no SDK is available on PATH"
+		return 1
+	fi
+	info ".NET SDK: $(dotnet --version)"
+}
+
+install_toolchain_prerequisites() {
+	local package
+	for package in "$@"; do
+		pkg_install "$package" || warn "Toolchain prerequisite $package failed to install; some Mason tools may be unavailable"
+	done
+	activate_brew_jdk
+	install_dotnet_sdk || warn "Install a compatible .NET SDK manually"
+	validate_toolchain_prerequisites
+}
+
 install_deps() {
 	detect_pkg_mgr
 	if [ -z "$PKG_MGR" ]; then
 		warn "Could not detect a package manager. Install these manually: git neovim>=0.12 ripgrep fd a C compiler unzip curl tar"
-		[ "$run_mason" -eq 0 ] || warn "The pinned Mason toolchain also needs Node.js/npm, Python, Go, and Cargo"
-		[ "$with_java" -eq 0 ] || warn "Java support also needs JDK 21+ and Python 3.9+"
+		if [ "$with_toolchain" -eq 1 ]; then
+			install_dotnet_sdk || warn "Install a compatible .NET SDK manually"
+			validate_toolchain_prerequisites
+		fi
 		return
 	fi
 	info "Installing dependencies with $PKG_MGR"
 
-	local required extras java_deps mason_deps
+	local required extras toolchain_deps
 	case "$PKG_MGR" in
 	pacman)
 		required=(git neovim ripgrep fd gcc unzip curl tar)
 		extras=(lazygit nodejs npm poppler sqlite imagemagick typst texlive-binextra)
-		java_deps=(jdk21-openjdk python)
-		mason_deps=(nodejs npm python python-pip go rust)
+		toolchain_deps=(nodejs npm python python-pip go rust jdk21-openjdk perl)
 		;;
 	apt)
 		$SUDO apt-get update
 		required=(git neovim ripgrep fd-find build-essential unzip curl tar)
 		extras=(lazygit nodejs npm poppler-utils sqlite3 imagemagick typst latexmk)
-		java_deps=(openjdk-21-jdk python3)
-		mason_deps=(nodejs npm python3 python3-venv python3-pip golang-go cargo)
+		toolchain_deps=(nodejs npm python3 python3-venv python3-pip golang-go cargo openjdk-21-jdk perl)
 		;;
 	dnf)
 		required=(git neovim ripgrep fd-find gcc unzip curl tar)
 		extras=(lazygit nodejs poppler-utils sqlite ImageMagick typst latexmk)
-		java_deps=(java-21-openjdk-devel python3)
-		mason_deps=(nodejs npm python3 python3-pip golang rust cargo)
+		toolchain_deps=(nodejs npm python3 python3-pip golang rust cargo java-21-openjdk-devel perl)
 		;;
 	zypper)
 		required=(git neovim ripgrep fd gcc unzip curl tar)
 		extras=(lazygit nodejs poppler-tools sqlite3 ImageMagick typst texlive-latexmk)
-		java_deps=(java-21-openjdk-devel python3)
-		mason_deps=(nodejs npm python3 python3-pip go rust cargo)
+		toolchain_deps=(nodejs npm python3 python3-pip go rust cargo java-21-openjdk-devel perl)
 		;;
 	brew)
 		required=(git neovim ripgrep fd)
 		extras=(lazygit node poppler sqlite imagemagick typst latexmk)
-		java_deps=(openjdk@21 python)
-		mason_deps=(node python go rust)
+		toolchain_deps=(node python go rust openjdk@21)
 		;;
 	esac
 
@@ -176,24 +337,15 @@ install_deps() {
 		done
 	fi
 
-	if [ "$run_mason" -eq 1 ]; then
-		local pkg
-		for pkg in "${mason_deps[@]}"; do
-			pkg_install "$pkg" || warn "Mason runtime dependency $pkg failed to install; some tools may be unavailable"
-		done
-	fi
-
-	if [ "$with_java" -eq 1 ]; then
-		local pkg
-		for pkg in "${java_deps[@]}"; do
-			pkg_install "$pkg" || warn "Java dependency $pkg failed to install; install JDK 21+ manually"
-		done
+	if [ "$with_toolchain" -eq 1 ]; then
+		install_toolchain_prerequisites "${toolchain_deps[@]}"
 	fi
 
 	# Debian and Ubuntu package fd as fdfind, so provide an fd symlink.
 	if ! command -v fd >/dev/null && command -v fdfind >/dev/null; then
 		mkdir -p "$LOCAL_BIN"
 		ln -sf "$(command -v fdfind)" "$LOCAL_BIN/fd"
+		ensure_local_bin_path
 		info "Linked fdfind -> $LOCAL_BIN/fd"
 	fi
 }
@@ -230,14 +382,7 @@ install_nvim_tarball() {
 	rm -f "$LOCAL_OPT/$asset.tar.gz"
 	ln -sf "$LOCAL_OPT/$asset/bin/nvim" "$LOCAL_BIN/nvim"
 
-	case ":$PATH:" in
-	*":$LOCAL_BIN:"*) ;;
-	*)
-		export PATH="$LOCAL_BIN:$PATH"
-		warn "$LOCAL_BIN was added for this deployment only; add 'export PATH=\"$LOCAL_BIN:\$PATH\"' to your shell configuration"
-		;;
-	esac
-	hash -r
+	ensure_local_bin_path
 	nvim_ok || die "Neovim is still unavailable after installation; check PATH"
 }
 
@@ -302,20 +447,11 @@ sync_plugins() {
 	info "Installing plugins headlessly from lazy-lock.json; the first run may take a few minutes"
 	nvim --headless "+Lazy! restore" +qa || warn "Plugin installation failed; run :Lazy restore inside Neovim later"
 
-	if [ "$run_mason" -eq 1 ]; then
-		command -v dotnet >/dev/null ||
-			warn "C# tools will be installed, but C# development also requires a .NET SDK on PATH"
-		command -v java >/dev/null ||
-			warn "Kotlin formatter/debugger tools will be installed, but they also require Java on PATH (use --java)"
+	if [ "$with_toolchain" -eq 1 ]; then
+		[ "$skip_deps" -eq 0 ] || validate_toolchain_prerequisites
 		info "Installing the pinned Mason language and development toolchain"
 		nvim --headless "+MasonToolsInstallSync" +qa ||
 			warn "Mason tool installation failed; run :MasonToolsInstall inside Neovim later"
-	fi
-
-	if [ "$with_java" -eq 1 ]; then
-		info "Installing JDTLS and Java debug/test extensions"
-		nvim --headless "+MasonJavaInstall" +qa ||
-			warn "Java tooling installation failed; run :MasonJavaInstall later"
 	fi
 }
 
@@ -341,9 +477,8 @@ cat <<'EOF'
 Notes:
   - Use a Nerd Font in your terminal so icons render correctly.
   - Mason tools are installed only when requested with --mason or :MasonToolsInstall.
-  - Java development requires JDK 21 or newer to run JDTLS; --java installs it.
-  - C# development requires a .NET SDK. Kotlin formatting/debugging requires Java;
-    use --java --mason to install the JVM and pinned Kotlin tools together.
+  - --mason bootstraps prerequisites used by the pinned tools. Project SDKs,
+    build systems, and project-specific versions remain project dependencies.
   - Inline images and PDF previews require a kitty-graphics terminal, ImageMagick, and poppler;
     --with-extras installs ImageMagick and poppler.
   - The offline dictionary expects ECDICT-ultimate at ~/.local/share/trans/ultimate.db.

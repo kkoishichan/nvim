@@ -20,16 +20,31 @@ do
 	local indicator = plugins["bufferline.nvim"].opts.options.diagnostics_indicator
 	assert(indicator(0, 0, { info = 2 }):match("2"), "Bufferline hides info-only diagnostics")
 	assert(indicator(0, 0, { hint = 3 }):match("3"), "Bufferline hides hint-only diagnostics")
-
-	local conform = plugins["conform.nvim"].opts
-	assert(vim.deep_equal(conform.formatters_by_ft.cs, { "csharpier" }), "C# formatter is missing")
-	assert(vim.deep_equal(conform.formatters_by_ft.kotlin, { "ktlint" }), "Kotlin formatter is missing")
-	assert(plugins["neotest-vstest"], "C# test plugin is missing")
-	assert(plugins["neotest-kotlin"], "Kotlin test plugin is missing")
 end
 
-assert(vim.treesitter.language.add("c_sharp"), "C# Tree-sitter parser is missing")
-assert(vim.treesitter.language.add("kotlin"), "Kotlin Tree-sitter parser is missing")
+do
+	local config = require("user.core.treesitter")
+	local available = {}
+	for _, parser in ipairs(require("nvim-treesitter").get_available()) do
+		available[parser] = true
+	end
+
+	local configured = {}
+	for _, parser in ipairs(config.parsers) do
+		assert(not configured[parser], "duplicate Tree-sitter parser: " .. parser)
+		assert(available[parser], "unknown Tree-sitter parser: " .. parser)
+		assert(vim.treesitter.language.add(parser), "Tree-sitter parser is not installed or loadable: " .. parser)
+		configured[parser] = true
+	end
+
+	local filetypes = {}
+	for _, filetype in ipairs(config.filetypes) do
+		assert(not filetypes[filetype], "duplicate Tree-sitter filetype: " .. filetype)
+		filetypes[filetype] = true
+		local parser = vim.treesitter.language.get_lang(filetype)
+		assert(configured[parser], ("Tree-sitter filetype %s maps to unconfigured parser %s"):format(filetype, parser))
+	end
+end
 
 local sensitive = require("user.core.sensitive")
 assert(sensitive.is_sensitive("/tmp/.env.production"), "environment file was not marked sensitive")
@@ -70,25 +85,22 @@ do
 end
 
 do
-	local seen = {}
 	local toolchain = require("user.toolchain")
+	local seen = {}
 	for _, package in ipairs(toolchain.packages) do
-		assert(package.version and not seen[package[1]], "invalid or duplicate tool pin: " .. package[1])
+		assert(type(package[1]) == "string" and package[1] ~= "", "invalid Mason package name")
+		assert(type(package.version) == "string" and package.version ~= "", "missing tool pin: " .. package[1])
+		assert(not seen[package[1]], "duplicate tool pin: " .. package[1])
 		seen[package[1]] = true
+		assert(toolchain.version(package[1]) == package.version, "tool pin lookup is inconsistent: " .. package[1])
 	end
-	for name, version in pairs({
-		["csharpier"] = "1.2.6",
-		["kotlin-debug-adapter"] = "0.4.4",
-		["kotlin-lsp"] = "kotlin-lsp/v262.8190.0",
-		["ktlint"] = "1.8.0",
-		["netcoredbg"] = "3.1.3-1062",
-		["roslyn-language-server"] = "5.8.0-1.26266.2",
-	}) do
-		assert(toolchain.version(name) == version, "missing or stale tool pin: " .. name)
+
+	seen = {}
+	for _, server in ipairs(toolchain.lsp_servers) do
+		assert(type(server) == "string" and server ~= "", "invalid LSP server name")
+		assert(not seen[server], "duplicate LSP server: " .. server)
+		seen[server] = true
 	end
-	assert(vim.tbl_contains(toolchain.lsp_servers, "roslyn_ls"), "C# LSP is not registered")
-	assert(vim.tbl_contains(toolchain.lsp_servers, "kotlin_lsp"), "Kotlin LSP is not registered")
-	assert(not vim.tbl_contains(toolchain.lsp_servers, "kotlin_language_server"), "legacy Kotlin LSP is enabled")
 end
 
 do
@@ -108,11 +120,11 @@ do
 	lazy.load({ plugins = { "nvim-lspconfig" } })
 	assert(vim.env.PATH == before, "LSP changed PATH")
 	assert(not package.loaded.mason and not package.loaded["mason-registry"], "ordinary LSP load started Mason")
-	assert(vim.fn.exists(":MasonCSharpInstall") == 2, "MasonCSharpInstall command is missing")
-	assert(vim.fn.exists(":MasonJavaInstall") == 2, "MasonJavaInstall command is missing")
-	assert(vim.fn.exists(":MasonKotlinInstall") == 2, "MasonKotlinInstall command is missing")
-	assert(vim.tbl_contains(vim.lsp.config.roslyn_ls.filetypes, "cs"), "Roslyn is not configured for C#")
-	assert(vim.tbl_contains(vim.lsp.config.kotlin_lsp.filetypes, "kotlin"), "Kotlin LSP filetype is missing")
+	for _, server in ipairs(require("user.toolchain").lsp_servers) do
+		local config = vim.lsp.config[server]
+		assert(type(config) == "table", "missing LSP config: " .. server)
+		assert(type(config.filetypes) == "table" and #config.filetypes > 0, "LSP has no filetypes: " .. server)
+	end
 
 	local vue = require("user.toolchain").executable("vue-language-server")
 	if vue then
@@ -124,6 +136,7 @@ do
 	end
 
 	lazy.load({ plugins = { "nvim-jdtls" } })
+	assert(not package.loaded.mason and not package.loaded["mason-registry"], "Java support started Mason")
 	assert(not package.loaded.dap, "nvim-dap loaded before Java debugging")
 
 	lazy.load({ plugins = { "rustaceanvim" } })

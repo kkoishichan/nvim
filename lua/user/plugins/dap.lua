@@ -12,8 +12,8 @@ local function missing_adapter(package)
 	)
 end
 
-local function missing_runtime(runtime, language)
-	vim.notify(("%s debugging requires %q on PATH."):format(language, runtime), vim.log.levels.ERROR, { title = "DAP" })
+local function missing_runtime(runtime, context)
+	vim.notify(("%s debugging requires %q on PATH."):format(context, runtime), vim.log.levels.ERROR, { title = "DAP" })
 end
 
 local function csharp_root()
@@ -84,9 +84,14 @@ end
 local adapter_by_filetype = {
 	c = { command = "codelldb", package = "codelldb" },
 	cpp = { command = "codelldb", package = "codelldb" },
-	cs = { command = "netcoredbg", package = "netcoredbg", runtime = "dotnet" },
+	cs = { command = "netcoredbg", package = "netcoredbg", runtime = "dotnet", label = "C#" },
 	go = { command = "dlv", package = "delve", plugin = "nvim-dap-go" },
-	kotlin = { command = "kotlin-debug-adapter", package = "kotlin-debug-adapter", runtime = "java" },
+	kotlin = {
+		command = "kotlin-debug-adapter",
+		package = "kotlin-debug-adapter",
+		runtime = "java",
+		label = "Kotlin",
+	},
 	python = { check = debugpy_python, package = "debugpy", plugin = "nvim-dap-python" },
 	javascript = { command = "js-debug-adapter", package = "js-debug-adapter", plugin = "nvim-dap-vscode-js" },
 	javascriptreact = { command = "js-debug-adapter", package = "js-debug-adapter", plugin = "nvim-dap-vscode-js" },
@@ -95,26 +100,33 @@ local adapter_by_filetype = {
 	vue = { command = "js-debug-adapter", package = "js-debug-adapter", plugin = "nvim-dap-vscode-js" },
 }
 
+local function adapter_executable(requirement)
+	if requirement.runtime and not executable(requirement.runtime) then
+		missing_runtime(requirement.runtime, requirement.label or requirement.package)
+		return nil
+	end
+	local available
+	if requirement.check then
+		available = requirement.check()
+	else
+		available = executable(requirement.command)
+	end
+	if not available then
+		missing_adapter(requirement.package)
+		return nil
+	end
+	return available
+end
+
 local function debug_continue()
 	local requirement = adapter_by_filetype[vim.bo.filetype]
-	local available
 	if requirement then
-		if requirement.runtime and not executable(requirement.runtime) then
-			missing_runtime(requirement.runtime, vim.bo.filetype == "cs" and "C#" or "Kotlin")
+		if not adapter_executable(requirement) then
 			return
 		end
-		if requirement.check then
-			available = requirement.check()
-		else
-			available = executable(requirement.command)
-		end
-		if available and requirement.plugin then
+		if requirement.plugin then
 			require("lazy").load({ plugins = { requirement.plugin } })
 		end
-	end
-	if requirement and not available then
-		missing_adapter(requirement.package)
-		return
 	end
 	require("dap").continue()
 end
@@ -226,9 +238,8 @@ return {
 			local dap = require("dap")
 
 			dap.adapters.codelldb = function(callback)
-				local command = executable("codelldb")
+				local command = adapter_executable(adapter_by_filetype.c)
 				if not command then
-					missing_adapter("codelldb")
 					return
 				end
 				callback({
@@ -261,13 +272,8 @@ return {
 			dap.configurations.cpp = cpp
 
 			dap.adapters.netcoredbg = function(callback)
-				if not executable("dotnet") then
-					missing_runtime("dotnet", "C#")
-					return
-				end
-				local command = executable("netcoredbg")
+				local command = adapter_executable(adapter_by_filetype.cs)
 				if not command then
-					missing_adapter("netcoredbg")
 					return
 				end
 				callback({
@@ -302,13 +308,8 @@ return {
 			}
 
 			dap.adapters.kotlin = function(callback)
-				if not executable("java") then
-					missing_runtime("java", "Kotlin")
-					return
-				end
-				local command = executable("kotlin-debug-adapter")
+				local command = adapter_executable(adapter_by_filetype.kotlin)
 				if not command then
-					missing_adapter("kotlin-debug-adapter")
 					return
 				end
 				callback({ type = "executable", command = command })
@@ -394,9 +395,8 @@ return {
 		lazy = true,
 		dependencies = { "mfussenegger/nvim-dap" },
 		config = function()
-			local delve = executable("dlv")
+			local delve = adapter_executable(adapter_by_filetype.go)
 			if not delve then
-				missing_adapter("delve")
 				return
 			end
 			require("dap-go").setup({ delve = { path = delve } })
@@ -407,9 +407,8 @@ return {
 		lazy = true,
 		dependencies = { "mfussenegger/nvim-dap" },
 		config = function()
-			local python = debugpy_python()
+			local python = adapter_executable(adapter_by_filetype.python)
 			if not python then
-				missing_adapter("debugpy")
 				return
 			end
 			require("dap-python").setup(python)
@@ -420,9 +419,8 @@ return {
 		lazy = true,
 		dependencies = { "mfussenegger/nvim-dap" },
 		config = function()
-			local command = executable("js-debug-adapter")
+			local command = adapter_executable(adapter_by_filetype.javascript)
 			if not command then
-				missing_adapter("js-debug-adapter")
 				return
 			end
 			require("dap-vscode-js").setup({
