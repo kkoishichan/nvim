@@ -1,18 +1,5 @@
 local layout = require("user.core.layout")
 
-local function setup_neovim_remote()
-	if vim.fn.executable("nvr") ~= 1 or vim.v.servername == "" then
-		vim.g.lazygit_use_neovim_remote = 0
-		return
-	end
-
-	vim.g.lazygit_use_neovim_remote = 1
-	vim.env.NVIM_LISTEN_ADDRESS = vim.v.servername
-	vim.env.GIT_EDITOR = ("nvr --servername %s -cc split --remote-wait +'set bufhidden=wipe'"):format(
-		vim.fn.shellescape(vim.v.servername)
-	)
-end
-
 local function toggle_diffview()
 	local ok, lib = pcall(require, "diffview.lib")
 	if ok and lib.get_current_view() then
@@ -36,7 +23,9 @@ return {
 		init = function()
 			vim.g.lazygit_floating_window_scaling_factor = layout.float_scale
 			vim.g.lazygit_floating_window_winblend = 0
-			setup_neovim_remote()
+			-- Do not mutate process-wide GIT_EDITOR/NVIM_LISTEN_ADDRESS. Lazygit
+			-- uses its terminal editor unless the user configured one in the shell.
+			vim.g.lazygit_use_neovim_remote = 0
 
 			-- lazygit centres on `vim.o.lines` (no statusline reservation), so it
 			-- sits one row/col lower-right than the toggleterm float, which subtracts
@@ -93,76 +82,6 @@ return {
 			{ "<leader>gd", toggle_diffview, desc = "Diffview toggle" },
 			{ "<leader>gf", "<cmd>DiffviewFileHistory %<cr>", desc = "File history" },
 			{ "<leader>gr", "<cmd>DiffviewFileHistory<cr>", desc = "Repo history" },
-		},
-	},
-	{
-		"akinsho/git-conflict.nvim",
-		version = "*",
-		event = { "BufReadPost", "BufNewFile" },
-		opts = {
-			default_mappings = false,
-			default_commands = true,
-			disable_diagnostics = true,
-			list_opener = "copen",
-			highlights = {
-				incoming = "DiffAdd",
-				current = "DiffText",
-			},
-		},
-		config = function(_, opts)
-			-- git-conflict still reads the deprecated `vim.highlight.priorities`
-			-- table while its module is loaded. Neovim exposes the same public data
-			-- at `vim.hl.priorities`; substitute it only for that require so the
-			-- compatibility workaround cannot affect other plugins.
-			local legacy_highlight = rawget(vim, "highlight")
-			local modern_validate = vim.validate
-			rawset(vim, "highlight", vim.hl)
-			local ok, git_conflict = pcall(require, "git-conflict")
-			rawset(vim, "highlight", legacy_highlight)
-
-			if not ok then
-				error(git_conflict)
-			end
-
-			-- Its colour helper also uses the removed table form of vim.validate.
-			-- Wrap that helper so later ColorScheme callbacks get the same isolated
-			-- compatibility path without replacing vim.validate between calls.
-			local type_alias = { b = "boolean", f = "function", n = "number", s = "string", t = "table" }
-			local function compat_validate(name, value, validator, optional, message)
-				if type(name) ~= "table" then
-					return modern_validate(name, value, validator, optional, message)
-				end
-				for field, spec in pairs(name) do
-					local expected = type(spec[2]) == "string" and (type_alias[spec[2]] or spec[2]) or spec[2]
-					modern_validate(field, spec[1], expected, spec[3], spec[4])
-				end
-			end
-
-			local colors = require("git-conflict.colors")
-			if not colors.user_validate_compat then
-				local shade_color = colors.shade_color
-				colors.shade_color = function(...)
-					local previous_validate = vim.validate
-					vim.validate = compat_validate
-					local shade_ok, result = pcall(shade_color, ...)
-					vim.validate = previous_validate
-					if not shade_ok then
-						error(result)
-					end
-					return result
-				end
-				colors.user_validate_compat = true
-			end
-			git_conflict.setup(opts)
-		end,
-		keys = {
-			{ "]x", "<Plug>(git-conflict-next-conflict)", desc = "Next conflict" },
-			{ "[x", "<Plug>(git-conflict-prev-conflict)", desc = "Previous conflict" },
-			{ "<leader>gxo", "<Plug>(git-conflict-ours)", desc = "Conflict choose ours" },
-			{ "<leader>gxt", "<Plug>(git-conflict-theirs)", desc = "Conflict choose theirs" },
-			{ "<leader>gxb", "<Plug>(git-conflict-both)", desc = "Conflict choose both" },
-			{ "<leader>gx0", "<Plug>(git-conflict-none)", desc = "Conflict choose none" },
-			{ "<leader>gxl", "<cmd>GitConflictListQf<cr>", desc = "Conflict quickfix list" },
 		},
 	},
 	{

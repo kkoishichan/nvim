@@ -1,3 +1,24 @@
+local toolchain = require("user.toolchain")
+
+local function command(name)
+	return function()
+		return toolchain.executable(name) or name
+	end
+end
+
+local function node_command(name)
+	local local_name = vim.fn.has("win32") == 1 and name .. ".cmd" or name
+	local resolver
+	return function(self, ctx)
+		resolver = resolver or require("conform.util").from_node_modules(local_name)
+		local candidate = resolver(self, ctx)
+		if candidate ~= local_name and vim.fn.executable(candidate) == 1 then
+			return candidate
+		end
+		return toolchain.executable(name) or candidate
+	end
+end
+
 return {
 	{
 		"stevearc/conform.nvim",
@@ -34,6 +55,7 @@ return {
 			formatters_by_ft = {
 				asm = { "asmfmt" },
 				c = { "clang-format" },
+				cs = { "csharpier" },
 				cmake = { "cmake_format" },
 				cpp = { "clang-format" },
 				css = { "biome", "prettier", stop_after_first = true },
@@ -43,6 +65,7 @@ return {
 				javascriptreact = { "biome", "prettier", stop_after_first = true },
 				json = { "biome", "prettier", stop_after_first = true },
 				jsonc = { "biome", "prettier", stop_after_first = true },
+				kotlin = { "ktlint" },
 				lua = { "stylua" },
 				markdown = { "prettier" },
 				python = { "ruff_organize_imports", "ruff_format" },
@@ -61,12 +84,41 @@ return {
 				-- No zsh: shfmt parses bash and can mangle zsh-specific syntax.
 			},
 			formatters = {
+				asmfmt = { command = command("asmfmt") },
 				biome = {
+					command = node_command("biome"),
 					require_cwd = true,
 				},
+				["clang-format"] = { command = command("clang-format") },
+				cmake_format = { command = command("cmake-format") },
+				csharpier = {
+					command = command("csharpier"),
+					args = { "format" },
+					condition = function()
+						return toolchain.executable("dotnet") ~= nil
+					end,
+				},
+				gofumpt = { command = command("gofumpt") },
+				goimports = { command = command("goimports") },
+				ktlint = {
+					command = command("ktlint"),
+					condition = function()
+						return toolchain.executable("java") ~= nil
+					end,
+				},
+				latexindent = { command = command("latexindent") },
+				prettier = { command = node_command("prettier") },
 				ruff_format = {
+					command = command("ruff"),
 					append_args = { "--line-length", "100" },
 				},
+				ruff_organize_imports = { command = command("ruff") },
+				shfmt = { command = command("shfmt") },
+				sqruff = { command = command("sqruff") },
+				stylua = { command = command("stylua") },
+				taplo = { command = command("taplo") },
+				typstyle = { command = command("typstyle") },
+				verible = { command = command("verible-verilog-format") },
 			},
 			format_on_save = function(bufnr)
 				if vim.g.disable_autoformat or vim.b[bufnr].disable_autoformat or vim.b[bufnr].bigfile then

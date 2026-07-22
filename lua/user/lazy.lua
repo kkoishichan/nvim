@@ -23,7 +23,7 @@ require("lazy").setup({
 		version = false,
 	},
 	install = {
-		colorscheme = { "gruvbox", "habamax" },
+		colorscheme = { "catppuccin", "habamax" },
 	},
 	checker = {
 		enabled = false,
@@ -37,14 +37,11 @@ require("lazy").setup({
 	performance = {
 		rtp = {
 			disabled_plugins = {
-				"gzip",
 				"matchit",
 				"matchparen",
 				"netrwPlugin",
-				"tarPlugin",
 				"tohtml",
 				"tutor",
-				"zipPlugin",
 			},
 		},
 	},

@@ -59,18 +59,44 @@ end, {
 	desc = "Diff current buffer with the file on disk",
 })
 
+vim.api.nvim_create_user_command("WriteCreateDirs", function(command)
+	local file = vim.api.nvim_buf_get_name(0)
+	if file == "" or vim.bo.buftype ~= "" then
+		vim.notify("Current buffer has no writable file path", vim.log.levels.WARN, { title = "Write" })
+		return
+	end
+	local directory = vim.fn.fnamemodify(file, ":p:h")
+	if vim.fn.isdirectory(directory) == 0 and vim.fn.mkdir(directory, "p") == 0 then
+		vim.notify("Could not create directory: " .. directory, vim.log.levels.ERROR, { title = "Write" })
+		return
+	end
+	vim.cmd.write({ bang = command.bang })
+end, {
+	bang = true,
+	desc = "Create missing parent directories and write the current file",
+})
+
 local root_markers = {
-	".git",
-	".jj",
-	"compile_commands.json",
-	"CMakeLists.txt",
-	"Makefile",
-	"package.json",
-	"pyproject.toml",
-	"Cargo.toml",
-	"go.mod",
-	"typst.toml",
 	".root",
+	{
+		"mvnw",
+		"gradlew",
+		"settings.gradle",
+		"settings.gradle.kts",
+		"pom.xml",
+		"build.gradle",
+		"build.gradle.kts",
+		"build.xml",
+		"compile_commands.json",
+		"CMakeLists.txt",
+		"Makefile",
+		"package.json",
+		"pyproject.toml",
+		"Cargo.toml",
+		"go.mod",
+		"typst.toml",
+	},
+	{ ".git", ".jj" },
 }
 
 local function cwd_display(path)
@@ -214,11 +240,7 @@ end, {
 
 local function normalize_path(path)
 	path = expand_home(path)
-	if path:sub(1, 1) ~= "/" then
-		path = vim.fs.joinpath(vim.fn.getcwd(), path)
-	end
-
-	return vim.fs.normalize(path)
+	return vim.fs.abspath(path)
 end
 
 local function open_directory(path, title)
@@ -307,7 +329,9 @@ local function pick_directory()
 
 	require("fzf-lua").files({
 		prompt = "Directories> ",
-		cmd = "fd --color=never --type d --hidden --no-ignore --exclude .git --exclude .jj",
+		-- Respect ignore files by default; scanning vendor/build trees makes a
+		-- directory picker surprisingly expensive in large repositories.
+		cmd = "fd --color=never --type d --hidden --exclude .git --exclude .jj",
 		fzf_opts = {
 			["--no-multi"] = true,
 		},
@@ -345,10 +369,13 @@ local function pdf_target_from_current_file()
 end
 
 local function pdf_viewer()
-	for _, viewer in ipairs({ "zathura", "xdg-open" }) do
+	for _, viewer in ipairs({ "zathura", "xdg-open", "open" }) do
 		if vim.fn.executable(viewer) == 1 then
-			return viewer
+			return { viewer }
 		end
+	end
+	if vim.fn.has("win32") == 1 and vim.fn.executable("cmd.exe") == 1 then
+		return { "cmd.exe", "/c", "start", "" }
 	end
 end
 
@@ -368,13 +395,14 @@ local function open_pdf(file)
 
 	local viewer = pdf_viewer()
 	if not viewer then
-		vim.notify("Missing PDF viewer: install zathura or xdg-open", vim.log.levels.ERROR, { title = title })
+		vim.notify("Missing a system PDF opener", vim.log.levels.ERROR, { title = title })
 		return
 	end
 
-	local job = vim.fn.jobstart({ viewer, file }, { detach = true })
+	local command = vim.list_extend(vim.deepcopy(viewer), { file })
+	local job = vim.fn.jobstart(command, { detach = true })
 	if job <= 0 then
-		vim.notify("Failed to open PDF with " .. viewer, vim.log.levels.ERROR, { title = title })
+		vim.notify("Failed to open PDF with " .. viewer[1], vim.log.levels.ERROR, { title = title })
 		return
 	end
 

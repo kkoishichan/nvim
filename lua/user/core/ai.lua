@@ -3,8 +3,9 @@ local M = {}
 local providers = {
 	codex = {
 		label = "Codex",
-		plugin = "codex.nvim",
-		executable = "codex",
+		command = "codex",
+		terminal = "codex",
+		count = 201,
 	},
 	claude = {
 		label = "Claude Code",
@@ -45,7 +46,6 @@ end
 local current = vim.g.user_ai_provider or saved_provider() or "claude"
 local chat_open = vim.g.user_ai_chat_open == true
 local chat_provider = vim.g.user_ai_chat_provider
-local cli_terms = {}
 
 local tree_filetypes = {
 	NvimTree = true,
@@ -80,18 +80,11 @@ local function load(plugin)
 	end
 end
 
-local function codex_slash(command)
-	load(providers.codex.plugin)
-	local ok, codex = pcall(require, "codex")
-	if ok and type(codex.execute_slash_command) == "function" then
-		local sent, err = codex.execute_slash_command({ command = command })
-		if not sent and err then
-			notify(("Codex /%s failed: %s"):format(command, err), vim.log.levels.WARN)
-		end
-		return
-	end
-	unsupported("/" .. command)
-end
+local terminals = require("user.core.ai_terminal").new({
+	providers = providers,
+	notify = notify,
+	load = load,
+})
 
 local function opencode_api()
 	load(providers.opencode.plugin)
@@ -128,141 +121,6 @@ local function set_chat_state(open, id)
 	vim.g.user_ai_chat_provider = chat_provider
 end
 
-local function cli_command(id)
-	local p = providers[id]
-	if not p or not p.command then
-		return nil
-	end
-	return p.terminal or p.command
-end
-
-local function cli_width()
-	return math.max(24, math.floor((vim.o.columns or 80) * 0.40))
-end
-
-local function terminal_buf(term)
-	return term and (term.bufnr or term.buf)
-end
-
-local function terminal_win(term)
-	return term and (term.window or term.win)
-end
-
-local function terminal_buf_valid(term)
-	local bufnr = terminal_buf(term)
-	if type(bufnr) ~= "number" then
-		return false
-	end
-	return vim.api.nvim_buf_is_valid(bufnr)
-end
-
-local function terminal_visible(term)
-	if not terminal_buf_valid(term) then
-		return false
-	end
-	if type(term.is_open) == "function" then
-		local ok, valid = pcall(term.is_open, term)
-		if ok then
-			return valid == true
-		end
-	end
-	local winid = terminal_win(term)
-	return type(winid) == "number" and vim.api.nvim_win_is_valid(winid)
-end
-
--- Windows across every tabpage, not just the current one: chat detection must
--- see a panel even when it lives on another tab.
-local function all_windows()
-	local wins = {}
-	for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
-		for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(tab)) do
-			wins[#wins + 1] = winid
-		end
-	end
-	return wins
-end
-
-local function visible_buffer(bufnr)
-	if type(bufnr) ~= "number" or not vim.api.nvim_buf_is_valid(bufnr) then
-		return false
-	end
-	for _, winid in ipairs(all_windows()) do
-		if vim.api.nvim_win_is_valid(winid) and vim.api.nvim_win_get_buf(winid) == bufnr then
-			return true
-		end
-	end
-	return false
-end
-
-local function buffer_var(bufnr, name)
-	local ok, value = pcall(vim.api.nvim_buf_get_var, bufnr, name)
-	if ok then
-		return value
-	end
-	return nil
-end
-
-local function pattern_escape(value)
-	return (value:gsub("([^%w])", "%%%1"))
-end
-
-local function command_matches(full_cmd, cmd)
-	if type(full_cmd) ~= "string" or type(cmd) ~= "string" or cmd == "" then
-		return false
-	end
-	local escaped = pattern_escape(cmd)
-	return full_cmd == cmd or full_cmd:match("^" .. escaped .. "%s") ~= nil
-end
-
-local function terminal_command(bufnr)
-	local ai = buffer_var(bufnr, "user_ai_terminal")
-	if type(ai) == "table" and type(ai.command) == "string" then
-		return ai.command
-	end
-
-	local marker = buffer_var(bufnr, "codex_terminal")
-	if type(marker) == "table" and type(marker.cmd) == "string" then
-		return marker.cmd
-	end
-
-	local name = vim.api.nvim_buf_get_name(bufnr)
-	if type(name) == "string" then
-		return name:match("^term://.-//%d+:(.+)$")
-	end
-	return nil
-end
-
-local function visible_command(cmd)
-	for _, winid in ipairs(all_windows()) do
-		if vim.api.nvim_win_is_valid(winid) then
-			local bufnr = vim.api.nvim_win_get_buf(winid)
-			if command_matches(terminal_command(bufnr), cmd) then
-				return true
-			end
-		end
-	end
-	return false
-end
-
--- Channel of a live terminal buffer running this provider's CLI, if any (used
--- to send an interrupt to terminal-backed agents like Codex).
-local function provider_terminal_channel(id)
-	local p = providers[id]
-	local cmd = p and (p.command or p.executable)
-	if not cmd then
-		return nil
-	end
-	for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-		if vim.api.nvim_buf_is_valid(bufnr) and command_matches(terminal_command(bufnr), cmd) then
-			local ok, chan = pcall(vim.api.nvim_get_option_value, "channel", { buf = bufnr })
-			if ok and type(chan) == "number" and chan > 0 then
-				return chan
-			end
-		end
-	end
-	return nil
-end
-
 -- Best-effort interrupt of a provider's in-flight generation, so switching away
 -- does not leave the previous agent working in the background.
 local function stop_generation(id)
@@ -271,134 +129,24 @@ local function stop_generation(id)
 	elseif id == "opencode" then
 		opencode_command("session.interrupt")
 	elseif id == "codex" then
-		local chan = provider_terminal_channel(id)
+		local chan = terminals.channel(id)
 		if chan then
 			pcall(vim.api.nvim_chan_send, chan, "\003")
 		end
 	end
 end
 
-local function cli_term(id)
-	local term = cli_terms[id]
-	if terminal_buf_valid(term) then
-		return term
-	end
-
-	local p = providers[id]
-	if not p or not p.count then
-		return nil
-	end
-
-	load("toggleterm.nvim")
-	local ok, terminal_mod = pcall(require, "toggleterm.terminal")
-	if not ok then
-		return nil
-	end
-
-	if type(terminal_mod.get) == "function" then
-		term = terminal_mod.get(p.count, true)
-		if terminal_buf_valid(term) then
-			cli_terms[id] = term
-			return term
-		end
-	end
-
-	return nil
-end
-
-local function cli_visible(id)
-	local p = providers[id]
-	return terminal_visible(cli_term(id)) or (p and visible_command(p.command))
-end
-
-local function cli_terminal(id, focus)
-	local p = providers[id]
-	if not p or not p.command then
-		return nil
-	end
-	if p.plugin then
-		load(p.plugin)
-	end
-	if vim.fn.executable(p.command) == 0 then
-		notify(p.command .. " is not executable", vim.log.levels.ERROR)
-		return nil
-	end
-
-	load("toggleterm.nvim")
-	local ok, terminal_mod = pcall(require, "toggleterm.terminal")
-	if not ok or not terminal_mod.Terminal then
-		notify("toggleterm.nvim is not available", vim.log.levels.ERROR)
-		return nil
-	end
-
-	local term = cli_term(id)
-	if term then
-		local ok_open = pcall(function()
-			if focus then
-				if not terminal_visible(term) then
-					term:open(cli_width(), "vertical")
-				end
-				term:focus()
-				vim.cmd.startinsert()
-			else
-				term:toggle(cli_width(), "vertical")
-			end
-		end)
-		if not ok_open then
-			notify("Could not open " .. p.label .. " terminal", vim.log.levels.ERROR)
-			return nil
-		end
-		return term
-	end
-
-	term = terminal_mod.Terminal:new({
-		cmd = cli_command(id),
-		count = p.count,
-		direction = "vertical",
-		display_name = p.label,
-		hidden = true,
-		close_on_exit = false,
-		on_create = function(t)
-			if t.bufnr and vim.api.nvim_buf_is_valid(t.bufnr) then
-				vim.api.nvim_buf_set_var(t.bufnr, "user_ai_terminal", {
-					provider = id,
-					command = cli_command(id),
-					label = p.label,
-				})
-			end
-		end,
-	})
-	cli_terms[id] = term
-	local ok_open = pcall(function()
-		if focus then
-			term:open(cli_width(), "vertical")
-			term:focus()
-			vim.cmd.startinsert()
-		else
-			term:toggle(cli_width(), "vertical")
-		end
-	end)
-	if not ok_open then
-		cli_terms[id] = nil
-		notify("Could not open " .. p.label .. " terminal", vim.log.levels.ERROR)
-		return nil
-	end
-	return term
-end
-
 local function provider_chat_visible(id)
-	if id == "codex" then
-		return visible_command("codex")
-	elseif id == "claude" and package.loaded["claudecode.terminal"] then
+	if id == "claude" and package.loaded["claudecode.terminal"] then
 		local ok, terminal = pcall(require, "claudecode.terminal")
 		if not ok then
 			return false
 		end
 		if type(terminal.get_active_terminal_bufnr) == "function" then
-			return visible_buffer(terminal.get_active_terminal_bufnr())
+			return terminals.visible_buffer(terminal.get_active_terminal_bufnr())
 		end
 	elseif is_cli(id) then
-		return cli_visible(id)
+		return terminals.visible(id)
 	end
 
 	return false
@@ -434,17 +182,11 @@ local function active_chat_provider()
 end
 
 local function close_chat(id)
-	if id == "codex" then
-		load(providers.codex.plugin)
-		return pcall(vim.cmd, "CodexClose")
-	elseif id == "claude" then
+	if id == "claude" then
 		load(providers.claude.plugin)
 		return pcall(vim.cmd, "ClaudeCodeClose")
 	elseif is_cli(id) then
-		local term = cli_term(id)
-		if term and type(term.close) == "function" and terminal_visible(term) then
-			return pcall(term.close, term)
-		end
+		return terminals.close(id)
 	end
 	return false
 end
@@ -458,68 +200,16 @@ local function open_chat(id, focus)
 		return false
 	end
 
-	if id == "codex" then
-		load(providers.codex.plugin)
-		ok = pcall(vim.cmd, focus and "CodexFocus" or "Codex")
-	elseif id == "claude" then
+	if id == "claude" then
 		load(providers.claude.plugin)
 		ok = pcall(vim.cmd, focus and "ClaudeCodeFocus" or "ClaudeCode")
 	elseif is_cli(id) then
-		ok = cli_terminal(id, focus) ~= nil
+		ok = terminals.open(id, focus) ~= nil
 	end
 	if ok then
 		set_chat_state(true, id)
 	end
 	return ok
-end
-
-local function terminal_channel(term)
-	local bufnr = terminal_buf(term)
-	if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
-		return nil
-	end
-
-	if type(term.job_id) == "number" and term.job_id > 0 then
-		return term.job_id
-	end
-
-	local ok_var, chan = pcall(vim.api.nvim_buf_get_var, bufnr, "terminal_job_id")
-	if ok_var and type(chan) == "number" and chan > 0 then
-		return chan
-	end
-
-	local ok_opt, opt = pcall(vim.api.nvim_get_option_value, "channel", { buf = bufnr })
-	if ok_opt and type(opt) == "number" and opt > 0 then
-		return opt
-	end
-
-	return nil
-end
-
-local function cli_send(id, text)
-	local term = cli_terminal(id, true)
-	if not term then
-		return
-	end
-
-	local function attempt(remaining)
-		local chan = terminal_channel(term)
-		if chan then
-			vim.api.nvim_chan_send(chan, text)
-			return
-		end
-		if remaining <= 0 then
-			notify("Could not send to " .. providers[id].label .. ": terminal is not ready", vim.log.levels.WARN)
-			return
-		end
-		vim.defer_fn(function()
-			attempt(remaining - 1)
-		end, 60)
-	end
-
-	vim.defer_fn(function()
-		attempt(12)
-	end, 80)
 end
 
 local function paste_submit(text)
@@ -540,7 +230,7 @@ local function send_file_reference(id)
 	if not path then
 		return
 	end
-	cli_send(id, paste_submit("Use this file as context: " .. path))
+	terminals.send(id, paste_submit("Use this file as context: " .. path))
 end
 
 local function visual_selection_text()
@@ -575,7 +265,7 @@ local function cli_send_selection(id)
 		notify("No visual selection to send", vim.log.levels.WARN)
 		return
 	end
-	cli_send(id, paste_submit(text))
+	terminals.send(id, paste_submit(text))
 end
 
 local function cli_mention_file(id)
@@ -587,7 +277,7 @@ local function cli_mention_file(id)
 		if not path or path == "" then
 			return
 		end
-		cli_send(id, paste_submit("Use this file as context: " .. vim.fn.fnamemodify(path, ":p")))
+		terminals.send(id, paste_submit("Use this file as context: " .. vim.fn.fnamemodify(path, ":p")))
 	end)
 end
 
@@ -689,15 +379,11 @@ function M.open_cli(id, focus)
 	if not is_cli(id) then
 		return nil
 	end
-	return cli_terminal(id, focus ~= false)
+	return terminals.open(id, focus ~= false)
 end
 
 function M.add_buffer()
 	local id = provider()
-	if id == "codex" then
-		vim.cmd("CodexSendFile")
-		return
-	end
 	if id == "opencode" then
 		opencode_prompt("@buffer ")
 		return
@@ -730,9 +416,7 @@ end
 
 function M.send_selection()
 	local id = provider()
-	if id == "codex" then
-		vim.cmd("'<,'>CodexSendSelection")
-	elseif id == "claude" then
+	if id == "claude" then
 		vim.cmd("'<,'>ClaudeCodeSend")
 	elseif id == "opencode" then
 		opencode_prompt("@this ")
@@ -743,9 +427,7 @@ end
 
 function M.attach_file()
 	local id = provider()
-	if id == "codex" then
-		vim.cmd("CodexMentionFile")
-	elseif id == "claude" and tree_filetypes[vim.bo.filetype] then
+	if id == "claude" and tree_filetypes[vim.bo.filetype] then
 		vim.cmd("ClaudeCodeTreeAdd")
 	elseif id == "opencode" then
 		opencode_mention_file()
@@ -758,25 +440,26 @@ end
 
 function M.interrupt()
 	local id = provider()
-	if id == "codex" then
-		vim.cmd("CodexClearInput")
-	elseif id == "claude" then
+	if id == "claude" then
 		vim.cmd("ClaudeCodeStop")
 	elseif id == "opencode" then
 		opencode_command("session.interrupt")
 	elseif is_cli(id) then
-		cli_send(id, "\003")
+		local channel = terminals.channel(id)
+		if channel then
+			vim.api.nvim_chan_send(channel, "\003")
+		end
 	end
 end
 
 function M.resume()
 	local id = provider()
-	if id == "codex" then
-		vim.cmd("CodexResume")
-	elseif id == "claude" then
+	if id == "claude" then
 		vim.cmd("ClaudeCode --resume")
 	elseif id == "opencode" then
 		opencode_command("session.select")
+	elseif is_cli(id) then
+		terminals.send(id, "/resume\r")
 	end
 end
 
@@ -791,9 +474,7 @@ end
 
 function M.model()
 	local id = provider()
-	if id == "codex" then
-		codex_slash("model")
-	elseif id == "claude" then
+	if id == "claude" then
 		vim.cmd("ClaudeCodeSelectModel")
 	elseif id == "opencode" then
 		local opencode = opencode_api()
@@ -801,7 +482,7 @@ function M.model()
 			opencode.select()
 		end
 	elseif is_cli(id) then
-		cli_send(id, "/model\r")
+		terminals.send(id, "/model\r")
 	end
 end
 

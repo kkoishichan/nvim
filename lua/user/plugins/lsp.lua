@@ -1,61 +1,5 @@
-local servers = {
-	"asm_lsp",
-	"autotools_ls",
-	"bashls",
-	"basedpyright",
-	"biome",
-	"clangd",
-	"cssls",
-	"dockerls",
-	"emmet_language_server",
-	"gopls",
-	"html",
-	"jdtls",
-	"jsonls",
-	"lua_ls",
-	"marksman",
-	"neocmake",
-	"ruff",
-	"rust_analyzer",
-	"sqlls",
-	"tailwindcss",
-	"taplo",
-	"texlab",
-	"tinymist",
-	"typos_lsp",
-	"verible",
-	"vtsls",
-	"vue_ls",
-	"yamlls",
-}
-
--- Formatters, linters, and auxiliary packages only. LSP servers (incl. their
--- CLIs like biome, jdtls, ruff, taplo, and verible) are installed through
--- mason-lspconfig below, so they must not be duplicated here.
-local tools = {
-	"asmfmt",
-	"checkmake",
-	"clang-format",
-	"cmakelang",
-	"cmakelint",
-	"gofumpt",
-	"goimports",
-	"golangci-lint",
-	"hadolint",
-	"java-debug-adapter",
-	"java-test",
-	"latexindent",
-	"markdownlint-cli2",
-	"prettier",
-	"selene",
-	"shellcheck",
-	"shfmt",
-	"sqruff",
-	"stylelint",
-	"stylua",
-	"typstyle",
-	"yamllint",
-}
+local toolchain = require("user.toolchain")
+local servers = toolchain.lsp_servers
 
 local function client_supports(client, method, bufnr)
 	if not client or not client.supports_method then
@@ -133,10 +77,41 @@ return {
 		"mason-org/mason.nvim",
 		cmd = { "Mason", "MasonInstall", "MasonLog", "MasonUninstall", "MasonUninstallAll", "MasonUpdate" },
 		opts = {
+			-- Resolve Mason binaries per plugin instead of changing Neovim's global
+			-- PATH (which would leak into every :terminal child process).
+			PATH = "skip",
 			ui = {
 				border = "rounded",
 			},
 		},
+		init = function()
+			local function install_command(name, package_names, description)
+				vim.api.nvim_create_user_command(name, function()
+					require("lazy").load({ plugins = { "mason.nvim" } })
+					local packages = {}
+					for _, package_name in ipairs(package_names) do
+						table.insert(packages, ("%s@%s"):format(package_name, toolchain.version(package_name)))
+					end
+					vim.cmd("MasonInstall " .. table.concat(packages, " "))
+				end, { desc = description, force = true })
+			end
+
+			install_command(
+				"MasonCSharpInstall",
+				{ "roslyn-language-server", "csharpier", "netcoredbg" },
+				"Install the pinned C# toolchain"
+			)
+			install_command(
+				"MasonJavaInstall",
+				{ "jdtls", "java-debug-adapter", "java-test" },
+				"Install the pinned Java toolchain"
+			)
+			install_command(
+				"MasonKotlinInstall",
+				{ "kotlin-lsp", "ktlint", "kotlin-debug-adapter" },
+				"Install the pinned Kotlin toolchain"
+			)
+		end,
 	},
 	{
 		"WhoIsSethDaniel/mason-tool-installer.nvim",
@@ -152,7 +127,7 @@ return {
 		-- offline network never blocks/backgrounds work at launch.
 		dependencies = { "mason-org/mason.nvim" },
 		opts = {
-			ensure_installed = tools,
+			ensure_installed = toolchain.packages,
 			auto_update = false,
 			run_on_start = false,
 		},
@@ -162,37 +137,9 @@ return {
 		event = { "BufReadPre", "BufNewFile" },
 		dependencies = {
 			"saghen/blink.cmp",
-			"mason-org/mason.nvim",
-			"mason-org/mason-lspconfig.nvim",
 		},
 		config = function()
 			setup_lsp_keymaps()
-
-			-- Style LSP floating previews (hover, etc.) as borderless background
-			-- blocks, matching the completion docs: a space "border" for padding
-			-- (no lines) plus a Pmenu bg via winhighlight, which open_floating_preview
-			-- doesn't expose an option for -- so wrap the (public) API and set it on
-			-- the window. Guarded by a global flag so re-running this config (e.g.
-			-- :Lazy reload) wraps exactly once instead of stacking wrappers, which
-			-- would otherwise compound the padding on every reload.
-			if not vim.g.user_lsp_preview_patched then
-				vim.g.user_lsp_preview_patched = true
-				local orig_preview = vim.lsp.util.open_floating_preview
-				-- Left/right padding only (no lines, no top/bottom rows), like blink's
-				-- "padded" border.
-				local pad = { " ", "", "", " ", "", "", " ", " " }
-				function vim.lsp.util.open_floating_preview(contents, syntax, opts, ...)
-					opts = opts or {}
-					if opts.border == nil then
-						opts.border = pad
-					end
-					local bufnr, winid = orig_preview(contents, syntax, opts, ...)
-					if winid and vim.api.nvim_win_is_valid(winid) then
-						vim.wo[winid].winhighlight = "Normal:Pmenu,NormalFloat:Pmenu,FloatBorder:Pmenu"
-					end
-					return bufnr, winid
-				end
-			end
 
 			local capabilities = require("blink.cmp").get_lsp_capabilities()
 			capabilities.textDocument.foldingRange = {
@@ -279,6 +226,50 @@ return {
 			})
 
 			vim.lsp.config("typos_lsp", {
+				-- Prose uses Neovim's spell checker. Restrict typos-lsp to code and
+				-- structured data so the two systems do not duplicate diagnostics.
+				filetypes = {
+					"asm",
+					"bash",
+					"c",
+					"cmake",
+					"cpp",
+					"cs",
+					"css",
+					"dockerfile",
+					"gitconfig",
+					"gitignore",
+					"go",
+					"gomod",
+					"gosum",
+					"gowork",
+					"html",
+					"hyprlang",
+					"java",
+					"javascript",
+					"javascriptreact",
+					"json",
+					"jsonc",
+					"kotlin",
+					"lua",
+					"make",
+					"nasm",
+					"python",
+					"query",
+					"riscv",
+					"rust",
+					"sh",
+					"sql",
+					"systemverilog",
+					"toml",
+					"typescript",
+					"typescriptreact",
+					"verilog",
+					"vim",
+					"vue",
+					"yaml",
+					"zsh",
+				},
 				init_options = {
 					-- Surface typos quietly; they are hints, not errors.
 					diagnosticSeverity = "Hint",
@@ -291,29 +282,53 @@ return {
 				root_markers = { ".git" },
 			})
 
-			local vue_language_server_path = vim.fn.stdpath("data")
-				.. "/mason/packages/vue-language-server/node_modules/@vue/language-server"
-			vim.lsp.config("vtsls", {
-				filetypes = {
-					"javascript",
-					"javascriptreact",
-					"typescript",
-					"typescriptreact",
-					"vue",
-				},
-				settings = {
-					vtsls = {
-						tsserver = {
-							globalPlugins = {
-								{
-									name = "@vue/typescript-plugin",
-									location = vue_language_server_path,
-									languages = { "vue" },
-									configNamespace = "typescript",
-								},
-							},
+			local function vue_language_server_path()
+				local executable = toolchain.executable("vue-language-server")
+				local realpath = executable and (vim.uv.fs_realpath(executable) or executable)
+				local package = realpath and vim.fs.dirname(vim.fs.dirname(vim.fs.normalize(realpath)))
+				if package and vim.uv.fs_stat(vim.fs.joinpath(package, "package.json")) then
+					return package
+				end
+
+				-- Windows Mason shims are regular .cmd files rather than symlinks, so
+				-- their realpath cannot reveal the npm package directory.
+				local mason_package = vim.fs.joinpath(
+					vim.fn.stdpath("data"),
+					"mason",
+					"packages",
+					"vue-language-server",
+					"node_modules",
+					"@vue",
+					"language-server"
+				)
+				return vim.uv.fs_stat(vim.fs.joinpath(mason_package, "package.json")) and mason_package or nil
+			end
+
+			local vue_plugin = vue_language_server_path()
+			local vtsls_filetypes = {
+				"javascript",
+				"javascriptreact",
+				"typescript",
+				"typescriptreact",
+			}
+			local vtsls_settings = {}
+			if vue_plugin then
+				table.insert(vtsls_filetypes, "vue")
+				vtsls_settings.tsserver = {
+					globalPlugins = {
+						{
+							name = "@vue/typescript-plugin",
+							location = vue_plugin,
+							languages = { "vue" },
+							configNamespace = "typescript",
 						},
 					},
+				}
+			end
+			vim.lsp.config("vtsls", {
+				filetypes = vtsls_filetypes,
+				settings = {
+					vtsls = vtsls_settings,
 				},
 			})
 
@@ -346,15 +361,41 @@ return {
 				},
 			})
 
-			require("mason-lspconfig").setup({
-				ensure_installed = servers,
-				-- Dedicated plugins manage these servers; Mason still installs them
-				-- through ensure_installed, but automatic_enable must not create a
-				-- duplicate client.
-				automatic_enable = vim.tbl_filter(function(name)
-					return name ~= "jdtls" and name ~= "rust_analyzer"
-				end, servers),
-			})
+			-- nvim-lspconfig defaults use command names. Resolve each command to an
+			-- absolute system-or-Mason path so Mason can keep PATH="skip".
+			local server_requirements = {
+				roslyn_ls = { "dotnet" },
+			}
+			local enabled_servers = {}
+			for _, server in ipairs(servers) do
+				if server ~= "jdtls" and server ~= "rust_analyzer" then
+					local requirements_met = true
+					for _, requirement in ipairs(server_requirements[server] or {}) do
+						if not toolchain.executable(requirement) then
+							requirements_met = false
+							break
+						end
+					end
+					local config = vim.lsp.config[server]
+					local cmd = config and config.cmd
+					if requirements_met and type(cmd) == "table" and type(cmd[1]) == "string" then
+						local resolved = toolchain.executable(cmd[1])
+						if resolved then
+							cmd = vim.deepcopy(cmd)
+							cmd[1] = resolved
+							vim.lsp.config(server, { cmd = cmd })
+							table.insert(enabled_servers, server)
+						end
+					elseif requirements_met and type(cmd) == "function" then
+						table.insert(enabled_servers, server)
+					end
+				end
+			end
+
+			-- Enable only servers whose command already exists. This deliberately
+			-- avoids mason-lspconfig.setup(), which refreshes the registry whenever
+			-- LSP loads even with an empty ensure_installed list.
+			vim.lsp.enable(enabled_servers)
 		end,
 	},
 }

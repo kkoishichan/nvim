@@ -7,7 +7,7 @@
 # Or from an existing clone:
 #   ./deploy.sh
 #
-# Workflow: install system dependencies -> ensure nvim >= 0.11 -> back up and
+# Workflow: install system dependencies -> ensure nvim >= 0.12 -> back up and
 # clone the configuration -> restore plugins headlessly from lazy-lock.json.
 # Supports Arch, Debian/Ubuntu, Fedora, openSUSE, and macOS (Homebrew).
 
@@ -15,7 +15,7 @@ set -euo pipefail
 
 REPO_HTTPS="https://github.com/kkoishichan/nvim.git"
 REPO_SSH="git@github.com:kkoishichan/nvim.git"
-NVIM_MIN_MINOR=11 # Require nvim >= 0.11
+NVIM_MIN_MINOR=12 # Require nvim >= 0.12
 
 # Offline dictionary used by lua/user/core/dict.lua. The configuration expects
 # it under ~/.local/share.
@@ -41,9 +41,9 @@ Usage: deploy.sh [options]
   --ssh           Clone over SSH (HTTPS is the default and needs no key setup)
   --repo <url>    Use a custom repository URL
   --no-deps       Skip system dependency installation
-  --with-extras   Install optional dependencies (lazygit, Node.js, poppler, sqlite3, etc.)
-  --java          Install JDK 21+ and Java tooling (JDTLS, debugger, tests)
-  --mason         Run :MasonToolsInstallSync headlessly after deployment
+  --with-extras   Install optional dependencies (lazygit, Node.js, ImageMagick, poppler, etc.)
+  --java          Install JDK 21+ and Java tooling (also used by Kotlin tools)
+  --mason         Install tool runtimes and restore the pinned Mason toolchain
   --dict          Download ECDICT-ultimate (~300 MB archive, ~1.2 GB extracted)
   --no-sync       Skip headless plugin installation and defer it to first launch
   -h, --help      Show this help message
@@ -125,38 +125,45 @@ pkg_install() {
 install_deps() {
 	detect_pkg_mgr
 	if [ -z "$PKG_MGR" ]; then
-		warn "Could not detect a package manager. Install these manually: git neovim>=0.11 ripgrep fd a C compiler unzip curl tar"
+		warn "Could not detect a package manager. Install these manually: git neovim>=0.12 ripgrep fd a C compiler unzip curl tar"
+		[ "$run_mason" -eq 0 ] || warn "The pinned Mason toolchain also needs Node.js/npm, Python, Go, and Cargo"
+		[ "$with_java" -eq 0 ] || warn "Java support also needs JDK 21+ and Python 3.9+"
 		return
 	fi
 	info "Installing dependencies with $PKG_MGR"
 
-	local required extras java_deps
+	local required extras java_deps mason_deps
 	case "$PKG_MGR" in
 	pacman)
 		required=(git neovim ripgrep fd gcc unzip curl tar)
-		extras=(lazygit nodejs npm yarn poppler sqlite)
+		extras=(lazygit nodejs npm poppler sqlite imagemagick typst texlive-binextra)
 		java_deps=(jdk21-openjdk python)
+		mason_deps=(nodejs npm python python-pip go rust)
 		;;
 	apt)
 		$SUDO apt-get update
 		required=(git neovim ripgrep fd-find build-essential unzip curl tar)
-		extras=(lazygit nodejs npm poppler-utils sqlite3)
+		extras=(lazygit nodejs npm poppler-utils sqlite3 imagemagick typst latexmk)
 		java_deps=(openjdk-21-jdk python3)
+		mason_deps=(nodejs npm python3 python3-venv python3-pip golang-go cargo)
 		;;
 	dnf)
 		required=(git neovim ripgrep fd-find gcc unzip curl tar)
-		extras=(lazygit nodejs poppler-utils sqlite)
+		extras=(lazygit nodejs poppler-utils sqlite ImageMagick typst latexmk)
 		java_deps=(java-21-openjdk-devel python3)
+		mason_deps=(nodejs npm python3 python3-pip golang rust cargo)
 		;;
 	zypper)
 		required=(git neovim ripgrep fd gcc unzip curl tar)
-		extras=(lazygit nodejs poppler-tools sqlite3)
+		extras=(lazygit nodejs poppler-tools sqlite3 ImageMagick typst texlive-latexmk)
 		java_deps=(java-21-openjdk-devel python3)
+		mason_deps=(nodejs npm python3 python3-pip go rust cargo)
 		;;
 	brew)
 		required=(git neovim ripgrep fd)
-		extras=(lazygit node yarn poppler sqlite)
+		extras=(lazygit node poppler sqlite imagemagick typst latexmk)
 		java_deps=(openjdk@21 python)
+		mason_deps=(node python go rust)
 		;;
 	esac
 
@@ -166,6 +173,13 @@ install_deps() {
 		local pkg
 		for pkg in "${extras[@]}"; do
 			pkg_install "$pkg" || warn "Optional dependency $pkg failed to install; skipping it"
+		done
+	fi
+
+	if [ "$run_mason" -eq 1 ]; then
+		local pkg
+		for pkg in "${mason_deps[@]}"; do
+			pkg_install "$pkg" || warn "Mason runtime dependency $pkg failed to install; some tools may be unavailable"
 		done
 	fi
 
@@ -218,7 +232,10 @@ install_nvim_tarball() {
 
 	case ":$PATH:" in
 	*":$LOCAL_BIN:"*) ;;
-	*) warn "$LOCAL_BIN is not in PATH; add 'export PATH=\"$LOCAL_BIN:\$PATH\"' to your shell configuration" ;;
+	*)
+		export PATH="$LOCAL_BIN:$PATH"
+		warn "$LOCAL_BIN was added for this deployment only; add 'export PATH=\"$LOCAL_BIN:\$PATH\"' to your shell configuration"
+		;;
 	esac
 	hash -r
 	nvim_ok || die "Neovim is still unavailable after installation; check PATH"
@@ -286,15 +303,19 @@ sync_plugins() {
 	nvim --headless "+Lazy! restore" +qa || warn "Plugin installation failed; run :Lazy restore inside Neovim later"
 
 	if [ "$run_mason" -eq 1 ]; then
-		info "Installing Mason formatter and linter tools"
+		command -v dotnet >/dev/null ||
+			warn "C# tools will be installed, but C# development also requires a .NET SDK on PATH"
+		command -v java >/dev/null ||
+			warn "Kotlin formatter/debugger tools will be installed, but they also require Java on PATH (use --java)"
+		info "Installing the pinned Mason language and development toolchain"
 		nvim --headless "+MasonToolsInstallSync" +qa ||
 			warn "Mason tool installation failed; run :MasonToolsInstall inside Neovim later"
 	fi
 
 	if [ "$with_java" -eq 1 ]; then
 		info "Installing JDTLS and Java debug/test extensions"
-		nvim --headless "+MasonInstall jdtls java-debug-adapter java-test" +qa ||
-			warn "Java tooling installation failed; run :MasonInstall jdtls java-debug-adapter java-test later"
+		nvim --headless "+MasonJavaInstall" +qa ||
+			warn "Java tooling installation failed; run :MasonJavaInstall later"
 	fi
 }
 
@@ -319,9 +340,12 @@ cat <<'EOF'
 
 Notes:
   - Use a Nerd Font in your terminal so icons render correctly.
-  - Mason installs language servers when their corresponding file types are opened.
+  - Mason tools are installed only when requested with --mason or :MasonToolsInstall.
   - Java development requires JDK 21 or newer to run JDTLS; --java installs it.
-  - Inline images and PDF previews require kitty and poppler; --with-extras installs poppler.
+  - C# development requires a .NET SDK. Kotlin formatting/debugging requires Java;
+    use --java --mason to install the JVM and pinned Kotlin tools together.
+  - Inline images and PDF previews require a kitty-graphics terminal, ImageMagick, and poppler;
+    --with-extras installs ImageMagick and poppler.
   - The offline dictionary expects ECDICT-ultimate at ~/.local/share/trans/ultimate.db.
     Use --dict to download it from github.com/skywind3000/ECDICT-ultimate.
 EOF

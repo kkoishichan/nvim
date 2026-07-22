@@ -1,26 +1,141 @@
+local toolchain = require("user.toolchain")
+
+local function executable(name)
+	return toolchain.executable(name)
+end
+
+local function missing_adapter(package)
+	vim.notify(
+		("Debug adapter %q is unavailable. Run :MasonToolsInstall or install it from :Mason."):format(package),
+		vim.log.levels.ERROR,
+		{ title = "DAP" }
+	)
+end
+
+local function missing_runtime(runtime, language)
+	vim.notify(("%s debugging requires %q on PATH."):format(language, runtime), vim.log.levels.ERROR, { title = "DAP" })
+end
+
+local function csharp_root()
+	return vim.fs.root(0, function(name)
+		return name:match("%.slnx?$") ~= nil or name:match("%.csproj$") ~= nil
+	end) or vim.fn.getcwd()
+end
+
+local function kotlin_root()
+	return vim.fs.root(0, {
+		"settings.gradle",
+		"settings.gradle.kts",
+		"pom.xml",
+		"build.gradle",
+		"build.gradle.kts",
+		"workspace.json",
+	}) or vim.fn.getcwd()
+end
+
+local function kotlin_main_class()
+	local filename = vim.api.nvim_buf_get_name(0)
+	local basename = vim.fs.basename(filename):gsub("%.kt$", "Kt")
+	local package_name
+	for _, line in ipairs(vim.api.nvim_buf_get_lines(0, 0, math.min(100, vim.api.nvim_buf_line_count(0)), false)) do
+		package_name = line:match("^%s*package%s+([%w_.]+)")
+		if package_name then
+			break
+		end
+	end
+	local default = package_name and (package_name .. "." .. basename) or basename
+	return vim.fn.input("Fully qualified main class: ", default)
+end
+
+local debugpy_runtime
+local function debugpy_python()
+	if debugpy_runtime and vim.fn.executable(debugpy_runtime) == 1 then
+		return debugpy_runtime
+	end
+	-- Prefer an independently installed adapter/runtime. On Windows,
+	-- nvim-dap-python cannot treat a debugpy-adapter.cmd shim as the adapter
+	-- executable, so use a Python interpreter with the module instead.
+	if vim.fn.has("win32") ~= 1 then
+		local adapter = vim.fn.exepath("debugpy-adapter")
+		if adapter ~= "" then
+			debugpy_runtime = adapter
+			return debugpy_runtime
+		end
+	end
+	for _, name in ipairs({ "python3", "python" }) do
+		local python = vim.fn.exepath(name)
+		if python ~= "" then
+			local result = vim.system({ python, "-c", "import debugpy" }, { text = true }):wait(2000)
+			if result.code == 0 then
+				debugpy_runtime = python
+				return debugpy_runtime
+			end
+		end
+	end
+
+	local package = vim.fs.joinpath(vim.fn.stdpath("data"), "mason", "packages", "debugpy", "venv")
+	local python = vim.fs.joinpath(package, vim.fn.has("win32") == 1 and "Scripts/python.exe" or "bin/python")
+	if vim.fn.executable(python) == 1 then
+		debugpy_runtime = python
+		return debugpy_runtime
+	end
+end
+
+local adapter_by_filetype = {
+	c = { command = "codelldb", package = "codelldb" },
+	cpp = { command = "codelldb", package = "codelldb" },
+	cs = { command = "netcoredbg", package = "netcoredbg", runtime = "dotnet" },
+	go = { command = "dlv", package = "delve", plugin = "nvim-dap-go" },
+	kotlin = { command = "kotlin-debug-adapter", package = "kotlin-debug-adapter", runtime = "java" },
+	python = { check = debugpy_python, package = "debugpy", plugin = "nvim-dap-python" },
+	javascript = { command = "js-debug-adapter", package = "js-debug-adapter", plugin = "nvim-dap-vscode-js" },
+	javascriptreact = { command = "js-debug-adapter", package = "js-debug-adapter", plugin = "nvim-dap-vscode-js" },
+	typescript = { command = "js-debug-adapter", package = "js-debug-adapter", plugin = "nvim-dap-vscode-js" },
+	typescriptreact = { command = "js-debug-adapter", package = "js-debug-adapter", plugin = "nvim-dap-vscode-js" },
+	vue = { command = "js-debug-adapter", package = "js-debug-adapter", plugin = "nvim-dap-vscode-js" },
+}
+
+local function debug_continue()
+	local requirement = adapter_by_filetype[vim.bo.filetype]
+	local available
+	if requirement then
+		if requirement.runtime and not executable(requirement.runtime) then
+			missing_runtime(requirement.runtime, vim.bo.filetype == "cs" and "C#" or "Kotlin")
+			return
+		end
+		if requirement.check then
+			available = requirement.check()
+		else
+			available = executable(requirement.command)
+		end
+		if available and requirement.plugin then
+			require("lazy").load({ plugins = { requirement.plugin } })
+		end
+	end
+	if requirement and not available then
+		missing_adapter(requirement.package)
+		return
+	end
+	require("dap").continue()
+end
+
+local function load_dap_ui(open)
+	pcall(function()
+		require("lazy").load({ plugins = { "nvim-dap-ui", "nvim-dap-virtual-text" } })
+	end)
+	if open then
+		local ok, dapui = pcall(require, "dapui")
+		if ok then
+			dapui.open()
+		end
+	end
+end
+
 return {
 	{
 		"mfussenegger/nvim-dap",
-		dependencies = {
-			{ "rcarriga/nvim-dap-ui", dependencies = { "nvim-neotest/nvim-nio" } },
-			"theHamsta/nvim-dap-virtual-text",
-			{
-				"jay-babu/mason-nvim-dap.nvim",
-				cmd = { "DapInstall", "DapUninstall" },
-				dependencies = { "mason-org/mason.nvim" },
-			},
-			"leoluz/nvim-dap-go",
-			"mfussenegger/nvim-dap-python",
-			"mxsdev/nvim-dap-vscode-js",
-		},
 		keys = {
-			{
-				"<F5>",
-				function()
-					require("dap").continue()
-				end,
-				desc = "Debug: continue / start",
-			},
+			{ "<F5>", debug_continue, desc = "Debug: continue / start" },
 			{
 				"<F10>",
 				function()
@@ -42,13 +157,7 @@ return {
 				end,
 				desc = "Debug: step out",
 			},
-			{
-				"<leader>dc",
-				function()
-					require("dap").continue()
-				end,
-				desc = "Continue / start",
-			},
+			{ "<leader>dc", debug_continue, desc = "Continue / start" },
 			{
 				"<leader>dC",
 				function()
@@ -112,71 +221,20 @@ return {
 				end,
 				desc = "Terminate",
 			},
-			{
-				"<leader>du",
-				function()
-					require("dapui").toggle()
-				end,
-				desc = "Toggle DAP UI",
-			},
-			{
-				"<leader>de",
-				function()
-					require("dapui").eval()
-				end,
-				mode = { "n", "x" },
-				desc = "Eval expression",
-			},
 		},
 		config = function()
 			local dap = require("dap")
-			local dapui = require("dapui")
 
-			require("mason-nvim-dap").setup({
-				ensure_installed = { "codelldb", "delve", "js", "python" },
-				-- Adapters and configurations below are deliberately set up by their
-				-- dedicated plugins/manual definitions. Leaving handlers nil prevents
-				-- mason-nvim-dap from adding a second set of defaults.
-				automatic_installation = false,
-			})
-
-			-- Mason installs adapters asynchronously; if a session starts before the
-			-- binary exists (first run, install pending, or offline) surface a clear
-			-- notification instead of a cryptic adapter failure. Checked at launch
-			-- (function adapter), so there are no false alarms while mason is still
-			-- installing during startup.
-			local function mason_bin(name)
-				return vim.fn.stdpath("data") .. "/mason/bin/" .. name
-			end
-			local function ensure_executable(path, adapter)
-				if vim.fn.executable(path) == 1 then
-					return true
-				end
-				vim.notify(
-					("DAP adapter %q not found at:\n%s\nInstall it with :DapInstall %s (or :Mason)."):format(
-						adapter,
-						path,
-						adapter
-					),
-					vim.log.levels.ERROR,
-					{ title = "DAP" }
-				)
-				return false
-			end
-
-			-- codelldb adapter (path provided by mason).
-			dap.adapters.codelldb = function(callback, _)
-				local cmd = mason_bin("codelldb")
-				if not ensure_executable(cmd, "codelldb") then
+			dap.adapters.codelldb = function(callback)
+				local command = executable("codelldb")
+				if not command then
+					missing_adapter("codelldb")
 					return
 				end
 				callback({
 					type = "server",
 					port = "${port}",
-					executable = {
-						command = cmd,
-						args = { "--port", "${port}" },
-					},
+					executable = { command = command, args = { "--port", "${port}" } },
 				})
 			end
 
@@ -202,15 +260,177 @@ return {
 			dap.configurations.c = cpp
 			dap.configurations.cpp = cpp
 
-			-- Go (delve) and Python (debugpy): adapters + default configs.
-			require("dap-go").setup()
-			require("dap-python").setup(vim.fn.stdpath("data") .. "/mason/packages/debugpy/venv/bin/python")
+			dap.adapters.netcoredbg = function(callback)
+				if not executable("dotnet") then
+					missing_runtime("dotnet", "C#")
+					return
+				end
+				local command = executable("netcoredbg")
+				if not command then
+					missing_adapter("netcoredbg")
+					return
+				end
+				callback({
+					type = "executable",
+					command = command,
+					args = { "--interpreter=vscode" },
+				})
+			end
 
+			dap.configurations.cs = {
+				{
+					name = "Launch .NET assembly",
+					type = "netcoredbg",
+					request = "launch",
+					program = function()
+						return vim.fn.input(
+							"Path to DLL: ",
+							vim.fs.joinpath(csharp_root(), "bin", "Debug") .. "/",
+							"file"
+						)
+					end,
+					cwd = csharp_root,
+					stopAtEntry = false,
+				},
+				{
+					name = "Attach to .NET process",
+					type = "netcoredbg",
+					request = "attach",
+					processId = require("dap.utils").pick_process,
+					cwd = csharp_root,
+				},
+			}
+
+			dap.adapters.kotlin = function(callback)
+				if not executable("java") then
+					missing_runtime("java", "Kotlin")
+					return
+				end
+				local command = executable("kotlin-debug-adapter")
+				if not command then
+					missing_adapter("kotlin-debug-adapter")
+					return
+				end
+				callback({ type = "executable", command = command })
+			end
+
+			dap.configurations.kotlin = {
+				{
+					name = "Launch Kotlin main class",
+					type = "kotlin",
+					request = "launch",
+					projectRoot = kotlin_root,
+					mainClass = kotlin_main_class,
+				},
+				{
+					name = "Attach to Kotlin JVM on :5005",
+					type = "kotlin",
+					request = "attach",
+					projectRoot = kotlin_root,
+					hostName = "localhost",
+					port = 5005,
+					timeout = 2000,
+				},
+			}
+
+			dap.listeners.after.event_initialized["user_dap_ui"] = function()
+				load_dap_ui(true)
+			end
+			local function close_ui()
+				local dapui = package.loaded.dapui
+				if dapui then
+					dapui.close()
+				end
+			end
+			dap.listeners.before.event_terminated["user_dap_ui"] = close_ui
+			dap.listeners.before.event_exited["user_dap_ui"] = close_ui
+
+			vim.fn.sign_define("DapBreakpoint", { text = "●", texthl = "DiagnosticError", numhl = "" })
+			vim.fn.sign_define("DapBreakpointCondition", { text = "◆", texthl = "DiagnosticWarn", numhl = "" })
+			vim.fn.sign_define("DapStopped", { text = "▶", texthl = "DiagnosticOk", linehl = "Visual", numhl = "" })
+			vim.fn.sign_define("DapBreakpointRejected", { text = "○", texthl = "DiagnosticHint", numhl = "" })
+		end,
+	},
+	{
+		"rcarriga/nvim-dap-ui",
+		lazy = true,
+		dependencies = { "mfussenegger/nvim-dap", "nvim-neotest/nvim-nio" },
+		opts = {},
+		keys = {
+			{
+				"<leader>du",
+				function()
+					require("dapui").toggle()
+				end,
+				desc = "Toggle DAP UI",
+			},
+			{
+				"<leader>de",
+				function()
+					require("dapui").eval()
+				end,
+				mode = { "n", "x" },
+				desc = "Eval expression",
+			},
+		},
+	},
+	{
+		"theHamsta/nvim-dap-virtual-text",
+		lazy = true,
+		dependencies = { "mfussenegger/nvim-dap" },
+		opts = { commented = true },
+	},
+	{
+		"jay-babu/mason-nvim-dap.nvim",
+		cmd = { "DapInstall", "DapUninstall" },
+		dependencies = { "mason-org/mason.nvim" },
+		opts = {
+			ensure_installed = {},
+			automatic_installation = false,
+		},
+	},
+	{
+		"leoluz/nvim-dap-go",
+		lazy = true,
+		dependencies = { "mfussenegger/nvim-dap" },
+		config = function()
+			local delve = executable("dlv")
+			if not delve then
+				missing_adapter("delve")
+				return
+			end
+			require("dap-go").setup({ delve = { path = delve } })
+		end,
+	},
+	{
+		"mfussenegger/nvim-dap-python",
+		lazy = true,
+		dependencies = { "mfussenegger/nvim-dap" },
+		config = function()
+			local python = debugpy_python()
+			if not python then
+				missing_adapter("debugpy")
+				return
+			end
+			require("dap-python").setup(python)
+		end,
+	},
+	{
+		"mxsdev/nvim-dap-vscode-js",
+		lazy = true,
+		dependencies = { "mfussenegger/nvim-dap" },
+		config = function()
+			local command = executable("js-debug-adapter")
+			if not command then
+				missing_adapter("js-debug-adapter")
+				return
+			end
 			require("dap-vscode-js").setup({
-				debugger_cmd = { vim.fn.stdpath("data") .. "/mason/bin/js-debug-adapter" },
+				debugger_cmd = { command },
 				adapters = { "pwa-node", "pwa-chrome", "pwa-msedge", "node-terminal", "pwa-extensionHost" },
 			})
 
+			local dap = require("dap")
 			local node_launch = {
 				{
 					name = "Launch current JavaScript file",
@@ -243,37 +463,14 @@ return {
 				},
 			}
 
-			-- Node cannot execute raw TypeScript or Vue SFCs. Offer direct launch
-			-- only for JavaScript; TypeScript can attach to its actual runner, while
-			-- browser-oriented files attach through their generated source maps.
 			local javascript = vim.list_extend(vim.deepcopy(node_launch), vim.deepcopy(node_attach))
 			vim.list_extend(javascript, vim.deepcopy(browser_attach))
 			dap.configurations.javascript = javascript
-
 			local attach_only = vim.list_extend(vim.deepcopy(node_attach), vim.deepcopy(browser_attach))
 			dap.configurations.javascriptreact = vim.deepcopy(attach_only)
 			dap.configurations.typescript = vim.deepcopy(attach_only)
 			dap.configurations.typescriptreact = vim.deepcopy(attach_only)
 			dap.configurations.vue = vim.deepcopy(browser_attach)
-
-			dapui.setup()
-			require("nvim-dap-virtual-text").setup({ commented = true })
-
-			dap.listeners.after.event_initialized["dapui_config"] = function()
-				dapui.open()
-			end
-			dap.listeners.before.event_terminated["dapui_config"] = function()
-				dapui.close()
-			end
-			dap.listeners.before.event_exited["dapui_config"] = function()
-				dapui.close()
-			end
-
-			-- Signs.
-			vim.fn.sign_define("DapBreakpoint", { text = "●", texthl = "DiagnosticError", numhl = "" })
-			vim.fn.sign_define("DapBreakpointCondition", { text = "◆", texthl = "DiagnosticWarn", numhl = "" })
-			vim.fn.sign_define("DapStopped", { text = "▶", texthl = "DiagnosticOk", linehl = "Visual", numhl = "" })
-			vim.fn.sign_define("DapBreakpointRejected", { text = "○", texthl = "DiagnosticHint", numhl = "" })
 		end,
 	},
 }

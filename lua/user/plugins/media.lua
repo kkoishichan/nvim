@@ -1,5 +1,7 @@
 local function has_ui()
-	return #vim.api.nvim_list_uis() > 0
+	local has_magick = vim.fn.executable("magick") == 1
+		or (vim.fn.executable("convert") == 1 and vim.fn.executable("identify") == 1)
+	return #vim.api.nvim_list_uis() > 0 and has_magick
 end
 
 local function toggle_images()

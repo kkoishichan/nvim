@@ -12,12 +12,20 @@ return {
 		-- Route vim.ui.select (code actions, etc.) through fzf-lua, lazily: the
 		-- first select call loads fzf-lua, which then replaces vim.ui.select.
 		init = function()
-			vim.ui.select = function(...)
+			local fallback = vim.ui.select
+			local wrapper
+			wrapper = function(...)
 				-- Loading fzf-lua runs its config, which calls register_ui_select()
 				-- and replaces vim.ui.select; then dispatch to the real one.
-				require("lazy").load({ plugins = { "fzf-lua" } })
-				return vim.ui.select(...)
+				local ok = pcall(function()
+					require("lazy").load({ plugins = { "fzf-lua" } })
+				end)
+				if ok and vim.ui.select ~= wrapper then
+					return vim.ui.select(...)
+				end
+				return fallback(...)
 			end
+			vim.ui.select = wrapper
 		end,
 		config = function(_, opts)
 			local fzf_lua = require("fzf-lua")

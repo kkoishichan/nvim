@@ -8,6 +8,8 @@ local markview_filetypes = {
 	latex = true,
 }
 
+local toolchain = require("user.toolchain")
+
 local function refresh_markview(bufnr)
 	if not vim.api.nvim_buf_is_valid(bufnr) or not markview_filetypes[vim.bo[bufnr].filetype] then
 		return
@@ -44,12 +46,58 @@ return {
 			-- Settings migrated from the former manual rust_analyzer lsp config.
 			vim.g.rustaceanvim = {
 				server = {
+					cmd = { toolchain.executable("rust-analyzer") or "rust-analyzer" },
+					on_attach = function(_, bufnr)
+						local function debug_continue()
+							if not toolchain.executable("codelldb") then
+								vim.notify(
+									"Rust debugging requires codelldb; run :MasonToolsInstall",
+									vim.log.levels.ERROR,
+									{ title = "Rust" }
+								)
+								return
+							end
+							require("lazy").load({ plugins = { "nvim-dap" } })
+							local dap = require("dap")
+							if dap.session() or #(dap.configurations.rust or {}) > 0 then
+								dap.continue()
+							else
+								vim.cmd("RustLsp debuggables")
+							end
+						end
+						vim.keymap.set("n", "<F5>", debug_continue, {
+							buffer = bufnr,
+							desc = "Debug Rust: continue / select",
+						})
+						vim.keymap.set("n", "<leader>dc", debug_continue, {
+							buffer = bufnr,
+							desc = "Debug Rust: continue / select",
+						})
+					end,
 					default_settings = {
 						["rust-analyzer"] = {
 							cargo = { allFeatures = true },
 							check = { command = "clippy" },
 						},
 					},
+				},
+				dap = {
+					autoload_configurations = false,
+					adapter = function()
+						local command = toolchain.executable("codelldb")
+						if not command then
+							return false
+						end
+						return {
+							type = "server",
+							host = "127.0.0.1",
+							port = "${port}",
+							executable = {
+								command = command,
+								args = { "--port", "${port}" },
+							},
+						}
+					end,
 				},
 			}
 		end,
@@ -152,7 +200,14 @@ return {
 		"iamcco/markdown-preview.nvim",
 		cmd = { "MarkdownPreview", "MarkdownPreviewStop", "MarkdownPreviewToggle" },
 		ft = { "markdown" },
-		build = "cd app && yarn install --frozen-lockfile",
+		-- Use the plugin's prebuilt installer; this avoids making Yarn an
+		-- undocumented deployment requirement.
+		build = function()
+			vim.fn["mkdp#util#install_sync"]()
+			if vim.trim(vim.fn["mkdp#util#pre_build_version"]()) == "" then
+				error("markdown-preview.nvim prebuilt binary installation failed")
+			end
+		end,
 		init = function()
 			vim.g.mkdp_auto_start = 0
 			vim.g.mkdp_auto_close = 1
@@ -205,7 +260,11 @@ return {
 					"-file-line-error",
 				},
 			}
-			vim.g.vimtex_view_method = "zathura"
+			if vim.fn.executable("zathura") == 1 then
+				vim.g.vimtex_view_method = "zathura"
+			elseif vim.fn.has("macunix") == 1 then
+				vim.g.vimtex_view_method = "skim"
+			end
 			vim.g.vimtex_view_forward_search_on_start = 1
 			vim.g.vimtex_quickfix_mode = 0
 			vim.g.vimtex_quickfix_open_on_warning = 0
@@ -270,7 +329,7 @@ return {
 		version = "1.*",
 		opts = {
 			dependencies_bin = {
-				tinymist = "tinymist",
+				tinymist = toolchain.executable("tinymist") or "tinymist",
 			},
 			follow_cursor = true,
 		},

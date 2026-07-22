@@ -88,7 +88,7 @@ return {
 			right = {
 				{
 					title = "Codex",
-					ft = "",
+					ft = "toggleterm",
 					filter = function(buf)
 						return ai_terminal(buf, "codex")
 					end,

@@ -12,25 +12,9 @@ vim.filetype.add({
 	},
 })
 
-local mason_bin = vim.fn.stdpath("data") .. "/mason/bin"
-local path_sep = vim.fn.has("win32") == 1 and ";" or ":"
-local path = vim.env.PATH or ""
-local in_path = false
-
-for _, entry in ipairs(vim.split(path, path_sep, { plain = true, trimempty = true })) do
-	if entry == mason_bin then
-		in_path = true
-		break
-	end
-end
-
-if not in_path then
-	vim.env.PATH = mason_bin .. path_sep .. path
-end
-
 local opt = vim.opt
 
-opt.autowrite = true
+opt.autowrite = false
 opt.autoread = true
 opt.breakindent = true
 opt.clipboard = "unnamedplus"
@@ -78,7 +62,12 @@ opt.timeoutlen = 400
 opt.undofile = true
 opt.updatetime = 250
 opt.virtualedit = "block"
+opt.winborder = "rounded"
 opt.wrap = false
+
+-- Do not persist copied register contents in ShaDa. Sensitive buffers also
+-- disable disk-backed undo/swap and expire an unchanged system clipboard.
+opt.shada = "!,'100,<0,s10,h,r/tmp/,r/private/"
 
 opt.fillchars = {
 	eob = " ",

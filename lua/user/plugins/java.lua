@@ -1,43 +1,8 @@
-local multi_module_markers = {
-	"mvnw",
-	"gradlew",
-	"settings.gradle",
-	"settings.gradle.kts",
-	".git",
-}
-
-local single_module_markers = {
-	"build.xml",
-	"pom.xml",
-	"build.gradle",
-	"build.gradle.kts",
-}
-
-local function project_root(bufnr)
-	local root = vim.fs.root(bufnr, multi_module_markers) or vim.fs.root(bufnr, single_module_markers)
-	if root then
-		return vim.fs.normalize(root)
-	end
-
-	local path = vim.api.nvim_buf_get_name(bufnr)
-	return path ~= "" and vim.fs.dirname(vim.fs.normalize(path)) or vim.fn.getcwd()
-end
-
-local function workspace_dir(root)
-	local project = vim.fn.fnamemodify(root, ":t"):gsub("[^%w._-]", "_")
-	if project == "" then
-		project = "root"
-	end
-
-	-- The hash prevents projects with the same directory name from sharing an
-	-- Eclipse workspace and leaking indexes or build configuration into each other.
-	return vim.fs.joinpath(
-		vim.fn.stdpath("data"),
-		"jdtls",
-		"workspaces",
-		("%s-%s"):format(project, vim.fn.sha256(root):sub(1, 12))
-	)
-end
+local java_core = require("user.core.java")
+local pending_jdtls_buffers = {}
+local jdtls_installing = false
+local registry_refreshing = false
+local start_jdtls
 
 local function mason_jdtls()
 	local executable = vim.fn.exepath("jdtls")
@@ -85,11 +50,13 @@ local function java_bundles()
 end
 
 local function install_hint(feature)
+	local packages = feature == "debugging" and "java-debug-adapter" or "java-debug-adapter and java-test"
 	vim.notify(
-		(
-			"Java %s requires the Mason packages java-debug-adapter and java-test.\n"
-			.. "Run :MasonToolsInstall, then restart Neovim."
-		):format(feature),
+		("Java %s requires the Mason package%s %s.\n" .. "Run :MasonJavaInstall, then restart Neovim."):format(
+			feature,
+			feature == "debugging" and "" or "s",
+			packages
+		),
 		vim.log.levels.WARN,
 		{ title = "Java" }
 	)
@@ -99,13 +66,36 @@ local function setup_java_keys(bufnr, jdtls, has_debug, has_test)
 	local function map(mode, lhs, rhs, desc)
 		vim.keymap.set(mode, lhs, rhs, { buffer = bufnr, desc = desc, silent = true })
 	end
+	local function ensure_dap(feature)
+		if not has_debug then
+			install_hint(feature or "debugging")
+			return nil
+		end
+		require("lazy").load({ plugins = { "nvim-dap" } })
+		local ok, dap = pcall(require, "dap")
+		if not ok then
+			vim.notify("nvim-dap is unavailable", vim.log.levels.ERROR, { title = "Java" })
+			return nil
+		end
+		jdtls.setup_dap({ hotcodereplace = "auto" })
+		return dap
+	end
 	local function test(method, debug)
 		return function()
 			if not has_debug or not has_test then
 				install_hint("testing")
 				return
 			end
+			if not ensure_dap("testing") then
+				return
+			end
 			jdtls[method]({ config_overrides = { noDebug = not debug } })
+		end
+	end
+	local function continue()
+		local dap = ensure_dap("debugging")
+		if dap then
+			dap.continue()
 		end
 	end
 
@@ -135,52 +125,147 @@ local function setup_java_keys(bufnr, jdtls, has_debug, has_test)
 	map("n", "<leader>rr", test("test_nearest_method", false), "Run nearest Java test")
 	map("n", "<leader>rf", test("test_class", false), "Run Java test class")
 	map("n", "<leader>rd", test("test_nearest_method", true), "Debug nearest Java test")
+	map("n", "<leader>rs", test("pick_test", false), "Pick Java test")
+	map("n", "<F5>", continue, "Debug Java: continue / start")
+	map("n", "<leader>dc", continue, "Debug Java: continue / start")
+	map("n", "<leader>ro", function()
+		local dap = ensure_dap("debugging")
+		if dap then
+			dap.repl.open()
+		end
+	end, "Open Java debug REPL")
+	map("n", "<leader>rO", function()
+		if not ensure_dap("debugging") then
+			return
+		end
+		require("lazy").load({ plugins = { "nvim-dap-ui" } })
+		require("dapui").toggle()
+	end, "Toggle Java debug UI")
+	map("n", "<leader>rx", function()
+		local dap = ensure_dap("debugging")
+		if dap then
+			dap.terminate()
+		end
+	end, "Stop Java debug session")
 	map("n", "<localleader>tp", test("pick_test", false), "Pick Java test")
 end
 
-local function start_jdtls(bufnr)
+local function retry_pending_jdtls()
+	local buffers = pending_jdtls_buffers
+	pending_jdtls_buffers = {}
+	for bufnr in pairs(buffers) do
+		local buffer = bufnr
+		vim.schedule(function()
+			start_jdtls(buffer)
+		end)
+	end
+end
+
+local function fail_pending_jdtls(message)
+	pending_jdtls_buffers = {}
+	vim.notify(message, vim.log.levels.ERROR, { title = "Java" })
+end
+
+local function install_jdtls(bufnr)
+	pending_jdtls_buffers[bufnr] = true
+	if jdtls_installing or registry_refreshing then
+		return
+	end
+
+	local ok_registry, registry = pcall(require, "mason-registry")
+	if not ok_registry then
+		fail_pending_jdtls("Mason is unavailable; run :MasonInstall jdtls")
+		return
+	end
+
+	local ok_package, package = pcall(registry.get_package, "jdtls")
+	if not ok_package then
+		-- A fresh Mason installation has no local registry yet. Refresh only for
+		-- this explicit Java request; ordinary LSP startup remains offline-only.
+		registry_refreshing = true
+		vim.notify("Refreshing the Mason registry for JDTLS", vim.log.levels.INFO, { title = "Java" })
+		local ok_refresh = pcall(registry.refresh, function(success)
+			vim.schedule(function()
+				registry_refreshing = false
+				if not success then
+					fail_pending_jdtls("Could not refresh the Mason registry; check :MasonLog")
+					return
+				end
+				local pending_bufnr = next(pending_jdtls_buffers)
+				if pending_bufnr then
+					install_jdtls(pending_bufnr)
+				end
+			end)
+		end)
+		if not ok_refresh then
+			registry_refreshing = false
+			fail_pending_jdtls("Could not refresh the Mason registry; check :MasonLog")
+		end
+		return
+	end
+
+	jdtls_installing = true
+	package:once("install:success", function()
+		jdtls_installing = false
+		retry_pending_jdtls()
+	end)
+	package:once("install:failed", function()
+		vim.schedule(function()
+			jdtls_installing = false
+			fail_pending_jdtls("JDTLS installation failed; check :MasonLog")
+		end)
+	end)
+	if not package:is_installing() then
+		local ok_install = pcall(package.install, package, {
+			version = require("user.toolchain").version("jdtls"),
+		})
+		if not ok_install then
+			jdtls_installing = false
+			fail_pending_jdtls("Could not start the JDTLS installation; check :MasonLog")
+			return
+		end
+	end
+	vim.notify_once("Installing JDTLS with Mason; Java support will attach when it finishes", vim.log.levels.INFO)
+end
+
+start_jdtls = function(bufnr)
 	if not vim.api.nvim_buf_is_valid(bufnr) or vim.bo[bufnr].filetype ~= "java" or vim.b[bufnr].bigfile then
+		return
+	end
+
+	local java, runtime = java_core.runtime()
+	if not java then
+		vim.notify(runtime or "Java 21 or newer is required", vim.log.levels.ERROR, { title = "Java" })
 		return
 	end
 
 	local executable = mason_jdtls()
 	if not executable then
-		local ok_registry, registry = pcall(require, "mason-registry")
-		local ok_package, package = false, nil
-		if ok_registry then
-			ok_package, package = pcall(registry.get_package, "jdtls")
-		end
-		if not ok_package then
-			vim.notify("JDTLS is unavailable; run :MasonInstall jdtls", vim.log.levels.ERROR, { title = "Java" })
-			return
-		end
-
-		package:once("install:success", function()
-			vim.schedule(function()
-				start_jdtls(bufnr)
-			end)
-		end)
-		package:once("install:failed", function()
-			vim.schedule(function()
-				vim.notify("JDTLS installation failed; check :MasonLog", vim.log.levels.ERROR, { title = "Java" })
-			end)
-		end)
-		if not package:is_installing() then
-			package:install()
-		end
-		vim.notify_once("Installing JDTLS with Mason; Java support will attach when it finishes", vim.log.levels.INFO)
+		install_jdtls(bufnr)
 		return
 	end
 
-	if vim.fn.executable("java") ~= 1 then
-		vim.notify("JDTLS requires Java 21 or newer in PATH", vim.log.levels.ERROR, { title = "Java" })
-		return
+	local mason_root = vim.fs.normalize(vim.fs.joinpath(vim.fn.stdpath("data"), "mason"))
+	local normalized_executable = vim.fs.normalize(executable)
+	local mason_relative = normalized_executable:sub(#mason_root + 1)
+	if
+		normalized_executable == mason_root
+		or (vim.startswith(normalized_executable, mason_root) and mason_relative:match("^[/\\]") ~= nil)
+	then
+		local python, python_version = java_core.python_runtime()
+		if not python then
+			vim.notify(python_version, vim.log.levels.ERROR, { title = "Java" })
+			return
+		end
 	end
 
 	local jdtls = require("jdtls")
-	local root = project_root(bufnr)
-	local workspace = workspace_dir(root)
-	vim.fn.mkdir(workspace, "p")
+	local root = java_core.project_root(bufnr)
+	local workspace = java_core.workspace_dir(root)
+	if vim.fn.mkdir(workspace, "p") == 0 and vim.fn.isdirectory(workspace) == 0 then
+		vim.notify("Could not create JDTLS workspace: " .. workspace, vim.log.levels.ERROR, { title = "Java" })
+		return
+	end
 
 	local cmd = { executable, "-data", workspace }
 	local lombok = vim.fs.joinpath(vim.fn.stdpath("data"), "mason", "share", "jdtls", "lombok.jar")
@@ -224,9 +309,6 @@ local function start_jdtls(bufnr)
 			extendedClientCapabilities = extended_capabilities,
 		},
 		on_attach = function(_, attached_bufnr)
-			if has_debug then
-				jdtls.setup_dap({ hotcodereplace = "auto" })
-			end
 			setup_java_keys(attached_bufnr, jdtls, has_debug, has_test)
 		end,
 	}
@@ -242,7 +324,6 @@ return {
 		ft = "java",
 		dependencies = {
 			"mason-org/mason.nvim",
-			"mfussenegger/nvim-dap",
 			"neovim/nvim-lspconfig",
 			"saghen/blink.cmp",
 		},

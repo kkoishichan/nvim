@@ -1,3 +1,5 @@
+local toolchain = require("user.toolchain")
+
 return {
 	{
 		"mfussenegger/nvim-lint",
@@ -11,6 +13,7 @@ return {
 				css = { "stylelint" },
 				dockerfile = { "hadolint" },
 				go = { "golangcilint" },
+				kotlin = { "ktlint" },
 				lua = { "selene" },
 				make = { "checkmake" },
 				markdown = { "markdownlint-cli2" },
@@ -112,6 +115,26 @@ return {
 				stylelint = stylelint_root,
 			}
 
+			local function local_node_command(bufnr, name)
+				local executable = vim.fn.has("win32") == 1 and name .. ".cmd" or name
+				local dir = buffer_dir(bufnr)
+				while dir do
+					local candidate = vim.fs.joinpath(dir, "node_modules", ".bin", executable)
+					if vim.fn.executable(candidate) == 1 then
+						return candidate
+					end
+					local parent = vim.fs.dirname(dir)
+					if not parent or parent == dir then
+						break
+					end
+					dir = parent
+				end
+			end
+
+			local original_commands = {}
+			local runtime_requirements = {
+				ktlint = { "java" },
+			}
 			local function resolve_linter(name)
 				local linter = lint.linters[name]
 				if type(linter) == "function" then
@@ -121,19 +144,30 @@ return {
 					end
 					linter = resolved
 				end
+				if linter and original_commands[name] == nil then
+					original_commands[name] = linter.cmd
+				end
 				return linter
 			end
 
-			local function executable_available(name, linter, root)
-				-- nvim-lint's Stylelint definition prefers a project-local binary.
-				if name == "stylelint" and root then
-					local local_cmd = vim.fs.joinpath(root, "node_modules", ".bin", "stylelint")
-					if vim.fn.executable(local_cmd) == 1 then
-						return true
+			local function executable_available(bufnr, name)
+				for _, runtime in ipairs(runtime_requirements[name] or {}) do
+					if not toolchain.executable(runtime) then
+						return false
 					end
 				end
 
-				local cmd = linter and linter.cmd
+				if name == "stylelint" or name == "markdownlint-cli2" then
+					local local_cmd = local_node_command(bufnr, name)
+					if local_cmd then
+						return local_cmd
+					end
+				end
+
+				-- Stylelint's upstream command function resolves node_modules from
+				-- Neovim's cwd, not the buffer. The buffer-aware lookup above has
+				-- already handled local installs, so fall back by logical name.
+				local cmd = name == "stylelint" and "stylelint" or original_commands[name]
 				if type(cmd) == "function" then
 					local ok, resolved = pcall(cmd)
 					if not ok then
@@ -141,28 +175,36 @@ return {
 					end
 					cmd = resolved
 				end
-				return type(cmd) == "string" and vim.fn.executable(cmd) == 1
+				if type(cmd) ~= "string" then
+					return false
+				end
+				local resolved = toolchain.executable(cmd)
+				return resolved
 			end
 
 			local function configured_linters(bufnr)
 				local names = {}
 				local roots = {}
+				local commands = {}
 				for _, name in ipairs(lint.linters_by_ft[vim.bo[bufnr].filetype] or {}) do
 					local root_for = project_roots[name]
 					local root = root_for and root_for(bufnr) or nil
 					local configured = not root_for or root ~= nil
 					local linter = configured and resolve_linter(name) or nil
 
-					if configured and linter and executable_available(name, linter, root) then
+					local command = configured and linter and executable_available(bufnr, name) or nil
+
+					if command then
 						table.insert(names, name)
 						roots[name] = root
+						commands[name] = command
 					else
 						-- A removed/disabled project configuration must not leave its old
 						-- diagnostics behind in an already-open buffer.
 						vim.diagnostic.reset(lint.get_namespace(name), bufnr)
 					end
 				end
-				return names, roots
+				return names, roots, commands
 			end
 
 			local function is_empty_buffer(bufnr)
@@ -180,7 +222,7 @@ return {
 				end
 
 				vim.api.nvim_buf_call(bufnr, function()
-					local names, roots = configured_linters(bufnr)
+					local names, roots, commands = configured_linters(bufnr)
 					if #names == 0 then
 						return
 					end
@@ -203,6 +245,7 @@ return {
 							return linter.stdin == true or not vim.bo[bufnr].modified
 						end,
 						wrap_linter = function(linter)
+							linter.cmd = commands[linter.name]
 							-- A process can finish after the user has edited again. Drop
 							-- those stale results instead of publishing diagnostics against
 							-- a different in-memory revision.
@@ -222,16 +265,6 @@ return {
 							local root = roots[linter.name]
 							if root then
 								linter.cwd = root
-								-- The upstream Stylelint command resolver checks
-								-- ./node_modules relative to Neovim's cwd before the child
-								-- process receives `linter.cwd`. Pin the known project-local
-								-- executable here so projects work from any editor cwd.
-								if linter.name == "stylelint" then
-									local local_cmd = vim.fs.joinpath(root, "node_modules", ".bin", "stylelint")
-									if vim.fn.executable(local_cmd) == 1 then
-										linter.cmd = local_cmd
-									end
-								end
 							end
 							return linter
 						end,
