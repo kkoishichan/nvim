@@ -35,6 +35,8 @@ Neovim 打磨成接近 IDE 的日常工作流。
   数据库 `~/.local/share/trans/ultimate.db`（离线词典）。下载 Release 里的
   [`ecdict-ultimate-sqlite.zip`](https://github.com/skywind3000/ECDICT-ultimate/releases/download/1.0.0/ecdict-ultimate-sqlite.zip)
   解压到该目录，或用 `./deploy.sh --dict` 自动安装（解压后约 1.2GB）
+- Java 开发需要 JDK 21+ 与 Python 3.9+ 来运行 Mason 的 JDTLS launcher；项目
+  本身仍可使用 JDK 8+，部署时可用 `./deploy.sh --java` 安装 Java 环境。
 
 语言服务器会在相应文件首次打开时由 Mason 检查安装；formatter / linter 通过
 `:MasonToolsInstall` 按需批量安装，DAP 适配器可用 `:DapInstall` 或 `:Mason` 安装。
@@ -77,6 +79,7 @@ Selene、Stylelint、golangci-lint 仅在项目存在对应配置时运行，避
         ├── picker.lua        -- fzf-lua
         ├── terminal.lua      -- toggleterm 多终端管理
         ├── neogen.lua        -- 文档注释生成
+        ├── java.lua          -- JDTLS / Java DAP / JUnit 与 TestNG
         ├── lsp.lua  completion.lua  formatting.lua  lint.lua
         ├── dap.lua  test.lua  tasks.lua
         ├── treesitter.lua  folding.lua  editor.lua  multicursor.lua
@@ -98,9 +101,9 @@ Release 安装到 `~/.local`。已有的 `~/.config/nvim` 会先备份为
 `nvim.bak.<时间戳>`；如果它本身就是本仓库则改为 `git pull`。
 
 常用选项：`--ssh`（SSH 克隆）、`--with-extras`（lazygit / node / poppler
-等可选依赖）、`--mason`（批量预装 formatter / linter）、`--dict`（下载
-ECDICT-ultimate 离线词典）、`--no-deps`、`--no-sync`。详见
-`./deploy.sh --help`。
+等可选依赖）、`--java`（JDK / JDTLS / 调试与测试）、`--mason`（批量预装
+formatter / linter）、`--dict`（下载 ECDICT-ultimate 离线词典）、
+`--no-deps`、`--no-sync`。详见 `./deploy.sh --help`。
 
 ## 首次启动
 
@@ -119,6 +122,31 @@ nvim
 :DapInstall           " 安装单个 DAP 适配器
 :checkhealth          " 健康检查
 ```
+
+## Java
+
+打开 Java 文件时会通过 Mason 安装并启动 JDTLS。首次打开 Java 项目前，建议安装
+调试和测试扩展：
+
+```vim
+:MasonInstall jdtls java-debug-adapter java-test
+:TSInstall java
+```
+
+支持 Maven、Gradle、Ant、独立 Java 文件、Lombok、格式化、源码下载、主类调试，
+以及 JUnit / TestNG 测试。每个项目使用独立的持久化 JDTLS workspace。
+
+Java buffer 中的附加键位：
+
+| 键 | 作用 |
+| --- | --- |
+| `<leader>rr` | 运行光标附近的测试方法 |
+| `<leader>rf` | 运行当前测试类 |
+| `<leader>rd` | 调试光标附近的测试方法 |
+| `<localleader>o` | 整理 imports |
+| `<localleader>v` / `<localleader>c` | 提取变量 / 常量 |
+| Visual `<localleader>m` | 提取方法 |
+| `<localleader>tp` | 选择并运行当前文件中的测试 |
 
 ## 键位
 

@@ -29,6 +29,7 @@ LOCAL_OPT="$HOME/.local/opt"
 repo_url="$REPO_HTTPS"
 skip_deps=0
 with_extras=0
+with_java=0
 skip_sync=0
 run_mason=0
 with_dict=0
@@ -41,6 +42,7 @@ Usage: deploy.sh [options]
   --repo <url>    Use a custom repository URL
   --no-deps       Skip system dependency installation
   --with-extras   Install optional dependencies (lazygit, Node.js, poppler, sqlite3, etc.)
+  --java          Install JDK 21+ and Java tooling (JDTLS, debugger, tests)
   --mason         Run :MasonToolsInstallSync headlessly after deployment
   --dict          Download ECDICT-ultimate (~300 MB archive, ~1.2 GB extracted)
   --no-sync       Skip headless plugin installation and defer it to first launch
@@ -57,6 +59,7 @@ while [ $# -gt 0 ]; do
 		;;
 	--no-deps) skip_deps=1 ;;
 	--with-extras) with_extras=1 ;;
+	--java) with_java=1 ;;
 	--mason) run_mason=1 ;;
 	--dict) with_dict=1 ;;
 	--no-sync) skip_sync=1 ;;
@@ -127,28 +130,33 @@ install_deps() {
 	fi
 	info "Installing dependencies with $PKG_MGR"
 
-	local required extras
+	local required extras java_deps
 	case "$PKG_MGR" in
 	pacman)
 		required=(git neovim ripgrep fd gcc unzip curl tar)
 		extras=(lazygit nodejs npm yarn poppler sqlite)
+		java_deps=(jdk21-openjdk python)
 		;;
 	apt)
 		$SUDO apt-get update
 		required=(git neovim ripgrep fd-find build-essential unzip curl tar)
 		extras=(lazygit nodejs npm poppler-utils sqlite3)
+		java_deps=(openjdk-21-jdk python3)
 		;;
 	dnf)
 		required=(git neovim ripgrep fd-find gcc unzip curl tar)
 		extras=(lazygit nodejs poppler-utils sqlite)
+		java_deps=(java-21-openjdk-devel python3)
 		;;
 	zypper)
 		required=(git neovim ripgrep fd gcc unzip curl tar)
 		extras=(lazygit nodejs poppler-tools sqlite3)
+		java_deps=(java-21-openjdk-devel python3)
 		;;
 	brew)
 		required=(git neovim ripgrep fd)
 		extras=(lazygit node yarn poppler sqlite)
+		java_deps=(openjdk@21 python)
 		;;
 	esac
 
@@ -158,6 +166,13 @@ install_deps() {
 		local pkg
 		for pkg in "${extras[@]}"; do
 			pkg_install "$pkg" || warn "Optional dependency $pkg failed to install; skipping it"
+		done
+	fi
+
+	if [ "$with_java" -eq 1 ]; then
+		local pkg
+		for pkg in "${java_deps[@]}"; do
+			pkg_install "$pkg" || warn "Java dependency $pkg failed to install; install JDK 21+ manually"
 		done
 	fi
 
@@ -275,6 +290,12 @@ sync_plugins() {
 		nvim --headless "+MasonToolsInstallSync" +qa ||
 			warn "Mason tool installation failed; run :MasonToolsInstall inside Neovim later"
 	fi
+
+	if [ "$with_java" -eq 1 ]; then
+		info "Installing JDTLS and Java debug/test extensions"
+		nvim --headless "+MasonInstall jdtls java-debug-adapter java-test" +qa ||
+			warn "Java tooling installation failed; run :MasonInstall jdtls java-debug-adapter java-test later"
+	fi
 }
 
 # ------------------------------------------------------------------- Main flow
@@ -299,6 +320,7 @@ cat <<'EOF'
 Notes:
   - Use a Nerd Font in your terminal so icons render correctly.
   - Mason installs language servers when their corresponding file types are opened.
+  - Java development requires JDK 21 or newer to run JDTLS; --java installs it.
   - Inline images and PDF previews require kitty and poppler; --with-extras installs poppler.
   - The offline dictionary expects ECDICT-ultimate at ~/.local/share/trans/ultimate.db.
     Use --dict to download it from github.com/skywind3000/ECDICT-ultimate.

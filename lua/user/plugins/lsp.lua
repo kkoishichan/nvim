@@ -10,6 +10,7 @@ local servers = {
 	"emmet_language_server",
 	"gopls",
 	"html",
+	"jdtls",
 	"jsonls",
 	"lua_ls",
 	"marksman",
@@ -28,9 +29,9 @@ local servers = {
 	"yamlls",
 }
 
--- Formatters and linters only. LSP servers (incl. their CLIs like biome, ruff,
--- taplo, verible) are installed via mason-lspconfig's ensure_installed below, so
--- they must not be duplicated here.
+-- Formatters, linters, and auxiliary packages only. LSP servers (incl. their
+-- CLIs like biome, jdtls, ruff, taplo, and verible) are installed through
+-- mason-lspconfig below, so they must not be duplicated here.
 local tools = {
 	"asmfmt",
 	"checkmake",
@@ -41,6 +42,8 @@ local tools = {
 	"goimports",
 	"golangci-lint",
 	"hadolint",
+	"java-debug-adapter",
+	"java-test",
 	"latexindent",
 	"markdownlint-cli2",
 	"prettier",
@@ -345,10 +348,11 @@ return {
 
 			require("mason-lspconfig").setup({
 				ensure_installed = servers,
-				-- rust_analyzer is enabled by rustaceanvim, not here, to avoid a
-				-- duplicate client. mason still installs it via ensure_installed.
+				-- Dedicated plugins manage these servers; Mason still installs them
+				-- through ensure_installed, but automatic_enable must not create a
+				-- duplicate client.
 				automatic_enable = vim.tbl_filter(function(name)
-					return name ~= "rust_analyzer"
+					return name ~= "jdtls" and name ~= "rust_analyzer"
 				end, servers),
 			})
 		end,
