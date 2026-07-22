@@ -43,6 +43,9 @@ jobs:
           ln -s "$GITHUB_WORKSPACE" "$HOME/.config/nvim"
           nvim --headless "+Lazy! restore" +qa
 
+      - name: Synchronize Tree-sitter parsers
+        run: nvim --headless "+lua require('user.core.treesitter').sync()" +qa
+
       - name: Install check tools
         run: >-
           nvim --headless

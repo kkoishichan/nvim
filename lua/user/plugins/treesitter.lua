@@ -1,4 +1,3 @@
-local install_dir = vim.fn.stdpath("data") .. "/site"
 local treesitter_config = require("user.core.treesitter")
 
 return {
@@ -8,17 +7,9 @@ return {
 		-- The main branch does not support lazy-loading (per its README): load at
 		-- startup so parsers and queries never desync from the plugin version.
 		lazy = false,
-		build = function()
-			local treesitter = require("nvim-treesitter")
-			treesitter.setup({ install_dir = install_dir })
-			-- install() supplies parsers missing on a fresh machine; update() then
-			-- refreshes parsers whose pinned grammar revision changed. update() alone
-			-- deliberately ignores missing parsers on nvim-treesitter's main branch.
-			assert(treesitter.install(treesitter_config.parsers):wait(300000), "failed to install Tree-sitter parsers")
-			assert(treesitter.update(treesitter_config.parsers):wait(300000), "failed to update Tree-sitter parsers")
-		end,
+		build = treesitter_config.sync,
 		opts = {
-			install_dir = install_dir,
+			install_dir = treesitter_config.install_dir,
 		},
 		config = function(_, opts)
 			require("nvim-treesitter").setup(opts)

@@ -2,6 +2,8 @@ local M = {}
 
 -- Keep parser installation, CI validation, and FileType activation on the same
 -- complete catalog instead of maintaining language-specific parser subsets.
+M.install_dir = vim.fn.stdpath("data") .. "/site"
+
 M.parsers = {
 	"asm",
 	"bash",
@@ -99,6 +101,20 @@ M.filetypes = {
 	"yaml",
 	"zsh",
 }
+
+function M.sync()
+	local treesitter = require("nvim-treesitter")
+	treesitter.setup({ install_dir = M.install_dir })
+
+	-- update() deliberately ignores missing parsers on nvim-treesitter's main
+	-- branch, so install the complete catalog before refreshing its revisions.
+	assert(treesitter.install(M.parsers):wait(300000), "failed to install Tree-sitter parsers")
+	assert(treesitter.update(M.parsers):wait(300000), "failed to update Tree-sitter parsers")
+
+	for _, parser in ipairs(M.parsers) do
+		assert(vim.treesitter.language.add(parser), "Tree-sitter parser is not loadable after sync: " .. parser)
+	end
+end
 
 function M.enable(event)
 	if vim.b[event.buf].bigfile then
