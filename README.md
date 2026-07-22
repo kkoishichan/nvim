@@ -34,11 +34,12 @@ Neovim 打磨成接近 IDE 的日常工作流。
 - `sqlite3` 与 [ECDICT-ultimate](https://github.com/skywind3000/ECDICT-ultimate)
   数据库 `~/.local/share/trans/ultimate.db`（离线词典）。下载 Release 里的
   [`ecdict-ultimate-sqlite.zip`](https://github.com/skywind3000/ECDICT-ultimate/releases/download/1.0.0/ecdict-ultimate-sqlite.zip)
-  解压到该目录，或用 `./deploy.sh --dict` 自动安装（解压后约 1.2GB）
+  解压到该目录，或用 `./scripts/deploy.sh --dict` 自动安装（解压后约 1.2GB）
 - Java 开发需要 JDK 21+ 与 Python 3.9+ 来运行 Mason 的 JDTLS launcher；项目
-  本身仍可使用 JDK 8+，部署时可用 `./deploy.sh --java` 安装 Java 环境。
+  本身仍可使用 JDK 8+，部署时可用 `./scripts/deploy.sh --java` 安装 Java 环境。
 - C# 开发需要 PATH 中有兼容项目的 [.NET SDK](https://dotnet.microsoft.com/download)。
-- Kotlin 的格式化、检查与调试需要 PATH 中有 Java；可用 `./deploy.sh --java --mason`
+- Kotlin 的格式化、检查与调试需要 PATH 中有 Java；可用
+  `./scripts/deploy.sh --java --mason`
   同时安装 JDK 和固定版本的 Kotlin 工具。
 
 普通文件不会加载 Mason、刷新 registry 或下载工具。`:MasonToolsInstall` 会按需恢复
@@ -117,14 +118,15 @@ Selene、Stylelint、golangci-lint 仅在项目存在对应配置时运行，避
 │           └── ui.lua
 ├── scripts/
 │   ├── check.lua              -- Neovim 集成回归
-│   └── check.sh               -- 静态检查与无头启动入口
+│   ├── check.sh               -- 静态检查与无头启动入口
+│   ├── deploy.sh              -- 跨设备部署脚本
+│   └── install_parsers.lua    -- CI 所需 Tree-sitter parser 引导与验证
 ├── spell/
 │   ├── en.utf-8.add           -- 自定义英文词表
 │   └── en.utf-8.add.spl       -- Neovim 编译后的词表
-├── deploy.sh                  -- 跨设备部署脚本
 ├── init.lua                   -- 入口：版本检查、core、lazy
 ├── lazy-lock.json             -- 插件版本锁
-├── LICENSE                    -- MIT 许可证
+├── LICENSE                    -- GNU GPL v3 许可证
 ├── neovim.yml                 -- Selene 的 Neovim 标准库声明
 ├── README.md                  -- 配置说明、依赖与快捷键
 └── selene.toml                -- Selene 规则
@@ -139,10 +141,10 @@ Selene、Stylelint、golangci-lint 仅在项目存在对应配置时运行，避
 新机器上一条命令完成（安装依赖 + 克隆配置 + 无头安装插件）：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/kkoishichan/nvim/main/deploy.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/kkoishichan/nvim/main/scripts/deploy.sh)
 ```
 
-或已克隆仓库时直接 `./deploy.sh`。支持 Arch / Debian·Ubuntu / Fedora /
+或已克隆仓库时直接 `./scripts/deploy.sh`。支持 Arch / Debian·Ubuntu / Fedora /
 openSUSE / macOS(Homebrew)；发行版仓库里的 Neovim 过旧时会自动从官方
 Release 安装到 `~/.local`。已有的 `~/.config/nvim` 会先备份为
 `nvim.bak.<时间戳>`；如果它本身就是本仓库则改为 `git pull`。
@@ -152,11 +154,11 @@ poppler / typst / latexmk 等可选依赖）、`--java`（JDK / JDTLS / Java 调
 Kotlin 工具的 JVM 依赖）、`--mason`（安装所需的
 Node.js / Python / Go / Cargo 运行时并批量预装固定版本的开发工具链）、
 `--dict`（下载 ECDICT-ultimate 离线词典）、
-`--no-deps`、`--no-sync`。详见 `./deploy.sh --help`。
+`--no-deps`、`--no-sync`。详见 `./scripts/deploy.sh --help`。
 
 ## 首次启动
 
-把配置放到 `~/.config/nvim`（或使用上面的 `deploy.sh`），然后：
+把配置放到 `~/.config/nvim`（或使用上面的 `./scripts/deploy.sh`），然后：
 
 ```bash
 nvim
@@ -169,73 +171,73 @@ nvim
 :Mason                " 语言服务 / 工具安装
 :MasonToolsInstall    " 恢复固定版本的预设工具链
 :MasonCSharpInstall   " 只安装 C# LSP / formatter / debugger
+:MasonJavaInstall     " 只安装 Java LSP / debugger / test bundles
 :MasonKotlinInstall   " 只安装 Kotlin LSP / formatter / debugger
 :DapInstall           " 安装单个 DAP 适配器
 :checkhealth          " 健康检查
 ```
 
-## Java
+## 语言支持
 
-打开 Java 文件时会验证 PATH 中确实有 Java 21+ 运行时，并按需安装、启动 JDTLS。首次打开
-Java 项目前，建议安装
-调试和测试扩展：
+这里的“支持”按层次区分：Tree-sitter 负责语法与文本对象，LSP 提供补全、诊断和重构，
+formatter / linter、Neotest、DAP 与预览工具则按语言独立配置。表中 `—` 表示没有专用集成，
+不代表文件无法编辑。
 
-```vim
-:MasonJavaInstall
-:TSInstall java
-```
+<!-- markdownlint-disable MD013 -->
 
-支持 Maven、Gradle、Ant、独立 Java 文件、Lombok、格式化、源码下载、主类调试，
-以及 JUnit / TestNG 测试。每个项目使用独立的持久化 JDTLS workspace。
+| 语言 / 文件类型 | LSP / 语义支持 | 格式化 / 检查 | 测试 / 调试 / 预览 |
+| --- | --- | --- | --- |
+| Assembly / RISC-V | asm-lsp | asmfmt（Assembly） | — |
+| C / C++ | clangd | clang-format、clang-tidy | codelldb 调试 |
+| CMake、Make、Autotools | neocmake、autotools-language-server | cmake-format、cmakelint、checkmake | — |
+| C# | Roslyn | CSharpier | VSTest；netcoredbg 调试 |
+| Go | gopls | goimports、gofumpt、staticcheck；按项目启用 golangci-lint | neotest-golang；Delve 调试 |
+| Java | JDTLS / nvim-jdtls | JDTLS formatter | JUnit / TestNG；Java Debug Adapter |
+| Kotlin | JetBrains Kotlin LSP（Alpha） | ktlint | 部分 Gradle / Kotest；Kotlin Debug Adapter |
+| Rust | rust-analyzer / rustaceanvim | rustfmt、Clippy | rustaceanvim Neotest；codelldb 调试 |
+| Python | BasedPyright、Ruff | Ruff | neotest-python；debugpy 调试 |
+| JavaScript、TypeScript、React | vtsls；按项目启用 Biome / Tailwind CSS | Biome 或 Prettier | Jest / Vitest；js-debug 调试 |
+| Vue | vue_ls、vtsls、Tailwind CSS | Prettier；按项目启用 Biome | Jest / Vitest；Node / 浏览器调试 |
+| HTML / CSS | html-lsp、css-lsp、Emmet、Tailwind CSS | Prettier；按项目启用 Biome / Stylelint | HTML live preview |
+| Lua | lua-language-server | StyLua；按项目启用 Selene | — |
+| Bash / POSIX sh | bash-language-server | shfmt、ShellCheck | — |
+| SQL | sql-language-server | sqruff | — |
+| Dockerfile | dockerfile-language-server | hadolint | — |
+| Verilog / SystemVerilog | Verible LSP | Verible formatter / rules | — |
+| JSON / YAML / TOML | json-lsp、yaml-language-server、Taplo | Biome / Prettier、yamllint、Taplo | — |
+| Markdown | Marksman | Prettier、markdownlint-cli2 | Markview、浏览器预览 |
+| LaTeX | TexLab | latexindent | VimTeX、latexmk 编译与预览 |
+| Typst | Tinymist | typstyle | typst-preview、PDF 编译 |
 
-Java buffer 中的附加键位：
+<!-- markdownlint-enable MD013 -->
 
-| 键 | 作用 |
-| --- | --- |
-| `<leader>rr` | 运行光标附近的测试方法 |
-| `<leader>rf` | 运行当前测试类 |
-| `<leader>rd` | 调试光标附近的测试方法 |
-| `<leader>rs` | 选择并运行 Java 测试 |
-| `<leader>ro` / `<leader>rO` | 打开调试 REPL / 切换调试 UI |
-| `<leader>rx` | 停止 Java 调试会话 |
-| `<localleader>o` | 整理 imports |
-| `<localleader>v` / `<localleader>c` | 提取变量 / 常量 |
-| Visual `<localleader>m` | 提取方法 |
-| `<localleader>tp` | 选择并运行当前文件中的测试 |
+此外，Tree-sitter 还覆盖 NASM、diff、Git 配置与提交信息、Go module 文件、Hyprlang、Zsh、
+Vim / Vimdoc、Doxygen、查询文件等；这些项目属于语法级支持，不应等同于完整 LSP、测试或调试。
+typos-lsp 会为代码和结构化数据提供低优先级拼写提示，普通文本则使用 Neovim spell。
 
-## C#
+### 安装与通用工作流
 
-安装 [.NET SDK](https://dotnet.microsoft.com/download) 后，在 Neovim 内执行：
+`:MasonToolsInstall` 会恢复表中由 Mason 管理的固定版本工具，但不会安装项目本身的运行时。
+Python、Node.js、Go、Rust / Cargo、.NET SDK 与 Java 等仍需按项目放在 `PATH` 中。Tree-sitter
+parser 会在插件安装或更新时统一同步，也可用 `:TSInstall <language>` 单独修复。
 
-```vim
-:MasonCSharpInstall
-:TSInstall c_sharp
-```
+支持 Neotest 的语言共用 `<leader>rr`（最近测试）、`<leader>rf`（当前文件）、
+`<leader>rd`（调试测试）、`<leader>rw`（watch）以及输出、停止和 summary 键位；应用调试共用
+`<F5>`、`<F10>`、`<F11>` 与 `<leader>d` 组。
 
-`.sln`、`.slnx` 与 `.csproj` 项目使用 Roslyn 提供补全、诊断、跳转和重构；CSharpier
-负责保存时格式化。`neotest-vstest` 通过 VSTest / Microsoft Testing Platform 支持
-各类 .NET 测试框架，沿用 `<leader>rr` / `<leader>rf` / `<leader>rd` 等通用测试键位。
-`<F5>` 调试使用 netcoredbg；
-先执行 `dotnet build`，再从提示中选择 `bin/Debug/...` 下的 DLL，或选择 attach 配置。
+### 特殊要求与限制
 
-## Kotlin
-
-安装 Java 后，在 Neovim 内执行：
-
-```vim
-:MasonKotlinInstall
-:TSInstall kotlin
-```
-
-配置使用 JetBrains 官方 Kotlin LSP，支持 Gradle、Maven 和实验性 Android Gradle Plugin
-项目；ktlint 负责格式化与检查。该 LSP 当前仍处于 Alpha 阶段。`<F5>` 使用 Kotlin Debug
-Adapter；启动前先用 Gradle/Maven 编译，再确认提示的完整主类名（顶层 `main` 默认推导为
-`包名.文件名Kt`），也可 attach 到 `localhost:5005`。
-
-Kotlin 的 Neotest 适配器目前只支持带 `gradlew` 的 Gradle 项目和部分 Kotest spec，尚不支持
-JUnit、`kotlin.test`、Maven 或测试调试；这些测试请通过 `<leader>j` 的 Overseer 任务或终端
-运行，应用程序调试使用 `<F5>`。配置会阻止 Kotlin buffer 中的 `<leader>rd`，避免把有限的适配器
-能力误认为完整测试支持。
+- Java 的 JDTLS 运行时要求 Java 21+；Mason 提供的 launcher 另需 Python 3.9+，项目本身
+  仍可使用较旧 JDK。打开 Java 文件会按需安装固定版本 JDTLS；`:MasonJavaInstall`
+  另装调试与测试 bundles。
+  Maven、Gradle、Ant、独立文件、Lombok、源码下载和独立 project workspace 均已配置；
+  Java buffer 还提供 `<localleader>o` 整理 imports，以及提取变量、常量和方法的重构键位。
+- C# 需要 [.NET SDK](https://dotnet.microsoft.com/download)；使用 `<F5>` 前先执行
+  `dotnet build`，再选择 `bin/Debug/...` 下的 DLL，或使用 attach 配置。
+- Kotlin 需要 Java。官方 Kotlin LSP 当前仍处于 Alpha；应用调试前需先用 Gradle / Maven
+  编译，也可 attach 到 `localhost:5005`。Neotest 只支持带 `gradlew` 的项目和部分 Kotest，
+  尚不支持 JUnit、`kotlin.test`、Maven 或测试调试，其他测试请使用 Overseer 或终端。
+- Stylelint、golangci-lint 与 Selene 只在项目存在对应配置时启用，避免凭空套用规则集。
 
 ## 键位
 

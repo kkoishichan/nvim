@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install system dependencies
         run: |
@@ -38,17 +38,15 @@ jobs:
           echo /opt/nvim-linux-x86_64/bin >> "$GITHUB_PATH"
 
       - name: Restore plugins
+        env:
+          NVIM_SKIP_TREESITTER_INSTALL: "1"
         run: |
           mkdir -p "$HOME/.config"
           ln -s "$GITHUB_WORKSPACE" "$HOME/.config/nvim"
           nvim --headless "+Lazy! restore" +qa
 
       - name: Install test parsers
-        run: |
-          nvim --headless \
-            "+lua require('nvim-treesitter').install({ \
-              'c_sharp', 'kotlin' }):wait(300000)" \
-            +qa
+        run: nvim --headless -l scripts/install_parsers.lua
 
       - name: Install check tools
         run: >-

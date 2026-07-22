@@ -2,10 +2,10 @@
 # Deploy this Neovim configuration across machines.
 #
 # On a new machine (without cloning the repository first):
-#   bash <(curl -fsSL https://raw.githubusercontent.com/kkoishichan/nvim/main/deploy.sh)
+#   bash <(curl -fsSL https://raw.githubusercontent.com/kkoishichan/nvim/main/scripts/deploy.sh)
 #
 # Or from an existing clone:
-#   ./deploy.sh
+#   ./scripts/deploy.sh
 #
 # Workflow: install system dependencies -> ensure nvim >= 0.12 -> back up and
 # clone the configuration -> restore plugins headlessly from lazy-lock.json.
@@ -36,7 +36,7 @@ with_dict=0
 
 usage() {
 	cat <<'EOF'
-Usage: deploy.sh [options]
+Usage: ./scripts/deploy.sh [options]
 
   --ssh           Clone over SSH (HTTPS is the default and needs no key setup)
   --repo <url>    Use a custom repository URL

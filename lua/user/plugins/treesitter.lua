@@ -127,13 +127,19 @@ return {
 		-- startup so parsers and queries never desync from the plugin version.
 		lazy = false,
 		build = function()
+			-- CI installs only the parsers exercised by its integration tests in a
+			-- separate, verified step instead of downloading the complete catalog.
+			if vim.env.NVIM_SKIP_TREESITTER_INSTALL == "1" then
+				return
+			end
+
 			local treesitter = require("nvim-treesitter")
 			treesitter.setup({ install_dir = install_dir })
-			-- update() force-(re)installs the given list: installs anything missing
-			-- on a fresh machine AND refreshes already-installed parsers on a plugin
-			-- bump. Plain install() skips parsers that already exist, so it would
-			-- never update them -- that was the stale-parser risk.
-			treesitter.update(languages):wait(300000)
+			-- install() supplies parsers missing on a fresh machine; update() then
+			-- refreshes parsers whose pinned grammar revision changed. update() alone
+			-- deliberately ignores missing parsers on nvim-treesitter's main branch.
+			assert(treesitter.install(languages):wait(300000), "failed to install Tree-sitter parsers")
+			assert(treesitter.update(languages):wait(300000), "failed to update Tree-sitter parsers")
 		end,
 		opts = {
 			install_dir = install_dir,
