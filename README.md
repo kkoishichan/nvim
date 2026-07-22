@@ -49,9 +49,6 @@ Selene、Stylelint、golangci-lint 仅在项目存在对应配置时运行，避
 
 ```text
 ~/.config/nvim
-├── .github/
-│   └── workflows/
-│       └── ci.yml             -- GitHub Actions 回归检查
 ├── .gitignore                 -- 本地状态、日志与临时文件忽略规则
 ├── after/
 │   └── ftplugin/

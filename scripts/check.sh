@@ -25,10 +25,6 @@ bash -n "$ROOT/scripts/deploy.sh" "$ROOT/scripts/check.sh"
 if command -v shellcheck >/dev/null 2>&1 || [ -x "$MASON_BIN/shellcheck" ]; then
 	"$(tool shellcheck)" "$ROOT/scripts/deploy.sh" "$ROOT/scripts/check.sh"
 fi
-if command -v yamllint >/dev/null 2>&1 || [ -x "$MASON_BIN/yamllint" ]; then
-	"$(tool yamllint)" "$ROOT/.github/workflows/ci.yml"
-fi
-
 "$STYLUA" --check "$ROOT/init.lua" "$ROOT/lua" "$ROOT/after" "$ROOT/scripts"
 "$SELENE" "$ROOT/init.lua" "$ROOT/lua" "$ROOT/after" "$ROOT/scripts"
 

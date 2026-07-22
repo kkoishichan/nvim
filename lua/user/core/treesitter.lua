@@ -1,6 +1,6 @@
 local M = {}
 
--- Keep parser installation, CI validation, and FileType activation on the same
+-- Keep parser installation, validation, and FileType activation on the same
 -- complete catalog instead of maintaining language-specific parser subsets.
 M.install_dir = vim.fn.stdpath("data") .. "/site"
 
