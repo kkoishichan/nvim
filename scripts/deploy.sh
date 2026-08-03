@@ -21,12 +21,10 @@ NVIM_MIN_MINOR=12 # Require nvim >= 0.12
 # it under ~/.local/share.
 DICT_URL="https://github.com/skywind3000/ECDICT-ultimate/releases/download/1.0.0/ecdict-ultimate-sqlite.zip"
 DICT_DB="$HOME/.local/share/trans/ultimate.db"
-DOTNET_INSTALL_URL="https://dot.net/v1/dotnet-install.sh"
 
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/nvim"
 LOCAL_BIN="$HOME/.local/bin"
 LOCAL_OPT="$HOME/.local/opt"
-DOTNET_DIR="$LOCAL_OPT/dotnet"
 
 repo_url="$REPO_HTTPS"
 skip_deps=0
@@ -37,7 +35,7 @@ with_dict=0
 
 # Logical capabilities required to install or run the complete pinned Mason
 # catalog. Package names remain distribution-specific in install_deps().
-toolchain_prerequisites=(node npm python pip go cargo java dotnet perl)
+toolchain_prerequisites=(node npm python pip go cargo java perl)
 
 usage() {
 	cat <<'EOF'
@@ -182,16 +180,11 @@ java_runtime_available() {
 	[ "$major" -ge 21 ]
 }
 
-dotnet_sdk_available() {
-	command -v dotnet >/dev/null && [ -n "$(dotnet --list-sdks 2>/dev/null)" ]
-}
-
 prerequisite_available() {
 	case "$1" in
 	python) python_runtime_available ;;
 	pip) pip_runtime_available ;;
 	java) java_runtime_available ;;
-	dotnet) dotnet_sdk_available ;;
 	*) command -v "$1" >/dev/null ;;
 	esac
 }
@@ -200,7 +193,6 @@ prerequisite_label() {
 	case "$1" in
 	python) printf 'Python 3.9+' ;;
 	java) printf 'JDK 21+' ;;
-	dotnet) printf '.NET SDK' ;;
 	*) printf '%s' "$1" ;;
 	esac
 }
@@ -239,50 +231,12 @@ activate_brew_jdk() {
 	hash -r
 }
 
-# Distribution repositories do not expose one portable .NET SDK package name.
-# Use Microsoft's non-root installer as the single user-local fallback.
-install_dotnet_sdk() {
-	if dotnet_sdk_available; then
-		info ".NET SDK: $(dotnet --version)"
-		return
-	fi
-	if ! command -v curl >/dev/null; then
-		warn "curl is unavailable; cannot install the .NET SDK"
-		return 1
-	fi
-
-	local installer
-	installer=$(mktemp)
-	info "Installing the latest .NET LTS SDK to $DOTNET_DIR"
-	if ! curl -fL --progress-bar "$DOTNET_INSTALL_URL" -o "$installer"; then
-		rm -f "$installer"
-		warn "Could not download the official .NET installer"
-		return 1
-	fi
-	mkdir -p "$DOTNET_DIR" "$LOCAL_BIN"
-	if ! bash "$installer" --channel LTS --install-dir "$DOTNET_DIR" --no-path; then
-		rm -f "$installer"
-		warn ".NET SDK installation failed"
-		return 1
-	fi
-	rm -f "$installer"
-	ln -sf "$DOTNET_DIR/dotnet" "$LOCAL_BIN/dotnet"
-	export DOTNET_ROOT="$DOTNET_DIR"
-	ensure_local_bin_path
-	if ! dotnet_sdk_available; then
-		warn ".NET was installed, but no SDK is available on PATH"
-		return 1
-	fi
-	info ".NET SDK: $(dotnet --version)"
-}
-
 install_toolchain_prerequisites() {
 	local package
 	for package in "$@"; do
 		pkg_install "$package" || warn "Toolchain prerequisite $package failed to install; some Mason tools may be unavailable"
 	done
 	activate_brew_jdk
-	install_dotnet_sdk || warn "Install a compatible .NET SDK manually"
 	validate_toolchain_prerequisites
 }
 
@@ -291,7 +245,6 @@ install_deps() {
 	if [ -z "$PKG_MGR" ]; then
 		warn "Could not detect a package manager. Install these manually: git neovim>=0.12 ripgrep fd a C compiler unzip curl tar"
 		if [ "$with_toolchain" -eq 1 ]; then
-			install_dotnet_sdk || warn "Install a compatible .NET SDK manually"
 			validate_toolchain_prerequisites
 		fi
 		return

@@ -178,10 +178,8 @@ formatter / linter、Neotest、DAP 与预览工具则按语言独立配置。表
 | Assembly / RISC-V | asm-lsp | asmfmt（Assembly） | — | 对应汇编工具链 |
 | C / C++ | clangd | clang-format、clang-tidy | codelldb 调试 | C / C++ 工具链；调试前先构建可执行文件 |
 | CMake、Make、Autotools | neocmake、autotools-language-server | cmake-format、cmakelint、checkmake | — | 对应构建工具 |
-| C# | Roslyn | CSharpier | VSTest；netcoredbg 调试 | [.NET SDK](https://dotnet.microsoft.com/download)；调试前先构建 DLL |
 | Go | gopls | goimports、gofumpt、staticcheck；按项目启用 golangci-lint | neotest-golang；Delve 调试 | Go toolchain |
 | Java | JDTLS / nvim-jdtls | JDTLS formatter | JUnit / TestNG；Java Debug Adapter | JDTLS 需 JDK 21+，Mason launcher 另需 Python 3.9+；项目可使用旧 JDK |
-| Kotlin | JetBrains Kotlin LSP | ktlint | 部分 Gradle / Kotest；Kotlin Debug Adapter | JDK 与 Gradle / Maven；LSP 为 Alpha；调试前先构建；Neotest 不支持 JUnit、kotlin.test、Maven 或测试调试 |
 | Rust | rust-analyzer / rustaceanvim | rustfmt、Clippy | rustaceanvim Neotest；codelldb 调试 | Rust / Cargo toolchain |
 | Python | BasedPyright、Ruff | Ruff | neotest-python；debugpy 调试 | Python |
 | JavaScript、TypeScript、React | vtsls；按项目启用 Biome / Tailwind CSS | Biome 或 Prettier | Jest / Vitest；js-debug 调试 | Node.js |

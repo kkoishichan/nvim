@@ -17,12 +17,10 @@ M.lsp_servers = {
 	"gopls",
 	"html",
 	"jsonls",
-	"kotlin_lsp",
 	"lua_ls",
 	"marksman",
 	"neocmake",
 	"ruff",
-	"roslyn_ls",
 	"sqlls",
 	"tailwindcss",
 	"taplo",
@@ -50,12 +48,10 @@ local packages = {
 	{ "html-lsp", version = "4.10.0" },
 	{ "jdtls", version = "v1.60.0" },
 	{ "json-lsp", version = "4.10.0" },
-	{ "kotlin-lsp", version = "kotlin-lsp/v262.8190.0" },
 	{ "lua-language-server", version = "3.18.2" },
 	{ "marksman", version = "2026-02-08" },
 	{ "neocmakelsp", version = "v0.10.2" },
 	{ "ruff", version = "0.15.14" },
-	{ "roslyn-language-server", version = "5.8.0-1.26266.2" },
 	{ "rust-analyzer", version = "2026-05-18" },
 	{ "sqlls", version = "1.7.1" },
 	{ "tailwindcss-language-server", version = "0.14.29" },
@@ -74,13 +70,11 @@ local packages = {
 	{ "clang-format", version = "22.1.5" },
 	{ "cmakelang", version = "0.6.13" },
 	{ "cmakelint", version = "1.4.3" },
-	{ "csharpier", version = "1.2.6" },
 	{ "gofumpt", version = "v0.10.0" },
 	{ "goimports", version = "v0.45.0" },
 	{ "golangci-lint", version = "v2.12.2" },
 	{ "hadolint", version = "v2.14.0" },
 	{ "latexindent", version = "V3.24.4" },
-	{ "ktlint", version = "1.8.0" },
 	{ "markdownlint-cli2", version = "0.22.1" },
 	{ "prettier", version = "3.8.3" },
 	{ "selene", version = "0.31.0" },
@@ -99,8 +93,6 @@ local packages = {
 	{ "js-debug-adapter", version = "v1.117.0" },
 	{ "java-debug-adapter", version = "0.59.0" },
 	{ "java-test", version = "0.45.0" },
-	{ "kotlin-debug-adapter", version = "0.4.4" },
-	{ "netcoredbg", version = "3.1.3-1062" },
 }
 
 M.packages = packages
@@ -113,12 +105,7 @@ function M.version(name)
 	end
 end
 
-function M.executable(name)
-	local system = vim.fn.exepath(name)
-	if system ~= "" then
-		return system
-	end
-
+local function mason_executable(name)
 	local candidates = vim.fn.has("win32") == 1 and { name .. ".cmd", name .. ".exe", name .. ".bat", name } or { name }
 	for _, candidate in ipairs(candidates) do
 		local path = vim.fs.joinpath(vim.fn.stdpath("data"), "mason", "bin", candidate)
@@ -126,6 +113,24 @@ function M.executable(name)
 			return path
 		end
 	end
+end
+
+function M.executable(name, opts)
+	opts = opts or {}
+
+	if opts.prefer_mason then
+		local mason = mason_executable(name)
+		if mason then
+			return mason
+		end
+	end
+
+	local system = vim.fn.exepath(name)
+	if system ~= "" then
+		return system
+	end
+
+	return mason_executable(name)
 end
 
 return M

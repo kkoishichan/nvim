@@ -5,20 +5,7 @@ local loaded = {}
 local configured = false
 local projects = {}
 
-local function csharp_root(directory)
-	local solution = vim.fs.root(directory, function(name)
-		return name:match("%.slnx?$") ~= nil
-	end)
-	if solution then
-		return solution
-	end
-	return vim.fs.root(directory, function(name)
-		return name:match("%.csproj$") ~= nil
-	end)
-end
-
 local debug_plugins = {
-	cs = "nvim-dap",
 	go = "nvim-dap-go",
 	javascript = "nvim-dap-vscode-js",
 	javascriptreact = "nvim-dap-vscode-js",
@@ -29,30 +16,7 @@ local debug_plugins = {
 	vue = "nvim-dap-vscode-js",
 }
 
-local debug_unsupported = {
-	kotlin = "The Kotlin Neotest adapter cannot debug tests; use F5 for application debugging.",
-}
-
 local definitions = {
-	cs = {
-		{
-			plugin = "neotest-vstest",
-			module = "neotest-vstest",
-			-- The adapter retains its selected solution in a closure. Give each
-			-- registered project a fresh instance so two solutions never collide.
-			cache = false,
-			requires = { "dotnet" },
-			root = csharp_root,
-			create = function(adapter)
-				return adapter({
-					-- Avoid recursively scanning every descendant when Neovim was
-					-- opened above a solution (for example in $HOME).
-					broad_recursive_discovery = false,
-					dap_settings = { type = "netcoredbg" },
-				})
-			end,
-		},
-	},
 	python = {
 		{
 			plugin = "neotest-python",
@@ -70,9 +34,6 @@ local definitions = {
 				return adapter({})
 			end,
 		},
-	},
-	kotlin = {
-		{ plugin = "neotest-kotlin", module = "neotest-kotlin", requires = { "java" } },
 	},
 	rust = {
 		{ plugin = "rustaceanvim", module = "rustaceanvim.neotest" },
@@ -227,11 +188,6 @@ end
 
 function M.run(target)
 	if type(target) == "table" and target.strategy == "dap" then
-		local unsupported = debug_unsupported[vim.bo.filetype]
-		if unsupported then
-			vim.notify(unsupported, vim.log.levels.WARN, { title = "Tests" })
-			return
-		end
 		local plugin = debug_plugins[vim.bo.filetype]
 		if plugin then
 			require("lazy").load({ plugins = { plugin } })

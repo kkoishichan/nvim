@@ -16,37 +16,6 @@ local function missing_runtime(runtime, context)
 	vim.notify(("%s debugging requires %q on PATH."):format(context, runtime), vim.log.levels.ERROR, { title = "DAP" })
 end
 
-local function csharp_root()
-	return vim.fs.root(0, function(name)
-		return name:match("%.slnx?$") ~= nil or name:match("%.csproj$") ~= nil
-	end) or vim.fn.getcwd()
-end
-
-local function kotlin_root()
-	return vim.fs.root(0, {
-		"settings.gradle",
-		"settings.gradle.kts",
-		"pom.xml",
-		"build.gradle",
-		"build.gradle.kts",
-		"workspace.json",
-	}) or vim.fn.getcwd()
-end
-
-local function kotlin_main_class()
-	local filename = vim.api.nvim_buf_get_name(0)
-	local basename = vim.fs.basename(filename):gsub("%.kt$", "Kt")
-	local package_name
-	for _, line in ipairs(vim.api.nvim_buf_get_lines(0, 0, math.min(100, vim.api.nvim_buf_line_count(0)), false)) do
-		package_name = line:match("^%s*package%s+([%w_.]+)")
-		if package_name then
-			break
-		end
-	end
-	local default = package_name and (package_name .. "." .. basename) or basename
-	return vim.fn.input("Fully qualified main class: ", default)
-end
-
 local debugpy_runtime
 local function debugpy_python()
 	if debugpy_runtime and vim.fn.executable(debugpy_runtime) == 1 then
@@ -84,14 +53,7 @@ end
 local adapter_by_filetype = {
 	c = { command = "codelldb", package = "codelldb" },
 	cpp = { command = "codelldb", package = "codelldb" },
-	cs = { command = "netcoredbg", package = "netcoredbg", runtime = "dotnet", label = "C#" },
 	go = { command = "dlv", package = "delve", plugin = "nvim-dap-go" },
-	kotlin = {
-		command = "kotlin-debug-adapter",
-		package = "kotlin-debug-adapter",
-		runtime = "java",
-		label = "Kotlin",
-	},
 	python = { check = debugpy_python, package = "debugpy", plugin = "nvim-dap-python" },
 	javascript = { command = "js-debug-adapter", package = "js-debug-adapter", plugin = "nvim-dap-vscode-js" },
 	javascriptreact = { command = "js-debug-adapter", package = "js-debug-adapter", plugin = "nvim-dap-vscode-js" },
@@ -270,69 +232,6 @@ return {
 			}
 			dap.configurations.c = cpp
 			dap.configurations.cpp = cpp
-
-			dap.adapters.netcoredbg = function(callback)
-				local command = adapter_executable(adapter_by_filetype.cs)
-				if not command then
-					return
-				end
-				callback({
-					type = "executable",
-					command = command,
-					args = { "--interpreter=vscode" },
-				})
-			end
-
-			dap.configurations.cs = {
-				{
-					name = "Launch .NET assembly",
-					type = "netcoredbg",
-					request = "launch",
-					program = function()
-						return vim.fn.input(
-							"Path to DLL: ",
-							vim.fs.joinpath(csharp_root(), "bin", "Debug") .. "/",
-							"file"
-						)
-					end,
-					cwd = csharp_root,
-					stopAtEntry = false,
-				},
-				{
-					name = "Attach to .NET process",
-					type = "netcoredbg",
-					request = "attach",
-					processId = require("dap.utils").pick_process,
-					cwd = csharp_root,
-				},
-			}
-
-			dap.adapters.kotlin = function(callback)
-				local command = adapter_executable(adapter_by_filetype.kotlin)
-				if not command then
-					return
-				end
-				callback({ type = "executable", command = command })
-			end
-
-			dap.configurations.kotlin = {
-				{
-					name = "Launch Kotlin main class",
-					type = "kotlin",
-					request = "launch",
-					projectRoot = kotlin_root,
-					mainClass = kotlin_main_class,
-				},
-				{
-					name = "Attach to Kotlin JVM on :5005",
-					type = "kotlin",
-					request = "attach",
-					projectRoot = kotlin_root,
-					hostName = "localhost",
-					port = 5005,
-					timeout = 2000,
-				},
-			}
 
 			dap.listeners.after.event_initialized["user_dap_ui"] = function()
 				load_dap_ui(true)

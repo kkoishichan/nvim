@@ -1,8 +1,8 @@
 local toolchain = require("user.toolchain")
 
-local function command(name)
+local function command(name, opts)
 	return function()
-		return toolchain.executable(name) or name
+		return toolchain.executable(name, opts) or name
 	end
 end
 
@@ -17,6 +17,12 @@ local function node_command(name)
 		end
 		return toolchain.executable(name) or candidate
 	end
+end
+
+local function latexindent_args()
+	local cruft = vim.fs.joinpath(vim.fn.stdpath("cache"), "latexindent")
+	vim.fn.mkdir(cruft, "p")
+	return { "--cruft=" .. cruft }
 end
 
 return {
@@ -55,7 +61,6 @@ return {
 			formatters_by_ft = {
 				asm = { "asmfmt" },
 				c = { "clang-format" },
-				cs = { "csharpier" },
 				cmake = { "cmake_format" },
 				cpp = { "clang-format" },
 				css = { "biome", "prettier", stop_after_first = true },
@@ -65,7 +70,6 @@ return {
 				javascriptreact = { "biome", "prettier", stop_after_first = true },
 				json = { "biome", "prettier", stop_after_first = true },
 				jsonc = { "biome", "prettier", stop_after_first = true },
-				kotlin = { "ktlint" },
 				lua = { "stylua" },
 				markdown = { "prettier" },
 				python = { "ruff_organize_imports", "ruff_format" },
@@ -91,22 +95,15 @@ return {
 				},
 				["clang-format"] = { command = command("clang-format") },
 				cmake_format = { command = command("cmake-format") },
-				csharpier = {
-					command = command("csharpier"),
-					args = { "format" },
-					condition = function()
-						return toolchain.executable("dotnet") ~= nil
-					end,
-				},
 				gofumpt = { command = command("gofumpt") },
 				goimports = { command = command("goimports") },
-				ktlint = {
-					command = command("ktlint"),
-					condition = function()
-						return toolchain.executable("java") ~= nil
-					end,
+				-- TeX distributions may expose latexindent even when its Perl modules
+				-- are incomplete. Mason ships a self-contained binary, so prefer it
+				-- when available and retain the system command as a fallback.
+				latexindent = {
+					command = command("latexindent", { prefer_mason = true }),
+					prepend_args = latexindent_args,
 				},
-				latexindent = { command = command("latexindent") },
 				prettier = { command = node_command("prettier") },
 				ruff_format = {
 					command = command("ruff"),

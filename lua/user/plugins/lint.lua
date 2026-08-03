@@ -13,7 +13,6 @@ return {
 				css = { "stylelint" },
 				dockerfile = { "hadolint" },
 				go = { "golangcilint" },
-				kotlin = { "ktlint" },
 				lua = { "selene" },
 				make = { "checkmake" },
 				markdown = { "markdownlint-cli2" },
@@ -132,9 +131,6 @@ return {
 			end
 
 			local original_commands = {}
-			local runtime_requirements = {
-				ktlint = { "java" },
-			}
 			local function resolve_linter(name)
 				local linter = lint.linters[name]
 				if type(linter) == "function" then
@@ -151,12 +147,6 @@ return {
 			end
 
 			local function executable_available(bufnr, name)
-				for _, runtime in ipairs(runtime_requirements[name] or {}) do
-					if not toolchain.executable(runtime) then
-						return false
-					end
-				end
-
 				if name == "stylelint" or name == "markdownlint-cli2" then
 					local local_cmd = local_node_command(bufnr, name)
 					if local_cmd then

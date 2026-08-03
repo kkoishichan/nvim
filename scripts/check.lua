@@ -101,6 +101,46 @@ do
 		assert(not seen[server], "duplicate LSP server: " .. server)
 		seen[server] = true
 	end
+
+	local mason_bin = vim.fs.joinpath(vim.fn.stdpath("data"), "mason", "bin")
+	local latexindent_candidates = vim.fn.has("win32") == 1
+			and { "latexindent.cmd", "latexindent.exe", "latexindent.bat", "latexindent" }
+		or { "latexindent" }
+	local mason_latexindent
+	for _, candidate in ipairs(latexindent_candidates) do
+		local executable = vim.fs.joinpath(mason_bin, candidate)
+		if vim.fn.executable(executable) == 1 then
+			mason_latexindent = executable
+			break
+		end
+	end
+	if mason_latexindent then
+		assert(
+			toolchain.executable("latexindent", { prefer_mason = true }) == mason_latexindent,
+			"latexindent did not prefer Mason's self-contained executable"
+		)
+		local result = vim.system({ mason_latexindent, "--version" }, { text = true }):wait(5000)
+		assert(result.code == 0, "Mason's latexindent executable is not runnable: " .. (result.stderr or ""))
+
+		require("lazy").load({ plugins = { "conform.nvim" } })
+		local buffer = vim.api.nvim_create_buf(false, false)
+		vim.api.nvim_buf_set_name(buffer, vim.fs.joinpath(tmp, "latexindent-audit.tex"))
+		vim.bo[buffer].filetype = "tex"
+		local format_err, formatted = require("conform").format_lines({ "latexindent" }, {
+			"\\begin{itemize}",
+			"\\item outer",
+			"\\begin{itemize}",
+			"\\item inner",
+			"\\end{itemize}",
+			"\\end{itemize}",
+		}, { bufnr = buffer, timeout_ms = 10000, quiet = true })
+		assert(not format_err and formatted, "latexindent formatting failed: " .. tostring(format_err))
+		assert(
+			vim.uv.fs_stat(vim.fs.joinpath(vim.fn.stdpath("cache"), "latexindent", "indent.log")),
+			"latexindent log was not redirected to Neovim's cache"
+		)
+		vim.api.nvim_buf_delete(buffer, { force = true })
+	end
 end
 
 do
@@ -124,6 +164,33 @@ do
 		local config = vim.lsp.config[server]
 		assert(type(config) == "table", "missing LSP config: " .. server)
 		assert(type(config.filetypes) == "table" and #config.filetypes > 0, "LSP has no filetypes: " .. server)
+	end
+
+	local rpc_start = vim.lsp.rpc.start
+	local ok_commands, web_commands = pcall(function()
+		vim.lsp.rpc.start = function(command)
+			return command
+		end
+		local config = { root_dir = tmp .. "/web-lsp-command-audit" }
+		return {
+			biome = vim.lsp.config.biome.cmd({}, config),
+			tailwindcss = vim.lsp.config.tailwindcss.cmd({}, config),
+		}
+	end)
+	vim.lsp.rpc.start = rpc_start
+	assert(ok_commands, "Web LSP command resolution failed: " .. tostring(web_commands))
+	local web_command_specs = {
+		biome = { executable = "biome", argument = "lsp-proxy" },
+		tailwindcss = { executable = "tailwindcss-language-server", argument = "--stdio" },
+	}
+	local toolchain = require("user.toolchain")
+	for server, spec in pairs(web_command_specs) do
+		local resolved = toolchain.executable(spec.executable)
+		assert(
+			not resolved or web_commands[server][1] == resolved,
+			server .. " did not resolve its Mason/system binary"
+		)
+		assert(web_commands[server][2] == spec.argument, server .. " lost its LSP transport argument")
 	end
 
 	local vue = require("user.toolchain").executable("vue-language-server")
@@ -155,15 +222,19 @@ end
 do
 	require("lazy").load({ plugins = { "nvim-dap" } })
 	local dap = require("dap")
-	assert(type(dap.adapters.netcoredbg) == "function", "netcoredbg adapter is missing")
-	assert(type(dap.adapters.kotlin) == "function", "Kotlin debug adapter is missing")
-	assert(#(dap.configurations.cs or {}) >= 2, "C# launch/attach configurations are missing")
-	assert(#(dap.configurations.kotlin or {}) >= 2, "Kotlin launch/attach configurations are missing")
+	assert(type(dap.adapters.codelldb) == "function", "codelldb adapter is missing")
+	assert(#(dap.configurations.c or {}) >= 2, "C launch/attach configurations are missing")
+	assert(#(dap.configurations.cpp or {}) >= 2, "C++ launch/attach configurations are missing")
 end
 
 do
 	require("lazy").load({ plugins = { "nvim-lint" } })
-	assert(vim.deep_equal(require("lint").linters_by_ft.kotlin, { "ktlint" }), "Kotlin linter is missing")
+	local lint = require("lint")
+	for filetype, names in pairs(lint.linters_by_ft) do
+		for _, name in ipairs(names) do
+			assert(lint.linters[name] ~= nil, ("unknown linter %s for %s"):format(name, filetype))
+		end
+	end
 end
 
 do
@@ -174,39 +245,9 @@ do
 	vim.fn.mkdir(base .. "/go", "p")
 	vim.fn.writefile({ "module example.test", "", "go 1.24" }, base .. "/go/go.mod")
 	vim.fn.writefile({ "package example" }, base .. "/go/example_test.go")
-	vim.fn.mkdir(base .. "/csharp", "p")
-	vim.fn.writefile({ '<Project Sdk="Microsoft.NET.Sdk">', "</Project>" }, base .. "/csharp/example.csproj")
-	vim.fn.writefile(
-		{ "public class ExampleTests {", "  [Fact] public void Works() {}", "}" },
-		base .. "/csharp/ExampleTests.cs"
-	)
-	vim.fn.mkdir(base .. "/kotlin/src/test/kotlin", "p")
-	vim.fn.writefile({}, base .. "/kotlin/gradlew")
-	vim.fn.writefile({
-		"package example",
-		"import io.kotest.core.spec.style.StringSpec",
-		"class ExampleSpec : StringSpec({",
-		'  "works" { }',
-		"})",
-	}, base .. "/kotlin/src/test/kotlin/ExampleSpec.kt")
 
 	require("lazy").load({ plugins = { "neotest" } })
 	local testing = require("user.core.testing")
-	local function run_async(callback)
-		local done, success, result, traceback
-		require("nio").run(callback, function(ok, value, trace)
-			success, result, traceback = ok, value, trace
-			done = true
-		end)
-		assert(
-			vim.wait(5000, function()
-				return done
-			end),
-			"test discovery timed out"
-		)
-		assert(success, ("test discovery failed: %s\n%s"):format(result, traceback or ""))
-		return result
-	end
 	local python_buffer = vim.api.nvim_create_buf(false, false)
 	vim.api.nvim_buf_set_name(python_buffer, base .. "/python/test_ok.py")
 	vim.api.nvim_set_current_buf(python_buffer)
@@ -221,27 +262,7 @@ do
 	assert(testing.prepare(), "Go test adapter unavailable")
 	assert(require("neotest").run == consumer, "Neotest client was replaced while adding an adapter")
 	assert(not package.loaded["neotest-jest"], "unrelated test adapter was loaded")
-
-	local csharp_buffer = vim.api.nvim_create_buf(false, false)
-	vim.api.nvim_buf_set_name(csharp_buffer, base .. "/csharp/ExampleTests.cs")
-	vim.api.nvim_set_current_buf(csharp_buffer)
-	vim.bo[csharp_buffer].filetype = "cs"
-	assert(testing.prepare(), "C# test adapter unavailable")
-	assert(require("neotest-vstest").name == "neotest-vstest", "unexpected C# test adapter")
-
-	local kotlin_buffer = vim.api.nvim_create_buf(false, false)
-	vim.api.nvim_buf_set_name(kotlin_buffer, base .. "/kotlin/src/test/kotlin/ExampleSpec.kt")
-	vim.api.nvim_set_current_buf(kotlin_buffer)
-	vim.bo[kotlin_buffer].filetype = "kotlin"
-	assert(testing.prepare(), "Kotlin test adapter unavailable")
-	assert(require("neotest-kotlin").name == "neotest-kotest", "unexpected Kotlin test adapter")
-	local kotlin_positions = run_async(function()
-		return require("neotest-kotlin").discover_positions(base .. "/kotlin/src/test/kotlin/ExampleSpec.kt")
-	end)
-	assert(kotlin_positions and #kotlin_positions:to_list() > 1, "Kotlin tests were not discovered")
 	assert(not package.loaded["neotest-vitest"], "unrelated test adapter was loaded")
-	vim.api.nvim_buf_delete(kotlin_buffer, { force = true })
-	vim.api.nvim_buf_delete(csharp_buffer, { force = true })
 	vim.api.nvim_buf_delete(go_buffer, { force = true })
 	vim.api.nvim_buf_delete(python_buffer, { force = true })
 end

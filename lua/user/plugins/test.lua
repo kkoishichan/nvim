@@ -65,8 +65,6 @@ return {
 			},
 		},
 	},
-	{ "codymikol/neotest-kotlin", lazy = true },
-	{ "Nsidorenco/neotest-vstest", lazy = true },
 	{ "nvim-neotest/neotest-python", lazy = true },
 	{ "nvim-neotest/neotest-jest", lazy = true },
 	{ "fredrikaverpil/neotest-golang", lazy = true },

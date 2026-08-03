@@ -113,6 +113,22 @@ return {
 		config = function()
 			setup_lsp_keymaps()
 
+			local function node_lsp_command(name, args)
+				local local_name = vim.fn.has("win32") == 1 and name .. ".cmd" or name
+				return function(dispatchers, config)
+					local command
+					local root = (config or {}).root_dir
+					if root then
+						local candidate = vim.fs.joinpath(root, "node_modules", ".bin", local_name)
+						if vim.fn.executable(candidate) == 1 then
+							command = candidate
+						end
+					end
+					command = command or toolchain.executable(name) or name
+					return vim.lsp.rpc.start(vim.list_extend({ command }, args), dispatchers)
+				end
+			end
+
 			local capabilities = require("blink.cmp").get_lsp_capabilities()
 			capabilities.textDocument.foldingRange = {
 				dynamicRegistration = false,
@@ -189,6 +205,10 @@ return {
 				},
 			})
 
+			vim.lsp.config("biome", {
+				cmd = node_lsp_command("biome", { "lsp-proxy" }),
+			})
+
 			vim.lsp.config("ruff", {
 				init_options = {
 					settings = {
@@ -206,7 +226,6 @@ return {
 					"c",
 					"cmake",
 					"cpp",
-					"cs",
 					"css",
 					"dockerfile",
 					"gitconfig",
@@ -222,7 +241,6 @@ return {
 					"javascriptreact",
 					"json",
 					"jsonc",
-					"kotlin",
 					"lua",
 					"make",
 					"nasm",
@@ -321,6 +339,7 @@ return {
 			})
 
 			vim.lsp.config("tailwindcss", {
+				cmd = node_lsp_command("tailwindcss-language-server", { "--stdio" }),
 				filetypes = {
 					"astro",
 					"css",
@@ -335,21 +354,11 @@ return {
 
 			-- nvim-lspconfig defaults use command names. Resolve each command to an
 			-- absolute system-or-Mason path so Mason can keep PATH="skip".
-			local server_requirements = {
-				roslyn_ls = { "dotnet" },
-			}
 			local enabled_servers = {}
 			for _, server in ipairs(servers) do
-				local requirements_met = true
-				for _, requirement in ipairs(server_requirements[server] or {}) do
-					if not toolchain.executable(requirement) then
-						requirements_met = false
-						break
-					end
-				end
 				local config = vim.lsp.config[server]
 				local cmd = config and config.cmd
-				if requirements_met and type(cmd) == "table" and type(cmd[1]) == "string" then
+				if type(cmd) == "table" and type(cmd[1]) == "string" then
 					local resolved = toolchain.executable(cmd[1])
 					if resolved then
 						cmd = vim.deepcopy(cmd)
@@ -357,7 +366,7 @@ return {
 						vim.lsp.config(server, { cmd = cmd })
 						table.insert(enabled_servers, server)
 					end
-				elseif requirements_met and type(cmd) == "function" then
+				elseif type(cmd) == "function" then
 					table.insert(enabled_servers, server)
 				end
 			end
