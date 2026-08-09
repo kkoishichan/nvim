@@ -1,4 +1,5 @@
 local panels = require("user.core.panels")
+local float_style = require("user.core.float_style")
 
 return {
 	{
@@ -85,6 +86,8 @@ return {
 					{ source = "git_status", display_name = "Git" },
 				},
 			},
+			-- Neo-tree accepts only named border presets here; float_style's
+			-- neo-tree-popup FileType fallback replaces the created dialog border.
 			popup_border_style = "rounded",
 			default_component_configs = {
 				indent = {
@@ -158,7 +161,9 @@ return {
 			},
 			preview_window = {
 				auto_preview = false,
-				border = "rounded",
+				border = float_style.border(),
+				winhl = "Normal:Pmenu,NormalFloat:Pmenu,FloatBorder:Pmenu,FloatTitle:Pmenu,EndOfBuffer:Pmenu",
+				winblend = 0,
 			},
 			providers = {
 				priority = { "lsp", "markdown", "norg", "treesitter" },
@@ -167,7 +172,6 @@ return {
 	},
 	{
 		"folke/flash.nvim",
-		event = "VeryLazy",
 		opts = {},
 		keys = {
 			{

@@ -48,7 +48,8 @@ opt.sidescrolloff = 8
 opt.signcolumn = "yes"
 -- IDE-like gutter order: action/diagnostic signs, hybrid line number, fold
 -- control, then a dedicated Git change lane directly beside the source text.
-opt.statuscolumn = [[%s%=%l%C%{%v:lua.require("user.core.statuscolumn").git()%}]]
+require("user.core.statuscolumn")
+opt.statuscolumn = [[%s%=%l%C%{%v:lua.vim._user_statuscolumn_git()%}]]
 opt.smartcase = true
 opt.smartindent = true
 opt.spelllang = { "en", "cjk" }
@@ -62,6 +63,8 @@ opt.timeoutlen = 400
 opt.undofile = true
 opt.updatetime = 250
 opt.virtualedit = "block"
+-- Default for application-sized or third-party panels. Small transient floats
+-- are restyled window-locally by user.core.float_style.
 opt.winborder = "rounded"
 opt.wrap = false
 

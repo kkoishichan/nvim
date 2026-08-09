@@ -1,4 +1,5 @@
 local toolchain = require("user.toolchain")
+local float_style = require("user.core.float_style")
 
 local function executable(name)
 	return toolchain.executable(name)
@@ -255,7 +256,11 @@ return {
 		"rcarriga/nvim-dap-ui",
 		lazy = true,
 		dependencies = { "mfussenegger/nvim-dap", "nvim-neotest/nvim-nio" },
-		opts = {},
+		opts = {
+			floating = {
+				border = float_style.border(),
+			},
+		},
 		keys = {
 			{
 				"<leader>du",

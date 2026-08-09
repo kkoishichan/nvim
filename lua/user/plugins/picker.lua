@@ -1,3 +1,5 @@
+local float_style = require("user.core.float_style")
+
 local function fzf()
 	return require("fzf-lua")
 end
@@ -41,7 +43,18 @@ return {
 				end
 				width = math.min(math.max(width + 8, 30), math.floor(vim.o.columns * 0.8))
 				return {
-					winopts = { height = height, width = width, row = 0.4, col = 0.5 },
+					winopts = {
+						height = height,
+						width = width,
+						row = 0.4,
+						col = 0.5,
+						border = float_style.border(),
+					},
+					hls = {
+						normal = "Pmenu",
+						border = "Pmenu",
+						title = "Pmenu",
+					},
 				}
 			end)
 		end,
@@ -49,6 +62,15 @@ return {
 			defaults = {
 				file_icons = "mini",
 				color_icons = true,
+			},
+			previewers = {
+				builtin = {
+					-- A picker should never turn a large binary/generated file into a
+					-- hidden full-buffer load just because the selection moved over it.
+					limit_b = 2 * 1024 * 1024,
+					syntax_limit_b = 512 * 1024,
+					treesitter = { context = false },
+				},
 			},
 			fzf_colors = true,
 			fzf_opts = {

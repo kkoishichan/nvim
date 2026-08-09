@@ -3,10 +3,18 @@ local toolchain = require("user.toolchain")
 return {
 	{
 		"mfussenegger/nvim-lint",
-		event = { "BufReadPost", "BufNewFile" },
+		ft = { "cmake", "css", "dockerfile", "go", "lua", "make", "markdown", "sh", "sql", "yaml" },
 		config = function()
 			local lint = require("lint")
 			local uv = vim.uv or vim.loop
+			local upward_cache = {}
+			local local_node_cache = {}
+			local stylelint_root_cache = {}
+			local function reset_lookup_caches()
+				upward_cache = {}
+				local_node_cache = {}
+				stylelint_root_cache = {}
+			end
 
 			lint.linters_by_ft = {
 				cmake = { "cmakelint" },
@@ -34,9 +42,19 @@ return {
 
 			local function find_upward(bufnr, markers)
 				local dir = buffer_dir(bufnr)
+				if not dir then
+					return nil
+				end
+				local cache_key = dir .. "\0" .. table.concat(markers, "\0")
+				local cached = upward_cache[cache_key]
+				if cached ~= nil then
+					return cached or nil
+				end
+
 				while dir do
 					for _, marker in ipairs(markers) do
 						if uv.fs_stat(vim.fs.joinpath(dir, marker)) then
+							upward_cache[cache_key] = dir
 							return dir
 						end
 					end
@@ -47,6 +65,7 @@ return {
 					end
 					dir = parent
 				end
+				upward_cache[cache_key] = false
 				return nil
 			end
 
@@ -67,8 +86,18 @@ return {
 			}
 
 			local function stylelint_root(bufnr)
+				local start_dir = buffer_dir(bufnr)
+				if not start_dir then
+					return nil
+				end
+				local cached = stylelint_root_cache[start_dir]
+				if cached ~= nil then
+					return cached or nil
+				end
+
 				local root = find_upward(bufnr, stylelint_markers)
 				if root then
+					stylelint_root_cache[start_dir] = root
 					return root
 				end
 
@@ -83,6 +112,7 @@ return {
 							ok_json, package = pcall(vim.json.decode, table.concat(lines, "\n"))
 						end
 						if ok_json and type(package) == "table" and package.stylelint ~= nil then
+							stylelint_root_cache[start_dir] = dir
 							return dir
 						end
 					end
@@ -93,6 +123,7 @@ return {
 					end
 					dir = parent
 				end
+				stylelint_root_cache[start_dir] = false
 				return nil
 			end
 
@@ -117,9 +148,19 @@ return {
 			local function local_node_command(bufnr, name)
 				local executable = vim.fn.has("win32") == 1 and name .. ".cmd" or name
 				local dir = buffer_dir(bufnr)
+				if not dir then
+					return nil
+				end
+				local cache_key = dir .. "\0" .. executable
+				local cached = local_node_cache[cache_key]
+				if cached ~= nil then
+					return cached or nil
+				end
+
 				while dir do
 					local candidate = vim.fs.joinpath(dir, "node_modules", ".bin", executable)
 					if vim.fn.executable(candidate) == 1 then
+						local_node_cache[cache_key] = candidate
 						return candidate
 					end
 					local parent = vim.fs.dirname(dir)
@@ -128,6 +169,7 @@ return {
 					end
 					dir = parent
 				end
+				local_node_cache[cache_key] = false
 			end
 
 			local original_commands = {}
@@ -198,8 +240,10 @@ return {
 			end
 
 			local function is_empty_buffer(bufnr)
-				local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-				return #lines == 0 or (#lines == 1 and lines[1] == "")
+				if vim.api.nvim_buf_line_count(bufnr) ~= 1 then
+					return false
+				end
+				return vim.api.nvim_buf_get_lines(bufnr, 0, 1, false)[1] == ""
 			end
 
 			local function run_lint(bufnr, stdin_only)
@@ -266,9 +310,18 @@ return {
 			-- libuv handles alive. Full and stdin-only runs are debounced separately.
 			local pending = {}
 			local function schedule_lint(bufnr, stdin_only, delay)
+				if not vim.api.nvim_buf_is_valid(bufnr) or not vim.api.nvim_buf_is_loaded(bufnr) then
+					return
+				end
 				local kind = stdin_only and "stdin" or "full"
-				pending[bufnr] = pending[bufnr] or { generation = {}, scheduled = {} }
+				pending[bufnr] = pending[bufnr] or { generation = {}, scheduled = {}, ticks = {} }
 				local state = pending[bufnr]
+				local changedtick = vim.api.nvim_buf_get_changedtick(bufnr)
+				if stdin_only and (state.ticks.stdin == changedtick or state.ticks.full == changedtick) then
+					return
+				elseif not stdin_only and state.ticks.full == changedtick and not state.scheduled.full then
+					return
+				end
 				if stdin_only and state.scheduled.full then
 					-- The pending full pass includes stdin linters already.
 					return
@@ -279,40 +332,53 @@ return {
 				end
 				state.generation[kind] = (state.generation[kind] or 0) + 1
 				state.scheduled[kind] = true
+				state.ticks[kind] = changedtick
 				local generation = state.generation[kind]
 
-				vim.defer_fn(function()
+				local function execute()
 					local current = pending[bufnr]
-					if current and current.generation[kind] == generation then
-						current.scheduled[kind] = false
-						run_lint(bufnr, stdin_only)
+					if
+						not current
+						or current.generation[kind] ~= generation
+						or not vim.api.nvim_buf_is_valid(bufnr)
+						or not vim.api.nvim_buf_is_loaded(bufnr)
+					then
+						return
 					end
-				end, delay)
+
+					current.scheduled[kind] = false
+					run_lint(bufnr, stdin_only)
+				end
+
+				vim.defer_fn(execute, delay)
 			end
 
 			local group = vim.api.nvim_create_augroup("user_lint", { clear = true })
 			vim.api.nvim_create_autocmd("BufReadPost", {
 				group = group,
 				callback = function(event)
-					schedule_lint(event.buf, false, 250)
-				end,
-			})
-			vim.api.nvim_create_autocmd("BufEnter", {
-				group = group,
-				callback = function(event)
-					schedule_lint(event.buf, true, 250)
+					schedule_lint(event.buf, false, 400)
 				end,
 			})
 			vim.api.nvim_create_autocmd("BufWritePost", {
 				group = group,
 				callback = function(event)
-					schedule_lint(event.buf, false, 100)
+					local name = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(event.buf), ":t")
+					if
+						name == "package.json"
+						or name == "selene.toml"
+						or name:match("^%.golangci%.")
+						or name:match("^%.?stylelint")
+					then
+						reset_lookup_caches()
+					end
+					schedule_lint(event.buf, false, 150)
 				end,
 			})
 			vim.api.nvim_create_autocmd("InsertLeave", {
 				group = group,
 				callback = function(event)
-					schedule_lint(event.buf, true, 150)
+					schedule_lint(event.buf, true, 250)
 				end,
 			})
 			vim.api.nvim_create_autocmd("BufWipeout", {
@@ -321,6 +387,10 @@ return {
 					pending[event.buf] = nil
 				end,
 			})
+			vim.api.nvim_create_autocmd("FocusGained", {
+				group = group,
+				callback = reset_lookup_caches,
+			})
 
 			vim.keymap.set("n", "<leader>cl", function()
 				run_lint(vim.api.nvim_get_current_buf(), false)
@@ -328,7 +398,8 @@ return {
 
 			-- The event that lazy-loaded nvim-lint may already have fired. The
 			-- debounce coalesces this with a replayed BufReadPost when applicable.
-			schedule_lint(vim.api.nvim_get_current_buf(), false, 250)
+			local current = vim.api.nvim_get_current_buf()
+			schedule_lint(current, false, 400)
 		end,
 	},
 }

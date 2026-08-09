@@ -31,26 +31,18 @@ local function set_notify_highlights()
 	end
 end
 
--- No global 'winborder' is set (floats default to borderless); each window that
--- wants one sets border = "rounded" itself. Make the border share the editor
--- background so it never shows an off-colour ring around the float.
+-- Large panels retain the shared accent frame. Most transient popups override
+-- their window-local Normal/FloatBorder to Pmenu through float_style.lua;
+-- nvim-notify deliberately keeps the independent groups defined above.
 local function set_float_highlights()
 	local p = palette.get()
 	vim.api.nvim_set_hl(0, "NormalFloat", { fg = p.fg, bg = p.bg })
-	-- Every float shares one accent border (theme-derived). FloatBorder is the
-	-- single source of truth; plugins that draw into their own groups are linked
-	-- back to it below so nothing escapes the scheme (e.g. tokyonight ships its
-	-- own blue FzfLuaBorder, which we override here).
+	-- FloatBorder remains the source of truth for application-sized panels.
 	vim.api.nvim_set_hl(0, "FloatBorder", { fg = p.accent, bg = p.bg })
 	vim.api.nvim_set_hl(0, "FloatTitle", { fg = p.accent, bg = p.bg, bold = true })
-	-- blink completion menus are borderless background blocks (border = "padded"),
-	-- not framed floats: lift the bg to Pmenu, blend the padding cells into that
-	-- bg (so no visible ring), and use PmenuSel for a strong selected row. These
-	-- high-frequency popups stay quiet instead of flashing the accent border.
-	-- (blink sets its groups with default = true, so these explicit links win.)
-	-- Borderless background blocks: lift the bg to the theme's Pmenu, blend the
-	-- padding cells into it (no visible ring), and use the theme's native PmenuSel
-	-- for the selected row.
+	-- Borderless popup blocks use Pmenu for both body and padding, and PmenuSel
+	-- for selected rows. Explicit links cover plugins that reset winhighlight
+	-- after creating their windows.
 	vim.api.nvim_set_hl(0, "BlinkCmpMenu", { link = "Pmenu" })
 	vim.api.nvim_set_hl(0, "BlinkCmpMenuBorder", { link = "Pmenu" })
 	vim.api.nvim_set_hl(0, "BlinkCmpMenuSelection", { link = "PmenuSel" })
@@ -61,6 +53,16 @@ local function set_float_highlights()
 	vim.api.nvim_set_hl(0, "BlinkCmpDocSeparator", { fg = p.gray, bg = vim.api.nvim_get_hl(0, { name = "Pmenu" }).bg })
 	vim.api.nvim_set_hl(0, "BlinkCmpSignatureHelp", { link = "Pmenu" })
 	vim.api.nvim_set_hl(0, "BlinkCmpSignatureHelpBorder", { link = "Pmenu" })
+	vim.api.nvim_set_hl(0, "BqfPreviewFloat", { link = "Pmenu" })
+	vim.api.nvim_set_hl(0, "BqfPreviewBorder", { link = "Pmenu" })
+	vim.api.nvim_set_hl(0, "BqfPreviewTitle", { link = "Pmenu" })
+	vim.api.nvim_set_hl(0, "DapUIFloatNormal", { link = "Pmenu" })
+	vim.api.nvim_set_hl(0, "DapUIFloatBorder", { link = "Pmenu" })
+	vim.api.nvim_set_hl(0, "SnacksInputNormal", { link = "Pmenu" })
+	vim.api.nvim_set_hl(0, "SnacksInputBorder", { link = "Pmenu" })
+	vim.api.nvim_set_hl(0, "WhichKeyNormal", { link = "Pmenu" })
+	vim.api.nvim_set_hl(0, "WhichKeyBorder", { link = "Pmenu" })
+	vim.api.nvim_set_hl(0, "WhichKeyTitle", { link = "Pmenu" })
 	-- fzf-lua: override the theme's own FzfLua* border/title onto the shared accent.
 	vim.api.nvim_set_hl(0, "FzfLuaBorder", { link = "FloatBorder" })
 	vim.api.nvim_set_hl(0, "FzfLuaPreviewBorder", { link = "FloatBorder" })

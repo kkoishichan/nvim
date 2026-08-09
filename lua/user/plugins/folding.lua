@@ -1,3 +1,5 @@
+local float_style = require("user.core.float_style")
+
 local disabled_filetypes = {
 	["fzflua_backdrop"] = true,
 	["neo-tree"] = true,
@@ -22,12 +24,11 @@ return {
 				default = false,
 			},
 			preview = {
-				win_config = {
-					border = "rounded",
+				win_config = float_style.padded({
 					winblend = 0,
-					winhighlight = "Normal:Normal,FloatBorder:FloatBorder,CursorLine:Visual",
+					winhighlight = "Normal:Pmenu,NormalFloat:Pmenu,FloatBorder:Pmenu,CursorLine:PmenuSel",
 					maxheight = 20,
-				},
+				}),
 				mappings = {
 					scrollU = "<C-u>",
 					scrollD = "<C-d>",

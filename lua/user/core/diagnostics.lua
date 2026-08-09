@@ -3,6 +3,8 @@
 -- line* expands beneath it via virtual_lines (built-in, 0.11+). This keeps long
 -- messages from overflowing the window the way trailing virtual_text does, shows
 -- code and message together without occluding, and points at the exact column.
+local float_style = require("user.core.float_style")
+
 local base = {
 	underline = true,
 	update_in_insert = false,
@@ -15,10 +17,9 @@ local base = {
 			[vim.diagnostic.severity.HINT] = "H",
 		},
 	},
-	float = {
-		border = "rounded",
+	float = float_style.padded({
 		source = true,
-	},
+	}),
 }
 
 -- Trailing inline text, used only in the "text" fallback mode. Collapse newlines
@@ -49,6 +50,11 @@ end
 
 apply_diagnostic_mode()
 
+local function open_diagnostic_float()
+	local _, winid = vim.diagnostic.open_float()
+	float_style.apply_padded(winid)
+end
+
 vim.keymap.set("n", "<leader>ud", function()
 	for index, name in ipairs(modes) do
 		if name == mode then
@@ -61,12 +67,14 @@ vim.keymap.set("n", "<leader>ud", function()
 end, { desc = "Cycle diagnostic display" })
 
 vim.keymap.set("n", "[d", function()
-	vim.diagnostic.jump({ count = -1, float = true })
+	vim.diagnostic.jump({ count = -1, float = false })
+	open_diagnostic_float()
 end, { desc = "Previous diagnostic" })
 
 vim.keymap.set("n", "]d", function()
-	vim.diagnostic.jump({ count = 1, float = true })
+	vim.diagnostic.jump({ count = 1, float = false })
+	open_diagnostic_float()
 end, { desc = "Next diagnostic" })
 
-vim.keymap.set("n", "<leader>cd", vim.diagnostic.open_float, { desc = "Line diagnostics" })
+vim.keymap.set("n", "<leader>cd", open_diagnostic_float, { desc = "Line diagnostics" })
 vim.keymap.set("n", "<leader>cD", vim.diagnostic.setloclist, { desc = "Diagnostic loclist" })

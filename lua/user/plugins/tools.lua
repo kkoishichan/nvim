@@ -1,3 +1,5 @@
+local float_style = require("user.core.float_style")
+
 return {
 	{
 		"kevinhwang91/nvim-bqf",
@@ -7,7 +9,7 @@ return {
 			auto_resize_height = true,
 			preview = {
 				auto_preview = true,
-				border = "rounded",
+				border = float_style.border(),
 				winblend = 0,
 			},
 		},

@@ -5,7 +5,8 @@ Neovim 打磨成接近 IDE 的日常工作流。
 
 - `lazy.nvim` 管理插件，首次启动自动 bootstrap。
 - 默认 `catppuccin` 主题（可持久切换），`<Space>` 作为 leader，`\` 作为 localleader。
-- `fzf-lua` 负责查找、搜索、LSP / Git 列表，并接管 `vim.ui.select`。
+- `fzf-lua` 负责查找、搜索、符号 / 调用关系与 Git 列表，并接管 `vim.ui.select`。
+- `glance.nvim` 提供定义、声明、实现、类型与引用的双栏 Peek 界面。
 - `oil.nvim` 像编辑 buffer 一样管理文件系统；`neo-tree.nvim` 提供侧边文件树。
 - `blink.cmp` 负责补全、snippet、签名帮助。
 - `nvim-lspconfig` + Mason 负责语言服务与外部工具安装。
@@ -14,6 +15,8 @@ Neovim 打磨成接近 IDE 的日常工作流。
 - `toggleterm.nvim` 提供 VSCode 风格的多终端管理。
 - `overseer.nvim` 任务运行，`neotest` 测试，`nvim-dap` + `dap-ui` 调试。
 - `snacks.nvim` 提供 dashboard、scratch、input 与 zen；通知由 `nvim-notify` 提供。
+- 除通知外，小型临时弹窗统一使用 Pmenu 背景的无边框 padding 设计；通知保留独立样式，Glance、Fzf 主界面、终端等大面板保留独立布局。
+- `:Lazy` 与 `:Mason` 共用同一个 80% 纯无边框矩形，并校正两插件不同的高度计算方式。
 
 当前在 Neovim `0.12.x` 上验证，并使用了 0.12 的公开 API，因此要求 `0.12+`。
 
@@ -66,6 +69,7 @@ Selene、Stylelint、golangci-lint 仅在项目存在对应配置时运行，避
 │       │   ├── conflicts.lua  -- Git conflict 高亮、跳转与选择
 │       │   ├── diagnostics.lua -- 诊断 UI
 │       │   ├── dict.lua       -- ECDICT 离线词典浮窗
+│       │   ├── float_style.lua -- 无边框 padding 浮窗共享样式
 │       │   ├── highlights.lua -- 主题切换后的高亮重放 helper
 │       │   ├── java.lua       -- Java root / runtime / workspace 解析
 │       │   ├── keymaps.lua    -- 全局非插件键位
@@ -165,6 +169,20 @@ nvim
 :checkhealth          " 健康检查
 ```
 
+## 性能策略
+
+`faster.nvim` 会为超过 1.5 MiB 或平均行长过高的 buffer 关闭 Tree-sitter、LSP、
+indent guide 等高成本功能。普通文件保留完整语言功能；lint 调度会按 buffer 去重、防抖并缓存
+工具和配置查找结果。聚焦 Neovim 时先检查可见文件，隐藏 buffer 按批次检查，避免长会话
+一次性 `stat` 所有文件。可按机器调整：
+
+```lua
+vim.g.user_checktime_batch_size = 16 -- 每批检查的隐藏 buffer 数
+```
+
+Git 行 blame 与 scrollview 搜索结果标记默认启用，可分别用 `<leader>ghB` 和 `<leader>us`
+切换。Neo-tree 保持目录 watcher、Git 状态和诊断功能。
+
 ## 语言支持
 
 这里的“支持”按层次区分：Tree-sitter 负责语法与文本对象，LSP 提供补全、诊断和重构，
@@ -239,10 +257,12 @@ Biome、Stylelint、golangci-lint 与 Selene 只在项目存在对应配置时�
 
 - `-` ：oil 编辑当前目录
 - `s` / `S` ：flash 跳转 / treesitter 跳转
+- `gd` / `gD` / `gi` / `gy` / `gr` ：Peek 定义 / 声明 / 实现 / 类型 / 引用
 - `gsa` / `gsd` / `gsr` ：添加 / 删除 / 替换 surround
 - `<M-1>` … `<M-9>` ：跳到第 N 个 buffer，`<M-0>` 跳到最后一个
 - `<C-/>` ：切换底部终端
 - `<leader>k` ：离线词典；`<leader>ut` ：选择并持久保存主题
+- `<leader>ghB` ：切换当前行 Git blame；`<leader>us` ：切换搜索结果滚动条标记
 - `zR` / `zM` / `zr` / `zm` / `zK` ：折叠开关与预览
 
 ### 终端（VSCode 风格）

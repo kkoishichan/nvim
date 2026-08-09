@@ -1,4 +1,5 @@
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
+local layout = require("user.core.layout")
 
 if not vim.uv.fs_stat(lazypath) then
 	if vim.fn.executable("git") == 0 then
@@ -33,6 +34,11 @@ require("lazy").setup({
 	},
 	change_detection = {
 		notify = false,
+	},
+	ui = {
+		size = { width = layout.manager_scale, height = layout.manager_scale },
+		border = layout.manager_border,
+		backdrop = 60,
 	},
 	performance = {
 		rtp = {

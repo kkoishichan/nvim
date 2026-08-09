@@ -172,12 +172,13 @@ vim.api.nvim_create_autocmd("FileType", {
 -- are picked up promptly and reconciled safely. Design:
 --   * Detection is event-driven (focus / buffer / terminal switches give an
 --     instant refresh). Optional focused polling covers the "window focused but
---     cursor idle" gap; :checktime then scans every loaded buffer.
+--     cursor idle" gap; visible files are checked first and hidden ones batched.
 --   * Reconciliation is decided in one place (FileChangedShell): clean buffers
 --     reload silently; buffers with unsaved edits are never clobbered (warn
 --     instead of the blocking W12 prompt); deleted files keep their buffer.
 --   * Reload notices are coalesced/de-duplicated so a burst of edits is one line.
 local external_changes = augroup("external_changes")
+local check_generation = 0
 
 local function check_external_changes(bufnr)
 	-- :checktime is illegal in the command-line window; harmless everywhere else.
@@ -186,8 +187,60 @@ local function check_external_changes(bufnr)
 	end
 	if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
 		pcall(vim.cmd.checktime, { args = { tostring(bufnr) } })
-	else
-		pcall(vim.cmd.checktime)
+	end
+end
+
+local function checkable_file_buffer(bufnr)
+	return vim.api.nvim_buf_is_valid(bufnr)
+		and vim.api.nvim_buf_is_loaded(bufnr)
+		and vim.bo[bufnr].buflisted
+		and vim.bo[bufnr].buftype == ""
+		and vim.api.nvim_buf_get_name(bufnr) ~= ""
+end
+
+-- Checking every loaded buffer in one :checktime call causes a visible focus
+-- hitch in long-lived sessions. Refresh visible files first, then yield between
+-- small batches of hidden buffers. A newer request supersedes an older queue.
+local function check_all_external_changes()
+	if vim.fn.getcmdwintype() ~= "" then
+		return
+	end
+
+	check_generation = check_generation + 1
+	local generation = check_generation
+	local seen = {}
+	for _, winid in ipairs(vim.api.nvim_list_wins()) do
+		local bufnr = vim.api.nvim_win_get_buf(winid)
+		if not seen[bufnr] and checkable_file_buffer(bufnr) then
+			seen[bufnr] = true
+			check_external_changes(bufnr)
+		end
+	end
+
+	local pending = {}
+	for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+		if not seen[bufnr] and checkable_file_buffer(bufnr) then
+			table.insert(pending, bufnr)
+		end
+	end
+
+	local batch_size = math.max(1, math.floor(tonumber(vim.g.user_checktime_batch_size) or 16))
+	local index = 1
+	local function drain()
+		if lifecycle.closed or generation ~= check_generation then
+			return
+		end
+		local last = math.min(index + batch_size - 1, #pending)
+		for item = index, last do
+			check_external_changes(pending[item])
+		end
+		index = last + 1
+		if index <= #pending then
+			vim.schedule(drain)
+		end
+	end
+	if #pending > 0 then
+		vim.schedule(drain)
 	end
 end
 
@@ -196,8 +249,12 @@ vim.api.nvim_create_autocmd({ "FocusGained", "BufEnter", "TermLeave", "TermClose
 	callback = function(event)
 		vim.schedule(function()
 			-- Buffer switches check only the entered buffer; focus/terminal events
-			-- intentionally reconcile every loaded file after external work.
-			check_external_changes(event.event == "BufEnter" and event.buf or nil)
+			-- reconcile visible files immediately and hidden files in small batches.
+			if event.event == "BufEnter" then
+				check_external_changes(event.buf)
+			else
+				check_all_external_changes()
+			end
 		end)
 	end,
 })
@@ -229,7 +286,7 @@ if poll_interval_ms > 0 then
 			poll_interval_ms,
 			vim.schedule_wrap(function()
 				if not lifecycle.closed and poll_focused then
-					check_external_changes()
+					check_all_external_changes()
 				end
 			end)
 		)

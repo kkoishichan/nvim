@@ -16,13 +16,17 @@ function M.git()
 		return blank_git_lane
 	end
 
-	local gitsigns = package.loaded.gitsigns
-	if type(gitsigns) ~= "table" or type(vim.b[bufnr].gitsigns_status_dict) ~= "table" then
+	local renderer = package.loaded["gitsigns.sign_renderer"]
+	if type(renderer) ~= "table" or type(renderer.statuscolumn) ~= "function" then
+		return blank_git_lane
+	end
+	if type(vim.b[bufnr].gitsigns_status_dict) ~= "table" then
 		return blank_git_lane
 	end
 
-	local ok, value = pcall(gitsigns.statuscolumn, bufnr, vim.v.lnum)
-	return ok and type(value) == "string" and value or blank_git_lane
+	return renderer.statuscolumn(bufnr, vim.v.lnum)
 end
+
+rawset(vim, "_user_statuscolumn_git", M.git)
 
 return M

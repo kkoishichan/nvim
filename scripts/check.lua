@@ -85,6 +85,166 @@ do
 end
 
 do
+	local plugins = require("lazy.core.config").plugins
+	local plugin = require("lazy.core.plugin")
+	local float_style = require("user.core.float_style")
+	local shared_border = float_style.border()
+	local function opts(name)
+		return plugin.values(assert(plugins[name], "missing plugin: " .. name), "opts", false)
+	end
+	local function assert_shared_border(border, label)
+		assert(vim.deep_equal(border, shared_border), label .. " does not use the shared borderless style")
+	end
+
+	local glance = plugins["glance.nvim"]
+	assert(glance and glance.cmd == "Glance", "Glance peek UI is missing or not lazy-loaded")
+	local neo_tree_opts = opts("neo-tree.nvim")
+	assert(neo_tree_opts.enable_git_status, "neo-tree Git status is disabled")
+	assert(neo_tree_opts.enable_diagnostics, "neo-tree diagnostics are disabled")
+	assert(neo_tree_opts.filesystem.use_libuv_file_watcher, "neo-tree file watcher is disabled")
+	local gitsigns_opts = opts("gitsigns.nvim")
+	assert(gitsigns_opts.current_line_blame, "current-line Git blame is disabled")
+	assert_shared_border(gitsigns_opts.preview_config.border, "Gitsigns previews")
+	assert(
+		gitsigns_opts.preview_config.row == 1 and gitsigns_opts.preview_config.col == 0,
+		"Gitsigns preview is misplaced"
+	)
+	assert_shared_border(vim.diagnostic.config().float.border, "Diagnostic floats")
+	assert_shared_border(opts("nvim-ufo").preview.win_config.border, "Fold previews")
+	assert_shared_border(opts("outline.nvim").preview_window.border, "Outline previews")
+	assert_shared_border(opts("nvim-bqf").preview.border, "Quickfix previews")
+	assert_shared_border(opts("nvim-dap-ui").floating.border, "DAP eval floats")
+	assert_shared_border(opts("crates.nvim").popup.border, "Crates popups")
+	local snacks_opts = opts("snacks.nvim")
+	assert_shared_border(snacks_opts.styles.input.border, "vim.ui.input")
+	assert(snacks_opts.styles.notification.border == "rounded", "Snacks notification style was changed")
+	assert_shared_border(opts("which-key.nvim").win.border, "Which-key")
+	assert(opts("blink.cmp").completion.menu.border == "padded", "Completion menu lost its borderless style")
+	assert(opts("nvim-notify").stages == "fade", "nvim-notify animation or frame was changed")
+	assert(
+		vim.api.nvim_get_hl(0, { name = "NotifyBackground", link = false }).bg
+			== require("user.core.palette").get().panel,
+		"nvim-notify background was changed"
+	)
+
+	-- Other application-sized overlays deliberately keep their framed layouts.
+	assert(opts("fzf-lua").winopts.border == "rounded", "Fzf main window lost its panel border")
+	assert(opts("oil.nvim").float.border == "rounded", "Oil float lost its panel border")
+	assert(opts("toggleterm.nvim").float_opts.border == "rounded", "Float terminal lost its panel border")
+	local layout = require("user.core.layout")
+	local mason_ui = opts("mason.nvim").ui
+	local lazy_ui = require("lazy.core.config").options.ui
+	assert(layout.manager_border == "none", "package managers still have a border or transparent shadow")
+	assert(mason_ui.border == layout.manager_border, "Mason lost its borderless manager style")
+	assert(lazy_ui.border == layout.manager_border, "Lazy lost its borderless manager style")
+	assert(
+		mason_ui.width == layout.manager_scale and mason_ui.height == layout.manager_scale,
+		"Mason manager size diverged"
+	)
+	assert(
+		lazy_ui.size.width == layout.manager_scale and lazy_ui.size.height == layout.manager_scale,
+		"Lazy manager size diverged"
+	)
+	assert(
+		vim.tbl_contains(opts("nvim-scrollview").signs_on_startup, "search"),
+		"scrollview search markers are disabled"
+	)
+end
+
+do
+	local float_style = require("user.core.float_style")
+	local function open_float(bufnr, width, height, border)
+		return vim.api.nvim_open_win(bufnr, false, {
+			relative = "editor",
+			row = 1,
+			col = 1,
+			width = width,
+			height = height,
+			border = border or "rounded",
+			style = "minimal",
+		})
+	end
+
+	local small_buffer = vim.api.nvim_create_buf(false, true)
+	local small = open_float(small_buffer, 24, 4)
+	vim.wo[small].winhighlight = "Normal:ErrorMsg,CursorLine:Visual"
+	assert(
+		vim.wait(200, function()
+			return float_style.is_padded(small)
+		end),
+		"small third-party float was not restyled"
+	)
+	assert(vim.wo[small].winhighlight:find("Normal:Pmenu", 1, true), "small float body does not use Pmenu")
+	assert(vim.wo[small].winhighlight:find("FloatBorder:Pmenu", 1, true), "small float padding does not use Pmenu")
+	assert(vim.wo[small].winhighlight:find("CursorLine:Visual", 1, true), "popup styling discarded a plugin highlight")
+
+	local large_buffer = vim.api.nvim_create_buf(false, true)
+	local large_width = math.max(1, vim.o.columns - 4)
+	local large_height = math.max(1, vim.o.lines - vim.o.cmdheight - 4)
+	local large = open_float(large_buffer, large_width, large_height)
+	vim.wait(50)
+	assert(not float_style.is_padded(large), "application-sized float was mistaken for a popup")
+
+	local panel_buffer = vim.api.nvim_create_buf(false, true)
+	vim.bo[panel_buffer].filetype = "Glance"
+	local panel = open_float(panel_buffer, 24, 4)
+	vim.wait(50)
+	assert(not float_style.is_padded(panel), "small Glance pane lost its dedicated layout")
+
+	local popup_buffer = vim.api.nvim_create_buf(false, true)
+	vim.bo[popup_buffer].filetype = "neo-tree-popup"
+	local popup = open_float(popup_buffer, large_width, 4)
+	assert(
+		vim.wait(200, function()
+			return float_style.is_padded(popup)
+		end),
+		"Neo-tree dialog fallback was not applied"
+	)
+
+	local notification_buffer = vim.api.nvim_create_buf(false, true)
+	local notification = open_float(notification_buffer, 24, 4)
+	vim.bo[notification_buffer].filetype = "notify"
+	vim.wait(50)
+	assert(not float_style.is_padded(notification), "generic popup styling changed nvim-notify")
+
+	local layout = require("user.core.layout")
+	local lazy_buffer = vim.api.nvim_create_buf(false, true)
+	local lazy_window = open_float(lazy_buffer, 30, 6, layout.manager_border)
+	vim.bo[lazy_buffer].filetype = "lazy"
+	local mason_buffer = vim.api.nvim_create_buf(false, true)
+	local mason_window = open_float(mason_buffer, 50, 10, layout.manager_border)
+	vim.bo[mason_buffer].filetype = "mason"
+	assert(
+		vim.wait(200, function()
+			local lazy_config = vim.api.nvim_win_get_config(lazy_window)
+			local mason_config = vim.api.nvim_win_get_config(mason_window)
+			return lazy_config.width == mason_config.width
+				and lazy_config.height == mason_config.height
+				and lazy_config.row == mason_config.row
+				and lazy_config.col == mason_config.col
+		end),
+		"Lazy and Mason manager rectangles still differ"
+	)
+
+	local backdrop_buffer = vim.api.nvim_create_buf(false, true)
+	local backdrop = open_float(backdrop_buffer, 30, 6)
+	vim.bo[backdrop_buffer].filetype = "lazy_backdrop"
+	local backdrop_config = vim.api.nvim_win_get_config(backdrop)
+	assert(backdrop_config.border == "none", "Lazy backdrop inherited the global window border")
+	assert(
+		backdrop_config.row == 0
+			and backdrop_config.col == 0
+			and backdrop_config.width == vim.o.columns
+			and backdrop_config.height == vim.o.lines,
+		"Lazy backdrop no longer covers the viewport exactly"
+	)
+
+	for _, winid in ipairs({ small, large, panel, popup, notification, lazy_window, mason_window, backdrop }) do
+		vim.api.nvim_win_close(winid, true)
+	end
+end
+
+do
 	local toolchain = require("user.toolchain")
 	local seen = {}
 	for _, package in ipairs(toolchain.packages) do
@@ -160,12 +320,34 @@ do
 	lazy.load({ plugins = { "nvim-lspconfig" } })
 	assert(vim.env.PATH == before, "LSP changed PATH")
 	assert(not package.loaded.mason and not package.loaded["mason-registry"], "ordinary LSP load started Mason")
+	local attach = vim.api.nvim_get_autocmds({ group = "user_lsp_attach", event = "LspAttach" })[1]
+	assert(attach and type(attach.callback) == "function", "LSP attach callback is missing")
+	local keymap_buffer = vim.api.nvim_create_buf(false, true)
+	attach.callback({ buf = keymap_buffer, data = { client_id = -1 } })
+	local lsp_keymaps = {}
+	for _, mapping in ipairs(vim.api.nvim_buf_get_keymap(keymap_buffer, "n")) do
+		lsp_keymaps[mapping.lhs] = mapping.rhs
+	end
+	for lhs, command in pairs({
+		gd = "definitions",
+		gD = "declarations",
+		gi = "implementations",
+		gy = "type_definitions",
+		gr = "references",
+		[" cpd"] = "definitions",
+		[" cpD"] = "declarations",
+		[" cpi"] = "implementations",
+		[" cpt"] = "type_definitions",
+		[" cpr"] = "references",
+	}) do
+		assert(lsp_keymaps[lhs] == "<Cmd>Glance " .. command .. "<CR>", lhs .. " no longer uses Glance")
+	end
+	vim.api.nvim_buf_delete(keymap_buffer, { force = true })
 	for _, server in ipairs(require("user.toolchain").lsp_servers) do
 		local config = vim.lsp.config[server]
 		assert(type(config) == "table", "missing LSP config: " .. server)
 		assert(type(config.filetypes) == "table" and #config.filetypes > 0, "LSP has no filetypes: " .. server)
 	end
-
 	local rpc_start = vim.lsp.rpc.start
 	local ok_commands, web_commands = pcall(function()
 		vim.lsp.rpc.start = function(command)

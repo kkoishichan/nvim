@@ -27,7 +27,16 @@ return {
 	{
 		"nvim-treesitter/nvim-treesitter-textobjects",
 		branch = "main",
-		event = { "BufReadPost", "BufNewFile" },
+		keys = {
+			{ "]m", mode = { "n", "x", "o" }, desc = "Next function start" },
+			{ "[m", mode = { "n", "x", "o" }, desc = "Previous function start" },
+			{ "]M", mode = { "n", "x", "o" }, desc = "Next function end" },
+			{ "[M", mode = { "n", "x", "o" }, desc = "Previous function end" },
+			{ "]]", mode = { "n", "x", "o" }, desc = "Next class start" },
+			{ "[[", mode = { "n", "x", "o" }, desc = "Previous class start" },
+			{ "][", mode = { "n", "x", "o" }, desc = "Next class end" },
+			{ "[]", mode = { "n", "x", "o" }, desc = "Previous class end" },
+		},
 		dependencies = { "nvim-treesitter/nvim-treesitter" },
 		config = function()
 			require("nvim-treesitter-textobjects").setup({

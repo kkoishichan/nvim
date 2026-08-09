@@ -1,3 +1,39 @@
+local color_filetypes = {
+	"astro",
+	"css",
+	"heex",
+	"html",
+	"javascript",
+	"javascriptreact",
+	"json",
+	"jsonc",
+	"less",
+	"lua",
+	"markdown",
+	"sass",
+	"scss",
+	"svelte",
+	"templ",
+	"toml",
+	"typescript",
+	"typescriptreact",
+	"vue",
+	"yaml",
+}
+local color_filetype_set = {}
+for _, filetype in ipairs(color_filetypes) do
+	color_filetype_set[filetype] = true
+end
+
+local function expensive_buffer(bufnr)
+	if vim.b[bufnr].bigfile or vim.api.nvim_buf_line_count(bufnr) > 10000 then
+		return true
+	end
+	local name = vim.api.nvim_buf_get_name(bufnr)
+	local stat = name ~= "" and vim.uv.fs_stat(name) or nil
+	return stat ~= nil and stat.size > 1.5 * 1024 * 1024
+end
+
 return {
 	{
 		"folke/persistence.nvim",
@@ -36,11 +72,15 @@ return {
 	},
 	{
 		"brenoprata10/nvim-highlight-colors",
-		event = { "BufReadPost", "BufNewFile" },
+		ft = color_filetypes,
 		opts = {
 			render = "background",
 			enable_named_colors = true,
 			enable_tailwind = true,
+			exclude_buftypes = { "nofile", "prompt", "quickfix", "terminal" },
+			exclude_buffer = function(bufnr)
+				return expensive_buffer(bufnr) or not color_filetype_set[vim.bo[bufnr].filetype]
+			end,
 		},
 	},
 	{
@@ -67,12 +107,12 @@ return {
 		event = { "BufReadPost", "BufNewFile" },
 		init = function()
 			vim.g.matchup_matchparen_deferred = 1
-			vim.g.matchup_matchparen_deferred_show_delay = 80
+			vim.g.matchup_matchparen_deferred_show_delay = 120
 			vim.g.matchup_matchparen_deferred_hide_delay = 300
 			vim.g.matchup_matchparen_hi_surround_always = 1
 			vim.g.matchup_matchparen_offscreen = {}
-			vim.g.matchup_matchparen_stopline = 500
-			vim.g.matchup_treesitter_stopline = 500
+			vim.g.matchup_matchparen_stopline = 300
+			vim.g.matchup_treesitter_stopline = 300
 		end,
 	},
 	{
@@ -114,7 +154,7 @@ return {
 		event = { "BufReadPost", "BufNewFile" },
 		opts = {
 			providers = { "lsp", "treesitter", "regex" },
-			delay = 120,
+			delay = 200,
 			filetypes_denylist = {
 				"DiffviewFiles",
 				"Trouble",
@@ -127,7 +167,7 @@ return {
 				"snacks_notif",
 				"terminal",
 			},
-			large_file_cutoff = 3000,
+			large_file_cutoff = 2000,
 			min_count_to_highlight = 2,
 			under_cursor = true,
 			disable_keymaps = true,
@@ -166,8 +206,8 @@ return {
 		},
 		opts = {
 			enable = true,
-			multiwindow = true,
-			max_lines = 5,
+			multiwindow = false,
+			max_lines = 3,
 			min_window_height = 12,
 			line_numbers = false,
 			multiline_threshold = 2,
@@ -176,7 +216,7 @@ return {
 			separator = nil,
 			zindex = 20,
 			on_attach = function(bufnr)
-				if vim.b[bufnr].bigfile then
+				if expensive_buffer(bufnr) then
 					return false
 				end
 

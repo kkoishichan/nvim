@@ -3,6 +3,7 @@
 -- icons, no exam tags -- closes on cursor movement, like other transient floats.
 
 local M = {}
+local float_style = require("user.core.float_style")
 
 local DB = vim.fn.expand("~/.local/share/trans/ultimate.db")
 local ns = vim.api.nvim_create_namespace("user_dict")
@@ -103,21 +104,21 @@ local function open_float(header, body)
 	vim.bo[buf].modifiable = false
 	vim.bo[buf].bufhidden = "wipe"
 
-	local win = vim.api.nvim_open_win(buf, false, {
-		relative = "cursor",
-		row = 1,
-		col = 0,
-		width = width,
-		height = height,
-		style = "minimal",
-		-- Borderless background block on a Pmenu bg, matching the completion docs
-		-- and LSP hover. Left/right padding only (no lines), like blink's "padded".
-		border = { " ", "", "", " ", "", "", " ", " " },
-		focusable = false,
-		noautocmd = true,
-	})
+	local win = vim.api.nvim_open_win(
+		buf,
+		false,
+		float_style.padded({
+			relative = "cursor",
+			row = 1,
+			col = 0,
+			width = width,
+			height = height,
+			focusable = false,
+			noautocmd = true,
+		})
+	)
 	vim.wo[win].wrap = true
-	vim.wo[win].winhighlight = "NormalFloat:Pmenu,FloatBorder:Pmenu"
+	float_style.apply_padded(win)
 
 	state.win = win
 	state.autocmd = vim.api.nvim_create_autocmd(

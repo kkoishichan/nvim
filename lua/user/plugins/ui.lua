@@ -1,4 +1,5 @@
 local layout = require("user.core.layout")
+local float_style = require("user.core.float_style")
 local theme = require("user.core.theme")
 local lsp_progress = require("user.core.lsp_progress")
 local active_theme = theme.saved()
@@ -60,7 +61,12 @@ return {
 		"Bekaboo/dropbar.nvim",
 		event = { "BufReadPost", "BufNewFile" },
 		dependencies = { "nvim-mini/mini.icons" },
-		opts = {},
+		opts = {
+			bar = {
+				-- Coalesce context updates while a repeated movement key is held.
+				update_debounce = 80,
+			},
+		},
 		keys = {
 			{
 				"<leader>cb",
@@ -182,6 +188,13 @@ return {
 			terminal = { enabled = false },
 			words = { enabled = false },
 			styles = {
+				input = {
+					border = float_style.border(),
+					wo = {
+						winblend = 0,
+						winhighlight = "Normal:Pmenu,NormalFloat:Pmenu,FloatBorder:Pmenu,FloatTitle:Pmenu",
+					},
+				},
 				notification = {
 					border = "rounded",
 				},
@@ -189,8 +202,8 @@ return {
 					wo = { foldcolumn = "0" },
 				},
 				scratch = {
-					-- Uses the shared accent FloatBorder like every other float; only
-					-- remap NormalFloat to keep the editor background.
+					-- Scratch is an application-sized panel, so it keeps the shared
+					-- accent FloatBorder and editor background.
 					-- Size tracks the shared float_scale so it matches lazygit/terminal.
 					width = layout.float_scale,
 					height = layout.float_scale,
@@ -217,7 +230,17 @@ return {
 	},
 	{
 		"karb94/neoscroll.nvim",
-		event = "VeryLazy",
+		keys = {
+			{ "<C-u>", mode = { "n", "x" } },
+			{ "<C-d>", mode = { "n", "x" } },
+			{ "<C-b>", mode = { "n", "x" } },
+			{ "<C-f>", mode = { "n", "x" } },
+			{ "<C-y>", mode = { "n", "x" } },
+			{ "<C-e>", mode = { "n", "x" } },
+			{ "zt", mode = { "n", "x" } },
+			{ "zz", mode = { "n", "x" } },
+			{ "zb", mode = { "n", "x" } },
+		},
 		opts = {
 			mappings = {
 				"<C-u>",
@@ -235,7 +258,7 @@ return {
 			respect_scrolloff = true,
 			cursor_scrolls_alone = true,
 			easing = "quadratic",
-			duration_multiplier = 0.8,
+			duration_multiplier = 0.65,
 			performance_mode = false,
 		},
 	},
@@ -303,14 +326,25 @@ return {
 					local bufnr = vim.api.nvim_win_get_buf(winid)
 					local add, change, delete = {}, {}, {}
 					local hunks = gitsigns.get_hunks(bufnr)
+					local changed_lines = 0
+					for _, hunk in ipairs(hunks or {}) do
+						changed_lines = changed_lines + math.max(hunk.added.count, 1)
+					end
+					local expand_hunks = changed_lines <= 1000
 					for _, hunk in ipairs(hunks or {}) do
 						local start = hunk.added.start
 						if hunk.type == "delete" then
 							delete[#delete + 1] = start
 						else
 							local bucket = hunk.type == "add" and add or change
-							for ln = start, start + math.max(hunk.added.count - 1, 0) do
-								bucket[#bucket + 1] = ln
+							local count = math.max(hunk.added.count, 1)
+							bucket[#bucket + 1] = start
+							if expand_hunks then
+								for line = start + 1, start + count - 1 do
+									bucket[#bucket + 1] = line
+								end
+							elseif count > 1 then
+								bucket[#bucket + 1] = start + count - 1
 							end
 						end
 					end
@@ -321,18 +355,24 @@ return {
 			end)
 			scrollview.set_sign_group_state(group, true)
 
+			local refresh_generation = 0
 			vim.api.nvim_create_autocmd("User", {
 				pattern = "GitSignsUpdate",
 				group = vim.api.nvim_create_augroup("user_scrollview_git", { clear = true }),
 				callback = function()
-					if scrollview.is_sign_group_active(group) then
-						vim.cmd("silent! ScrollViewRefresh")
-					end
+					refresh_generation = refresh_generation + 1
+					local generation = refresh_generation
+					vim.defer_fn(function()
+						if generation == refresh_generation and scrollview.is_sign_group_active(group) then
+							scrollview.refresh()
+						end
+					end, 120)
 				end,
 			})
 		end,
 		keys = {
 			{ "<leader>uv", "<cmd>ScrollViewToggle<cr>", desc = "Toggle scrollbar" },
+			{ "<leader>us", "<cmd>ScrollViewToggle search<cr>", desc = "Toggle search markers" },
 		},
 	},
 	{
@@ -341,7 +381,7 @@ return {
 		cmd = "Notifications",
 		opts = {
 			background_colour = "NotifyBackground",
-			fps = 60,
+			fps = 30,
 			level = vim.log.levels.INFO,
 			max_width = function()
 				return math.min(math.max(math.floor(vim.o.columns * 0.38), 44), 72)
@@ -351,7 +391,7 @@ return {
 			end,
 			minimum_width = 44,
 			render = "default",
-			stages = "slide",
+			stages = "fade",
 			timeout = 3000,
 			top_down = true,
 		},
@@ -599,6 +639,14 @@ return {
 				preset = "modern",
 				delay = 300,
 				spec = groups,
+				win = {
+					border = float_style.border(),
+					padding = { 1, 1 },
+					wo = {
+						winblend = 0,
+						winhighlight = "Normal:Pmenu,NormalFloat:Pmenu,FloatBorder:Pmenu,FloatTitle:Pmenu",
+					},
+				},
 				icons = {
 					-- which-key's default Space icon is "󱁐 " -- a glyph followed by a
 					-- trailing space, which makes the leader popup title read as the

@@ -283,7 +283,7 @@ return {
 			persist_size = true,
 			shade_terminals = false,
 			shell = vim.o.shell,
-			-- Float terminal uses the shared accent FloatBorder like every other float.
+			-- The application-sized float terminal keeps the shared accent frame.
 			highlights = {
 				FloatBorder = { link = "FloatBorder" },
 				NormalFloat = { link = "NormalFloat" },

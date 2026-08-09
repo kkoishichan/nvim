@@ -9,6 +9,7 @@ local markview_filetypes = {
 }
 
 local toolchain = require("user.toolchain")
+local float_style = require("user.core.float_style")
 
 local function refresh_markview(bufnr)
 	if not vim.api.nvim_buf_is_valid(bufnr) or not markview_filetypes[vim.bo[bufnr].filetype] then
@@ -45,6 +46,9 @@ return {
 			-- rustaceanvim manages rust_analyzer + DAP (codelldb) + neotest itself.
 			-- Settings migrated from the former manual rust_analyzer lsp config.
 			vim.g.rustaceanvim = {
+				tools = {
+					float_win_config = float_style.padded(),
+				},
 				server = {
 					cmd = { toolchain.executable("rust-analyzer") or "rust-analyzer" },
 					on_attach = function(_, bufnr)
@@ -107,6 +111,10 @@ return {
 		tag = "stable",
 		event = { "BufRead Cargo.toml", "BufNewFile Cargo.toml" },
 		opts = {
+			popup = {
+				border = float_style.border(),
+				padding = 0,
+			},
 			completion = {
 				crates = { enabled = true },
 			},

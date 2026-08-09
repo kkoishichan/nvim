@@ -1,7 +1,27 @@
 return {
 	{
 		"jake-stewart/multicursor.nvim",
-		event = "VeryLazy",
+		keys = {
+			{ "<M-n>", mode = { "n", "x" }, desc = "Add next match" },
+			{ "<M-p>", mode = { "n", "x" }, desc = "Add previous match" },
+			{ "<M-s>", mode = { "n", "x" }, desc = "Skip next match" },
+			{ "<M-a>", mode = { "n", "x" }, desc = "Add all matches" },
+			{ "<M-Down>", mode = { "n", "x" }, desc = "Add cursor below" },
+			{ "<M-Up>", mode = { "n", "x" }, desc = "Add cursor above" },
+			{ "<M-LeftMouse>", mode = { "n", "i" }, desc = "Toggle mouse cursor" },
+			{ "<leader>vn", mode = { "n", "x" }, desc = "Add next match" },
+			{ "<leader>vN", mode = { "n", "x" }, desc = "Add previous match" },
+			{ "<leader>vs", mode = { "n", "x" }, desc = "Skip next match" },
+			{ "<leader>vS", mode = { "n", "x" }, desc = "Skip previous match" },
+			{ "<leader>va", mode = { "n", "x" }, desc = "Add all matches" },
+			{ "<leader>vj", mode = { "n", "x" }, desc = "Add cursor below" },
+			{ "<leader>vk", mode = { "n", "x" }, desc = "Add cursor above" },
+			{ "<leader>vm", mode = "x", desc = "Match within selection" },
+			{ "<leader>vc", mode = "x", desc = "Selection to cursors" },
+			{ "<leader>v=", mode = { "n", "x" }, desc = "Align cursors" },
+			{ "<leader>vl", mode = { "n", "x" }, desc = "Toggle cursor lock" },
+			{ "<leader>vr", mode = "n", desc = "Restore cursors" },
+		},
 		config = function()
 			local mc = require("multicursor-nvim")
 			mc.setup()

@@ -8,7 +8,9 @@ function M.setup(notify, dismiss_notifications)
 	end
 
 	local spinner = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" }
-	local spinner_interval = 120
+	-- Progress events can be very noisy while a large workspace is indexing.
+	-- A 4 Hz spinner remains legible without forcing redraws every 120 ms.
+	local spinner_interval = 250
 	local frame = 1
 	local progress = {}
 	local records = {}
@@ -157,7 +159,7 @@ function M.setup(notify, dismiss_notifications)
 		end
 
 		spinner_running = true
-		timer:start(0, spinner_interval, vim.schedule_wrap(redraw_spinner))
+		timer:start(spinner_interval, spinner_interval, vim.schedule_wrap(redraw_spinner))
 	end
 
 	local progress_group = vim.api.nvim_create_augroup("user_lsp_progress_notify", { clear = true })
@@ -174,6 +176,7 @@ function M.setup(notify, dismiss_notifications)
 
 			local client_progress = progress[client.id] or {}
 			progress[client.id] = client_progress
+			local was_active = #client_progress > 0
 
 			local percentage = value.kind == "end" and 100 or value.percentage or 0
 			local title = value.title or "Working"
@@ -206,7 +209,12 @@ function M.setup(notify, dismiss_notifications)
 			end
 
 			progress[client.id] = #active_items > 0 and active_items or nil
-			notify_client_progress(client, active_items, done_items)
+			-- Intermediate reports are rendered by the bounded-rate spinner. Only
+			-- beginnings and final completions notify immediately, so a server that
+			-- emits hundreds of indexing reports cannot force hundreds of redraws.
+			if not was_active or #active_items == 0 then
+				notify_client_progress(client, active_items, done_items)
+			end
 			if #active_items == 0 then
 				client_names[client.id] = nil
 			end

@@ -115,22 +115,37 @@ local function mason_executable(name)
 	end
 end
 
+local executable_cache = {}
+
 function M.executable(name, opts)
 	opts = opts or {}
+	local cache_key = name .. "\0" .. (opts.prefer_mason and "mason" or "system")
+	local cached = executable_cache[cache_key]
+	if cached ~= nil then
+		return cached or nil
+	end
 
 	if opts.prefer_mason then
 		local mason = mason_executable(name)
 		if mason then
+			executable_cache[cache_key] = mason
 			return mason
 		end
 	end
 
 	local system = vim.fn.exepath(name)
 	if system ~= "" then
+		executable_cache[cache_key] = system
 		return system
 	end
 
-	return mason_executable(name)
+	local mason = mason_executable(name)
+	executable_cache[cache_key] = mason or false
+	return mason
+end
+
+function M.clear_executable_cache()
+	executable_cache = {}
 end
 
 return M
