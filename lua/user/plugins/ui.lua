@@ -3,6 +3,24 @@ local float_style = require("user.core.float_style")
 local theme = require("user.core.theme")
 local lsp_progress = require("user.core.lsp_progress")
 local active_theme = theme.saved()
+local scrollview_symbols = {
+	diagnostics = {
+		error = "E",
+		warn = "W",
+		info = "I",
+		hint = "H",
+	},
+	search = "━",
+	git = "┃",
+	keywords = {
+		fix = "",
+		todo = "",
+		hack = "",
+		warn = "",
+		xxx = "",
+	},
+	conflict = "×",
+}
 
 local function dashboard_header()
 	return [[
@@ -263,20 +281,52 @@ return {
 		},
 	},
 	{
-		-- Virtual scrollbar that stripes whole-file markers on the right edge,
-		-- the way a modern IDE does: diagnostics, search hits, marks, TODO/FIXME
-		-- keywords, merge conflicts, and git add/change/delete bars (wired to
-		-- gitsigns below -- scrollview has no built-in git). The scrollbar thumb
-		-- already conveys cursor position, so the `cursor` sign is left off.
-		-- Diagnostic signs default to E/W/I/H already, matching diagnostics.lua.
+		-- A single overview rail: diagnostics, search hits, marks, TODO/FIXME,
+		-- conflicts, and Git changes all occupy the same stable rightmost column.
+		-- Every source occupies one cell but has its own shape, so colour conveys
+		-- severity while shape conveys provenance. Vim marks retain their letters
+		-- because those are the actual jump targets. The scrollbar thumb already
+		-- conveys cursor position, so no cursor sign is needed.
 		"dstein64/nvim-scrollview",
 		event = { "BufReadPost", "BufNewFile" },
 		cmd = { "ScrollViewToggle", "ScrollViewEnable", "ScrollViewDisable" },
 		dependencies = { "lewis6991/gitsigns.nvim" },
 		opts = {
 			mode = "virtual",
+			visibility = "overflow",
 			winblend = 0,
+			winblend_gui = 0,
+			hide_on_float_intersect = true,
+			signs_scrollbar_overlap = "over",
+			signs_max_per_row = 1,
 			signs_on_startup = { "diagnostics", "search", "marks", "keywords", "conflicts" },
+			diagnostics_error_priority = 100,
+			diagnostics_warn_priority = 90,
+			diagnostics_info_priority = 60,
+			diagnostics_hint_priority = 40,
+			diagnostics_error_symbol = scrollview_symbols.diagnostics.error,
+			diagnostics_warn_symbol = scrollview_symbols.diagnostics.warn,
+			diagnostics_info_symbol = scrollview_symbols.diagnostics.info,
+			diagnostics_hint_symbol = scrollview_symbols.diagnostics.hint,
+			conflicts_top_priority = 95,
+			conflicts_middle_priority = 95,
+			conflicts_bottom_priority = 95,
+			conflicts_top_symbol = scrollview_symbols.conflict,
+			conflicts_middle_symbol = scrollview_symbols.conflict,
+			conflicts_bottom_symbol = scrollview_symbols.conflict,
+			search_priority = 80,
+			search_symbol = scrollview_symbols.search,
+			marks_priority = 75,
+			keywords_fix_priority = 50,
+			keywords_hack_priority = 50,
+			keywords_todo_priority = 50,
+			keywords_warn_priority = 50,
+			keywords_xxx_priority = 50,
+			keywords_fix_symbol = scrollview_symbols.keywords.fix,
+			keywords_hack_symbol = scrollview_symbols.keywords.hack,
+			keywords_todo_symbol = scrollview_symbols.keywords.todo,
+			keywords_warn_symbol = scrollview_symbols.keywords.warn,
+			keywords_xxx_symbol = scrollview_symbols.keywords.xxx,
 			excluded_filetypes = {
 				"neo-tree",
 				"oil",
@@ -305,15 +355,15 @@ return {
 			scrollview.register_sign_group(group)
 			local names = {}
 			for kind, spec in pairs({
-				add = { symbol = "│", highlight = "GitSignsAdd" },
-				change = { symbol = "│", highlight = "GitSignsChange" },
-				delete = { symbol = "▁", highlight = "GitSignsDelete" },
+				add = { highlight = "GitSignsAdd", priority = 30 },
+				change = { highlight = "GitSignsChange", priority = 31 },
+				delete = { highlight = "GitSignsDelete", priority = 32 },
 			}) do
 				names[kind] = scrollview.register_sign_spec({
 					group = group,
-					symbol = spec.symbol,
+					symbol = scrollview_symbols.git,
 					highlight = spec.highlight,
-					priority = 60,
+					priority = spec.priority,
 				}).name
 			end
 
@@ -372,7 +422,6 @@ return {
 		end,
 		keys = {
 			{ "<leader>uv", "<cmd>ScrollViewToggle<cr>", desc = "Toggle scrollbar" },
-			{ "<leader>us", "<cmd>ScrollViewToggle search<cr>", desc = "Toggle search markers" },
 		},
 	},
 	{

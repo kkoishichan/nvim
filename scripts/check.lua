@@ -104,6 +104,11 @@ do
 	assert(neo_tree_opts.filesystem.use_libuv_file_watcher, "neo-tree file watcher is disabled")
 	local gitsigns_opts = opts("gitsigns.nvim")
 	assert(gitsigns_opts.current_line_blame, "current-line Git blame is disabled")
+	for _, signs in ipairs({ gitsigns_opts.signs, gitsigns_opts.signs_staged }) do
+		for _, kind in ipairs({ "add", "change", "changedelete" }) do
+			assert(signs[kind].text == "┃", "Gitsigns " .. kind .. " marker is not a centred heavy bar")
+		end
+	end
 	assert_shared_border(gitsigns_opts.preview_config.border, "Gitsigns previews")
 	assert(
 		gitsigns_opts.preview_config.row == 1 and gitsigns_opts.preview_config.col == 0,
@@ -145,10 +150,84 @@ do
 		lazy_ui.size.width == layout.manager_scale and lazy_ui.size.height == layout.manager_scale,
 		"Lazy manager size diverged"
 	)
+	local scrollview_opts = opts("nvim-scrollview")
+	for _, group in ipairs({ "diagnostics", "search", "marks", "keywords", "conflicts" }) do
+		assert(
+			vim.tbl_contains(scrollview_opts.signs_on_startup, group),
+			"scrollview " .. group .. " markers are disabled"
+		)
+	end
+	assert(scrollview_opts.signs_scrollbar_overlap == "over", "scrollview markers no longer use a single rail")
+	assert(scrollview_opts.signs_max_per_row == 1, "scrollview markers can spill into multiple columns")
+	assert(scrollview_opts.hide_on_float_intersect, "scrollview can draw through floating windows")
+	local scrollview_symbols = {
+		diagnostic_error = scrollview_opts.diagnostics_error_symbol,
+		diagnostic_warn = scrollview_opts.diagnostics_warn_symbol,
+		diagnostic_info = scrollview_opts.diagnostics_info_symbol,
+		diagnostic_hint = scrollview_opts.diagnostics_hint_symbol,
+		search = scrollview_opts.search_symbol,
+		keyword_fix = scrollview_opts.keywords_fix_symbol,
+		keyword_todo = scrollview_opts.keywords_todo_symbol,
+		keyword_hack = scrollview_opts.keywords_hack_symbol,
+		keyword_warn = scrollview_opts.keywords_warn_symbol,
+		keyword_xxx = scrollview_opts.keywords_xxx_symbol,
+		conflict = scrollview_opts.conflicts_top_symbol,
+	}
 	assert(
-		vim.tbl_contains(opts("nvim-scrollview").signs_on_startup, "search"),
-		"scrollview search markers are disabled"
+		vim.deep_equal(scrollview_symbols, {
+			diagnostic_error = "E",
+			diagnostic_warn = "W",
+			diagnostic_info = "I",
+			diagnostic_hint = "H",
+			search = "━",
+			keyword_fix = "",
+			keyword_todo = "",
+			keyword_hack = "",
+			keyword_warn = "",
+			keyword_xxx = "",
+			conflict = "×",
+		}),
+		"scrollview markers diverged from the left gutter vocabulary"
 	)
+	for source, symbol in pairs(scrollview_symbols) do
+		assert(vim.fn.strdisplaywidth(symbol) == 1, "scrollview " .. source .. " symbol is not one cell wide")
+	end
+	assert(
+		scrollview_opts.diagnostics_error_priority > scrollview_opts.conflicts_top_priority
+			and scrollview_opts.conflicts_top_priority > scrollview_opts.diagnostics_warn_priority
+			and scrollview_opts.diagnostics_warn_priority > scrollview_opts.search_priority
+			and scrollview_opts.search_priority > scrollview_opts.marks_priority
+			and scrollview_opts.marks_priority > scrollview_opts.diagnostics_info_priority,
+		"scrollview marker priority hierarchy changed"
+	)
+	local p = require("user.core.palette").get()
+	assert(
+		vim.api.nvim_get_hl(0, { name = "ScrollView", link = false }).bg
+			== require("user.core.palette").blend(p.fg, p.bg, 0.13),
+		"scrollview thumb is not using the quiet theme-derived colour"
+	)
+	assert(
+		vim.api.nvim_get_hl(0, { name = "ScrollViewSearch", link = false }).fg
+			== vim.api.nvim_get_hl(0, { name = "Special", link = false }).fg,
+		"scrollview search markers lost their source-specific colour"
+	)
+	for group, colour in pairs({
+		ScrollViewKeywordsFix = p.error,
+		ScrollViewKeywordsTodo = p.info,
+		ScrollViewKeywordsHack = p.warn,
+		ScrollViewKeywordsWarn = p.warn,
+		ScrollViewKeywordsXxx = p.warn,
+	}) do
+		assert(
+			vim.api.nvim_get_hl(0, { name = group, link = false }).fg == colour,
+			group .. " no longer matches the left gutter colour"
+		)
+	end
+	require("lazy").load({ plugins = { "nvim-scrollview" } })
+	vim.wait(200)
+	local git_legend = vim.api.nvim_exec2("ScrollViewLegend! gitsigns", { output = true }).output
+	assert(git_legend:find("┃", 1, true), "scrollview Git marker is not a heavy solid centred bar")
+	assert(vim.fn.maparg("<leader>us", "n") == "", "search markers regained a dedicated toggle")
 end
 
 do

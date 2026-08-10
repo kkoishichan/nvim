@@ -180,8 +180,16 @@ indent guide 等高成本功能。普通文件保留完整语言功能；lint �
 vim.g.user_checktime_batch_size = 16 -- 每批检查的隐藏 buffer 数
 ```
 
-Git 行 blame 与 scrollview 搜索结果标记默认启用，可分别用 `<leader>ghB` 和 `<leader>us`
-切换。Neo-tree 保持目录 watcher、Git 状态和诊断功能。
+Git 行 blame 默认启用，可用 `<leader>ghB` 切换；scrollview 搜索结果标记保持启用，
+不设置单独开关。Neo-tree 保持目录 watcher、Git 状态和诊断功能。
+
+右侧滚动条采用单轨概览设计：滑块、诊断、搜索、mark、TODO、冲突和 Git 改动始终
+共用一列，同一高度只显示优先级最高的标记。诊断沿用左列的 `E/W/I/H`，FIX、TODO、
+HACK、WARN/XXX 也沿用对应图标；Git 使用粗实线 `┃`，搜索 `━`、冲突 `×`，mark 保留字母。
+左右两侧的 Git 新增/修改标记均使用居中的 `┃`；所有标记固定占用一个字符，并使用与
+左列一致的主题语义色。
+右侧发生位置碰撞时，诊断、冲突、搜索、mark 和关键词均优先于 Git；精确 Git 状态仍由
+左侧专用车道持续显示。
 
 ## 语言支持
 
@@ -262,7 +270,7 @@ Biome、Stylelint、golangci-lint 与 Selene 只在项目存在对应配置时�
 - `<M-1>` … `<M-9>` ：跳到第 N 个 buffer，`<M-0>` 跳到最后一个
 - `<C-/>` ：切换底部终端
 - `<leader>k` ：离线词典；`<leader>ut` ：选择并持久保存主题
-- `<leader>ghB` ：切换当前行 Git blame；`<leader>us` ：切换搜索结果滚动条标记
+- `<leader>ghB` ：切换当前行 Git blame
 - `zR` / `zM` / `zr` / `zm` / `zK` ：折叠开关与预览
 
 ### 终端（VSCode 风格）

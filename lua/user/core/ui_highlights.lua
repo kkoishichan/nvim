@@ -74,10 +74,41 @@ local function set_float_highlights()
 	vim.api.nvim_set_hl(0, "LazyGitFloat", { link = "NormalFloat" })
 end
 
+-- Keep the scrollbar quieter than editor selections and encode overview-ruler
+-- information primarily through colour. The thumb is a low-contrast neutral;
+-- hovering turns it into a stronger theme accent without introducing a frame.
+local function set_scrollview_highlights()
+	local p = palette.get()
+	local function foreground(name, fallback)
+		return vim.api.nvim_get_hl(0, { name = name, link = false }).fg or fallback
+	end
+	local search = foreground("Special", p.warn)
+	local mark = foreground("Identifier", p.accent)
+	local conflict = foreground("Statement", p.error)
+	vim.api.nvim_set_hl(0, "ScrollView", { bg = palette.blend(p.fg, p.bg, 0.13) })
+	vim.api.nvim_set_hl(0, "ScrollViewHover", {
+		fg = p.fg,
+		bg = palette.blend(p.accent, p.bg, 0.38),
+		bold = true,
+	})
+	vim.api.nvim_set_hl(0, "ScrollViewRestricted", { bg = palette.blend(p.warn, p.bg, 0.28) })
+	vim.api.nvim_set_hl(0, "ScrollViewSearch", { fg = search, bold = true })
+	vim.api.nvim_set_hl(0, "ScrollViewMarks", { fg = mark, bold = true })
+	vim.api.nvim_set_hl(0, "ScrollViewConflictsTop", { fg = conflict, bold = true })
+	vim.api.nvim_set_hl(0, "ScrollViewConflictsMiddle", { fg = conflict, bold = true })
+	vim.api.nvim_set_hl(0, "ScrollViewConflictsBottom", { fg = conflict, bold = true })
+	vim.api.nvim_set_hl(0, "ScrollViewKeywordsFix", { fg = p.error })
+	vim.api.nvim_set_hl(0, "ScrollViewKeywordsHack", { fg = p.warn })
+	vim.api.nvim_set_hl(0, "ScrollViewKeywordsTodo", { fg = p.info })
+	vim.api.nvim_set_hl(0, "ScrollViewKeywordsWarn", { fg = p.warn, bold = true })
+	vim.api.nvim_set_hl(0, "ScrollViewKeywordsXxx", { fg = p.warn, bold = true })
+end
+
 ---Apply all theme-derived UI highlights from the current colorscheme.
 function M.apply()
 	set_notify_highlights()
 	set_float_highlights()
+	set_scrollview_highlights()
 	local p = palette.get()
 	vim.api.nvim_set_hl(0, "MatchParen", { bg = p.strong, fg = p.warn, bold = true })
 end
