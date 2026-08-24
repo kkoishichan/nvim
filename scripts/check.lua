@@ -135,12 +135,94 @@ do
 		vim.deep_equal(completion_opts.keymap["<Esc>"], { "cancel", "fallback" }),
 		"Escape no longer dismisses completion before leaving Insert mode"
 	)
+	assert(completion_opts.keymap["<C-k>"] == false, "Blink still owns the signature-help mapping")
+	assert(not completion_opts.signature.enabled, "Blink signature help is still enabled")
+	local signature_opts = opts("lsp_signature.nvim")
+	assert(not signature_opts.floating_window, "Signature help still opens an automatic floating window")
+	assert(not signature_opts.hint_enable, "Flat-colour lsp_signature virtual hints are still enabled")
 	assert(
-		vim.deep_equal(completion_opts.keymap["<C-k>"], { "show_signature", "hide_signature", "fallback" }),
-		"C-k no longer toggles signature help"
+		signature_opts.hi_parameter == "LspSignatureActiveParameter",
+		"Active signature parameters lost their dedicated highlight"
 	)
-	assert(completion_opts.signature.enabled, "Manual signature help is disabled")
-	assert(not completion_opts.signature.trigger.enabled, "Signature help opens automatically")
+	assert(signature_opts.doc_lines == 0, "Signature help includes bulky documentation")
+	assert(signature_opts.max_height == nil, "Signature help reintroduced a custom height cap")
+	assert(signature_opts.floating_window_above_cur_line, "Manual signature help no longer prefers the upper side")
+	assert_shared_border(signature_opts.handler_opts.border, "Signature help")
+	assert(vim.fn.maparg("<C-k>", "i", false, true).desc == "Toggle signature help", "C-k lost signature help")
+	local closes_signature_for_completion = false
+	for _, autocmd in ipairs(vim.api.nvim_get_autocmds({ event = "User", pattern = "BlinkCmpShow" })) do
+		if autocmd.desc == "Close signature help when completion opens" then
+			closes_signature_for_completion = true
+			break
+		end
+	end
+	assert(closes_signature_for_completion, "Completion can overlap an open signature window")
+	local has_signature_renderer = false
+	for _, autocmd in ipairs(vim.api.nvim_get_autocmds({ event = "TextChangedI" })) do
+		if autocmd.desc == "Render signature hints with Tree-sitter" then
+			has_signature_renderer = true
+			break
+		end
+	end
+	assert(has_signature_renderer, "Tree-sitter signature renderer is not active")
+	local signature_chunks = require("user.core.signature_highlight").syntax_chunks(
+		"out: Tensor | None = None",
+		"python",
+		"LspSignatureHint"
+	)
+	local signature_syntax = {}
+	for _, chunk in ipairs(signature_chunks) do
+		signature_syntax[chunk[2]] = true
+	end
+	for _, highlight in ipairs({ "@variable.python", "@type.python", "@operator.python", "@constant.builtin.python" }) do
+		assert(signature_syntax[highlight], "Signature hints lost Tree-sitter group " .. highlight)
+	end
+	local signature_renderer = require("user.core.signature_highlight")
+	local parameter = "out: Tensor | None = None"
+	local signature_label = "arange(start: Number, " .. parameter .. ") -> Tensor"
+	local parameter_start, parameter_end = assert(signature_label:find(parameter, 1, true))
+	assert(signature_renderer.parameter_text({
+		hint = parameter .. ": optional destination tensor",
+		label = signature_label,
+		range = { start = parameter_start, ["end"] = parameter_end },
+	}) == parameter, "Virtual signature still includes parameter documentation")
+	assert(
+		signature_renderer.parameter_text({ hint = parameter }) == parameter,
+		"Virtual signature cannot fall back when an LSP omits the active range"
+	)
+	local virtual_chunks = signature_renderer.virtual_chunks(parameter, "python")
+	assert(virtual_chunks[1][1] == " 󰊕 ", "Virtual signature lost its function marker")
+	local virtual_text = ""
+	for _, chunk in ipairs(virtual_chunks) do
+		virtual_text = virtual_text .. chunk[1]
+		local groups = chunk[2]
+		assert(
+			type(groups) == "table" and vim.tbl_contains(groups, "LspSignatureVirtual"),
+			"Virtual signature chunk lost its popup background"
+		)
+	end
+	assert(virtual_text == " 󰊕 out: Tensor | None = None ", "Virtual signature card changed its visible text")
+	local signature_palette = require("user.core.palette")
+	local signature_colors = signature_palette.get()
+	local signature_hint = vim.api.nvim_get_hl(0, { name = "LspSignatureHint", link = false })
+	assert(
+		signature_hint.fg == signature_palette.blend(signature_colors.hint, signature_colors.gray, 0.72)
+			and not signature_hint.italic,
+		"Virtual signature hint colour is noisy or inconsistent with the theme"
+	)
+	local signature_parameter = vim.api.nvim_get_hl(0, { name = "LspSignatureActiveParameter", link = false })
+	local signature_popup_bg = vim.api.nvim_get_hl(0, { name = "Pmenu", link = false }).bg or signature_colors.panel
+	local signature_virtual = vim.api.nvim_get_hl(0, { name = "LspSignatureVirtual", link = false })
+	assert(
+		signature_virtual.bg == signature_popup_bg and signature_virtual.fg == nil,
+		"Virtual signature background differs from Blink or overrides syntax foregrounds"
+	)
+	assert(
+		signature_parameter.fg == nil
+			and signature_parameter.bg == signature_palette.blend(signature_colors.hint, signature_popup_bg, 0.16)
+			and signature_parameter.bold,
+		"Active signature parameter styling overrides syntax foregrounds"
+	)
 	assert(opts("nvim-notify").stages == "fade", "nvim-notify animation or frame was changed")
 	assert(
 		vim.api.nvim_get_hl(0, { name = "NotifyBackground", link = false }).bg
