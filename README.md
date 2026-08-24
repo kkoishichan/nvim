@@ -8,7 +8,8 @@ Neovim 打磨成接近 IDE 的日常工作流。
 - `fzf-lua` 负责查找、搜索、符号 / 调用关系与 Git 列表，并接管 `vim.ui.select`。
 - `glance.nvim` 提供定义、声明、实现、类型与引用的双栏 Peek 界面。
 - `oil.nvim` 像编辑 buffer 一样管理文件系统；`neo-tree.nvim` 提供侧边文件树。
-- `blink.cmp` 负责补全、snippet、签名帮助。
+- `blink.cmp` 负责补全、snippet、签名帮助；`Tab` / `Enter` 确认候选，方向键选择，
+  `Ctrl-Space` 主动唤起，`Esc` 优先关闭补全菜单。
 - `nvim-lspconfig` + Mason 负责语言服务与外部工具安装。
 - `conform.nvim` 格式化，`nvim-lint` 静态检查。
 - `nvim-ufo` + Tree-sitter 折叠。

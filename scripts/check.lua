@@ -124,7 +124,17 @@ do
 	assert_shared_border(snacks_opts.styles.input.border, "vim.ui.input")
 	assert(snacks_opts.styles.notification.border == "rounded", "Snacks notification style was changed")
 	assert_shared_border(opts("which-key.nvim").win.border, "Which-key")
-	assert(opts("blink.cmp").completion.menu.border == "padded", "Completion menu lost its borderless style")
+	local completion_opts = opts("blink.cmp")
+	assert(completion_opts.completion.menu.border == "padded", "Completion menu lost its borderless style")
+	assert(completion_opts.keymap.preset == "super-tab", "Completion no longer uses IDE-style Tab acceptance")
+	assert(
+		vim.deep_equal(completion_opts.keymap["<CR>"], { "accept", "fallback" }),
+		"Enter no longer safely confirms an explicitly selected completion"
+	)
+	assert(
+		vim.deep_equal(completion_opts.keymap["<Esc>"], { "cancel", "fallback" }),
+		"Escape no longer dismisses completion before leaving Insert mode"
+	)
 	assert(opts("nvim-notify").stages == "fade", "nvim-notify animation or frame was changed")
 	assert(
 		vim.api.nvim_get_hl(0, { name = "NotifyBackground", link = false }).bg

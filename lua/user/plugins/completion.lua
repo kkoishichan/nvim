@@ -8,7 +8,13 @@ return {
 		},
 		opts = {
 			keymap = {
-				preset = "enter",
+				-- IDE-style completion: Tab accepts the selected (or first) item,
+				-- then advances through snippet placeholders. Enter only accepts an
+				-- explicitly selected item, so an untouched menu cannot steal a
+				-- newline. Escape dismisses the menu before leaving Insert mode.
+				preset = "super-tab",
+				["<CR>"] = { "accept", "fallback" },
+				["<Esc>"] = { "cancel", "fallback" },
 			},
 			appearance = {
 				nerd_font_variant = "mono",
