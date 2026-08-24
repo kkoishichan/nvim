@@ -15,6 +15,7 @@ return {
 				preset = "super-tab",
 				["<CR>"] = { "accept", "fallback" },
 				["<Esc>"] = { "cancel", "fallback" },
+				["<C-k>"] = { "show_signature", "hide_signature", "fallback" },
 			},
 			appearance = {
 				nerd_font_variant = "mono",
@@ -48,6 +49,9 @@ return {
 			},
 			signature = {
 				enabled = true,
+				-- Large overload lists can cover the implementation. Keep signature
+				-- help available on demand through C-k without opening it on `(`/`,`.
+				trigger = { enabled = false },
 				window = {
 					border = "padded",
 				},

@@ -135,6 +135,12 @@ do
 		vim.deep_equal(completion_opts.keymap["<Esc>"], { "cancel", "fallback" }),
 		"Escape no longer dismisses completion before leaving Insert mode"
 	)
+	assert(
+		vim.deep_equal(completion_opts.keymap["<C-k>"], { "show_signature", "hide_signature", "fallback" }),
+		"C-k no longer toggles signature help"
+	)
+	assert(completion_opts.signature.enabled, "Manual signature help is disabled")
+	assert(not completion_opts.signature.trigger.enabled, "Signature help opens automatically")
 	assert(opts("nvim-notify").stages == "fade", "nvim-notify animation or frame was changed")
 	assert(
 		vim.api.nvim_get_hl(0, { name = "NotifyBackground", link = false }).bg
