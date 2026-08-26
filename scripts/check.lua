@@ -1,7 +1,7 @@
 local tmp = assert(vim.env.NVIM_TEST_TMP, "NVIM_TEST_TMP is required")
 
-assert(require("user.core.theme").saved() == "catppuccin", "default theme is not catppuccin")
-assert(vim.startswith(vim.g.colors_name or "", "catppuccin"), "catppuccin was not applied at startup")
+assert(require("user.core.theme").saved() == "vscode", "default theme is not vscode")
+assert(vim.g.colors_name == "vscode", "vscode was not applied at startup")
 assert(vim.o.shada:match("<0"), "ShaDa still persists register contents")
 assert(vim.g.user_lsp_preview_patched == nil, "LSP floating-preview API was monkeypatched")
 

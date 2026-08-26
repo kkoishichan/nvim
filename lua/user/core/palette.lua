@@ -37,7 +37,7 @@ function M.get()
 		bg = bg,
 		gray = attr("Comment", "fg") or 0x928374,
 		-- Float-border accent: a cyan/blue that stays in the same family across
-		-- themes (gruvbox aqua, tokyonight/catppuccin blue), unlike Function/Title
+		-- themes (gruvbox aqua, tokyonight/catppuccin/vscode blue), unlike Function/Title
 		-- which go green in gruvbox.
 		accent = attr("DiagnosticInfo", "fg") or 0x83a598,
 		panel = M.blend(fg, bg, 0.05), -- barely-lifted panel bg (notifications)

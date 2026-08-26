@@ -11,9 +11,10 @@ M.themes = {
 	gruvbox = { plugin = "gruvbox", colorscheme = "gruvbox" },
 	tokyonight = { plugin = "tokyonight.nvim", colorscheme = "tokyonight" },
 	catppuccin = { plugin = "catppuccin", colorscheme = "catppuccin" },
+	vscode = { plugin = "vscode.nvim", colorscheme = "vscode" },
 }
 
-M.default = "catppuccin"
+M.default = "vscode"
 
 local bootstrapped = false
 

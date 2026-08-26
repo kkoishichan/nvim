@@ -4,7 +4,7 @@
 Neovim 打磨成接近 IDE 的日常工作流。
 
 - `lazy.nvim` 管理插件，首次启动自动 bootstrap。
-- 默认 `catppuccin` 主题（可持久切换），`<Space>` 作为 leader，`\` 作为 localleader。
+- 默认 `vscode` Dark+ 主题（可持久切换），`<Space>` 作为 leader，`\` 作为 localleader。
 - `fzf-lua` 负责查找、搜索、符号 / 调用关系与 Git 列表，并接管 `vim.ui.select`。
 - `glance.nvim` 提供定义、声明、实现、类型与引用的双栏 Peek 界面。
 - `oil.nvim` 像编辑 buffer 一样管理文件系统；`neo-tree.nvim` 提供侧边文件树。

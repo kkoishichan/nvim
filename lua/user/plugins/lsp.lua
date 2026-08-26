@@ -145,7 +145,7 @@ return {
 				-- Two shades: the Pmenu block and a step toward the editor bg. Assign
 				-- the darker to the preview and the lighter to the list, so the preview
 				-- is reliably the darker panel whichever way the theme's Pmenu leans
-				-- (gruvbox's Pmenu is lighter than the editor, tokyonight/catppuccin's
+				-- (gruvbox's Pmenu is lighter than the editor, tokyonight/catppuccin/vscode's
 				-- darker -- this picks correctly for each instead of a fixed order).
 				local function lum(c)
 					return 0.299 * (math.floor(c / 65536) % 256)

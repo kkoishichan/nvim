@@ -141,6 +141,22 @@ return {
 		end,
 	},
 	{
+		"Mofiqul/vscode.nvim",
+		lazy = active_theme ~= "vscode",
+		priority = 1000,
+		opts = {
+			style = "dark",
+			transparent = false,
+			italic_comments = true,
+			underline_links = true,
+			terminal_colors = true,
+		},
+		config = function(_, opts)
+			require("vscode").setup(opts)
+			theme.bootstrap()
+		end,
+	},
+	{
 		"folke/snacks.nvim",
 		lazy = false,
 		priority = 1000,

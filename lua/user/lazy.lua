@@ -24,7 +24,7 @@ require("lazy").setup({
 		version = false,
 	},
 	install = {
-		colorscheme = { "catppuccin", "habamax" },
+		colorscheme = { "vscode", "habamax" },
 	},
 	checker = {
 		enabled = false,
