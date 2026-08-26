@@ -27,6 +27,7 @@ local untouched_filetypes = {
 }
 
 local popup_filetypes = {
+	["neotest-output"] = true,
 	["neo-tree-popup"] = true,
 	trouble = true,
 }
@@ -42,6 +43,16 @@ local styled_window_highlights = {
 
 local function border_character(item)
 	return type(item) == "table" and item[1] or item
+end
+
+-- Tree-sitter Context and nvim-scrollview are implemented as tiny floating
+-- windows, but they are persistent editor chrome rather than dismissible UI.
+-- Keep them out of both the popup styling fallback and the global Esc closer.
+local function is_editor_chrome(winid)
+	if vim.w[winid].treesitter_context or vim.w[winid].treesitter_context_line_number then
+		return true
+	end
+	return vim.w[winid].scrollview_key == "scrollview_val"
 end
 
 local function merge_winhighlight(current)
@@ -61,7 +72,12 @@ end
 local function is_panel(winid)
 	local bufnr = vim.api.nvim_win_get_buf(winid)
 	local filetype = vim.bo[bufnr].filetype
-	if vim.bo[bufnr].buftype == "terminal" or panel_filetypes[filetype] or untouched_filetypes[filetype] then
+	if
+		is_editor_chrome(winid)
+		or vim.bo[bufnr].buftype == "terminal"
+		or panel_filetypes[filetype]
+		or untouched_filetypes[filetype]
+	then
 		return true
 	end
 	-- Glance's preview shows the source buffer's real filetype, so its window
@@ -111,6 +127,21 @@ function M.is_padded(winid)
 	return true
 end
 
+---Whether a window is a short-lived popup that Esc may safely dismiss.
+---Application panels, terminals, notifications, backdrops, and editor chrome
+---are deliberately excluded; notification plugins need their own close API.
+function M.is_transient(winid)
+	if not winid or not vim.api.nvim_win_is_valid(winid) then
+		return false
+	end
+	local bufnr = vim.api.nvim_win_get_buf(winid)
+	local config = vim.api.nvim_win_get_config(winid)
+	if config.relative == "" or is_panel(winid) then
+		return false
+	end
+	return M.is_padded(winid) or popup_filetypes[vim.bo[bufnr].filetype] or is_small_float(winid)
+end
+
 ---Apply the shared border and Pmenu background after a popup is created.
 function M.apply_padded(winid)
 	if not winid or not vim.api.nvim_win_is_valid(winid) then
@@ -132,10 +163,7 @@ function M.style_if_small(winid)
 	if not winid or not vim.api.nvim_win_is_valid(winid) then
 		return false
 	end
-	local bufnr = vim.api.nvim_win_get_buf(winid)
-	local config = vim.api.nvim_win_get_config(winid)
-	local known_popup = config.relative ~= "" and popup_filetypes[vim.bo[bufnr].filetype]
-	if M.is_padded(winid) or known_popup or is_small_float(winid) then
+	if M.is_transient(winid) then
 		return M.apply_padded(winid)
 	end
 	return false
@@ -159,7 +187,7 @@ function M.setup()
 	-- just those late-bound cases without adding work to normal buffer events.
 	vim.api.nvim_create_autocmd("FileType", {
 		group = group,
-		pattern = { "dap-float", "neo-tree-popup", "trouble" },
+		pattern = { "dap-float", "neotest-output", "neo-tree-popup", "trouble" },
 		callback = function(event)
 			vim.schedule(function()
 				if not vim.api.nvim_buf_is_valid(event.buf) then

@@ -29,6 +29,20 @@ return {
 			delete_to_trash = true,
 			skip_confirm_for_simple_edits = false,
 			watch_for_changes = true,
+			keymaps = {
+				["<Esc>"] = {
+					callback = function()
+						if vim.api.nvim_win_get_config(0).relative ~= "" then
+							require("oil").close()
+							return
+						end
+						require("user.core.popups").close()
+						vim.cmd.nohlsearch()
+					end,
+					desc = "Close floating Oil / dismiss popups",
+					mode = "n",
+				},
+			},
 			columns = {
 				"icon",
 				"permissions",

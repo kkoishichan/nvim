@@ -147,6 +147,9 @@ return {
 		opts = {
 			style = "dark",
 			transparent = false,
+			-- The stock popup is #202020 against a #1F1F1F editor. Our small
+			-- borderless floats use Pmenu, so lift it enough to remain legible.
+			color_overrides = { vscPopupBack = "#2D2D30" },
 			italic_comments = true,
 			underline_links = true,
 			terminal_colors = true,
@@ -224,6 +227,11 @@ return {
 			styles = {
 				input = {
 					border = float_style.border(),
+					keys = {
+						-- One Escape cancels the prompt; Snacks otherwise uses the
+						-- first press only to leave Insert mode.
+						i_esc = { "<Esc>", { "cmp_close", "cancel" }, mode = "i", expr = true },
+					},
 					wo = {
 						winblend = 0,
 						winhighlight = "Normal:Pmenu,NormalFloat:Pmenu,FloatBorder:Pmenu,FloatTitle:Pmenu",

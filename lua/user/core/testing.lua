@@ -1,5 +1,6 @@
 local M = {}
 local toolchain = require("user.toolchain")
+local float_style = require("user.core.float_style")
 
 local loaded = {}
 local configured = false
@@ -63,7 +64,10 @@ definitions.vue = definitions.javascript
 
 local function configure_once()
 	if not configured then
-		require("neotest").setup({ adapters = {} })
+		require("neotest").setup({
+			adapters = {},
+			floating = { border = float_style.border() },
+		})
 		configured = true
 	end
 end

@@ -1,22 +1,7 @@
-local signature_highlight = require("user.core.signature_highlight")
+local blink_signature = require("user.core.blink_signature")
 
-local function close_full_signature()
-	local signature_helper = package.loaded["lsp_signature.helper"]
-	if not signature_helper then
-		return false
-	end
-
-	-- lsp_signature.toggle_float_win() also clears the virtual-text namespace.
-	-- Close only the full float so the lightweight active-parameter hint remains.
-	local windows = vim.api.nvim_list_wins()
-	signature_helper.close_float_win(true)
-	for _, window in ipairs(windows) do
-		if not vim.api.nvim_win_is_valid(window) then
-			signature_highlight.stop_float(vim.api.nvim_get_current_buf())
-			return true
-		end
-	end
-	return false
+local function dismiss_popups(cmp)
+	return require("user.core.popups").close({ blink = cmp })
 end
 
 return {
@@ -35,9 +20,10 @@ return {
 				-- newline. Escape dismisses the menu before leaving Insert mode.
 				preset = "super-tab",
 				["<CR>"] = { "accept", "fallback" },
-				["<Esc>"] = { "cancel", "fallback" },
-				-- lsp_signature.nvim owns signature help and its C-k mapping.
-				["<C-k>"] = false,
+				["<Esc>"] = { dismiss_popups, "cancel", "fallback" },
+				["<C-k>"] = { blink_signature.toggle, "fallback" },
+				["<C-b>"] = { "scroll_signature_up", "scroll_documentation_up", "fallback" },
+				["<C-f>"] = { "scroll_signature_down", "scroll_documentation_down", "fallback" },
 			},
 			appearance = {
 				nerd_font_variant = "mono",
@@ -70,8 +56,17 @@ return {
 				},
 			},
 			signature = {
-				-- Dedicated signature UI is provided by lsp_signature.nvim below.
-				enabled = false,
+				enabled = true,
+				-- Show the selected overload as virtual text; C-k toggles the full popup.
+				trigger = {
+					enabled = true,
+					-- Also ask once when Insert mode starts inside an existing call.
+					show_on_insert = true,
+				},
+				window = {
+					border = "padded",
+					max_height = blink_signature.compact_height,
+				},
 			},
 			cmdline = {
 				completion = {
@@ -97,63 +92,9 @@ return {
 			},
 		},
 		opts_extend = { "sources.default" },
-	},
-	{
-		"ray-x/lsp_signature.nvim",
-		event = "InsertEnter",
-		init = function()
-			signature_highlight.setup()
-			vim.api.nvim_create_autocmd("User", {
-				group = vim.api.nvim_create_augroup("user_signature_completion", { clear = true }),
-				pattern = "BlinkCmpShow",
-				desc = "Close signature help when completion opens",
-				callback = function()
-					close_full_signature()
-				end,
-			})
+		config = function(_, opts)
+			require("blink.cmp").setup(opts)
+			blink_signature.setup()
 		end,
-		keys = {
-			{
-				"<C-k>",
-				function()
-					if close_full_signature() then
-						return
-					end
-
-					local source_buffer = vim.api.nvim_get_current_buf()
-					local function toggle_signature()
-						require("lsp_signature").toggle_float_win()
-						signature_highlight.request_float(source_buffer)
-					end
-
-					local cmp = require("blink.cmp")
-					if cmp.is_menu_visible() then
-						cmp.hide({ callback = toggle_signature })
-					else
-						toggle_signature()
-					end
-				end,
-				mode = { "i", "s" },
-				desc = "Toggle signature help",
-			},
-		},
-		opts = {
-			bind = true,
-			-- A Tree-sitter renderer consumes status_line() for the virtual hint;
-			-- lsp_signature's built-in hint only supports one colour for all tokens.
-			floating_window = false,
-			hint_enable = false,
-			hi_parameter = "LspSignatureActiveParameter",
-			doc_lines = 0,
-			max_width = function()
-				return math.min(100, math.max(40, math.floor(vim.api.nvim_win_get_width(0) * 0.72)))
-			end,
-			-- Full signature help is manual, so prefer the unobstructed side above
-			-- the cursor. Completion opening later closes it via BlinkCmpShow.
-			floating_window_above_cur_line = true,
-			handler_opts = {
-				border = require("user.core.float_style").border(),
-			},
-		},
 	},
 }

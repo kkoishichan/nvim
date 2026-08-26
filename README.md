@@ -8,17 +8,19 @@ Neovim 打磨成接近 IDE 的日常工作流。
 - `fzf-lua` 负责查找、搜索、符号 / 调用关系与 Git 列表，并接管 `vim.ui.select`。
 - `glance.nvim` 提供定义、声明、实现、类型与引用的双栏 Peek 界面。
 - `oil.nvim` 像编辑 buffer 一样管理文件系统；`neo-tree.nvim` 提供侧边文件树。
-- `blink.cmp` 负责补全与 snippet；`Tab` / `Enter` 确认候选，方向键选择，
-  `Ctrl-Space` 主动唤起，`Esc` 优先关闭补全菜单。
-- `lsp_signature.nvim` 以 Blink 同款底色、Tree-sitter 语法高亮的简洁虚拟文本提示当前参数，`Ctrl-K`
-  按需打开同样带语法高亮的完整签名；完整签名优先放在上方，并与补全菜单互斥。
+- `blink.cmp` 负责补全、snippet 与签名帮助；`Tab` / `Enter` 确认候选，方向键选择，
+	`Ctrl-Space` 主动唤起；当前重载默认以带函数标记的虚拟文本显示，并在空间允许时借用相邻行，
+	`Ctrl-K` 切换完整签名浮窗，`Ctrl-B` / `Ctrl-F` 滚动超出屏幕的签名。
 - `nvim-lspconfig` + Mason 负责语言服务与外部工具安装。
 - `conform.nvim` 格式化，`nvim-lint` 静态检查。
 - `nvim-ufo` + Tree-sitter 折叠。
 - `toggleterm.nvim` 提供 VSCode 风格的多终端管理。
 - `overseer.nvim` 任务运行，`neotest` 测试，`nvim-dap` + `dap-ui` 调试。
 - `snacks.nvim` 提供 dashboard、scratch、input 与 zen；通知由 `nvim-notify` 提供。
-- 除通知外，小型临时弹窗统一使用 Pmenu 背景的无边框 padding 设计；通知保留独立样式，Glance、Fzf 主界面、终端等大面板保留独立布局。
+- 除通知外，小型临时弹窗统一使用 Pmenu 背景的无边框 padding 设计；`Esc` 一次收起当前
+  标签页内重叠的补全、签名、文档、提示与预览。通知按超时自动消失（`<leader>un` 可立即
+  清空），Glance、Fzf、Lazy、Mason、Oil 等界面走各自关闭接口；终端、scratch、zen 等
+  编辑工作区不会被误关。
 - `:Lazy` 与 `:Mason` 共用同一个 80% 纯无边框矩形，并校正两插件不同的高度计算方式。
 
 当前在 Neovim `0.12.x` 上验证，并使用了 0.12 的公开 API，因此要求 `0.12+`。
@@ -83,6 +85,7 @@ Selene、Stylelint、golangci-lint 仅在项目存在对应配置时运行，避
 │       │   ├── panels.lua     -- 侧边面板尺寸常量
 │       │   ├── pdf.lua        -- PDF 状态栏数据
 │       │   ├── pdf_preview.lua -- PDF 渲染、缓存、按键与文件监听
+│       │   ├── popups.lua     -- Esc 统一关闭临时弹窗
 │       │   ├── sensitive.lua  -- 密钥文件与剪贴板保护
 │       │   ├── statuscolumn.lua -- IDE 风格 gutter 排布
 │       │   ├── testing.lua    -- 按项目/语言加载 neotest adapter
@@ -266,6 +269,7 @@ Biome、Stylelint、golangci-lint 与 Selene 只在项目存在对应配置时�
 
 常用单键 / 其他：
 
+- `<Esc>` ：关闭当前标签页内的临时弹窗；没有弹窗时清除搜索高亮
 - `-` ：oil 编辑当前目录
 - `s` / `S` ：flash 跳转 / treesitter 跳转
 - `gd` / `gD` / `gi` / `gy` / `gr` ：Peek 定义 / 声明 / 实现 / 类型 / 引用

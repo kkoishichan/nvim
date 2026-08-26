@@ -53,19 +53,17 @@ local function set_float_highlights()
 	vim.api.nvim_set_hl(0, "BlinkCmpDocSeparator", { fg = p.gray, bg = vim.api.nvim_get_hl(0, { name = "Pmenu" }).bg })
 	vim.api.nvim_set_hl(0, "BlinkCmpSignatureHelp", { link = "Pmenu" })
 	vim.api.nvim_set_hl(0, "BlinkCmpSignatureHelpBorder", { link = "Pmenu" })
-	-- Tree-sitter owns token foregrounds for both signature renderers. Keep the
-	-- prefix/fallback quiet, and mark the active floating parameter with only a
-	-- tinted background so its function/type/literal colours remain visible.
-	local signature_hint = palette.blend(p.hint, p.gray, 0.72)
-	local popup_bg = vim.api.nvim_get_hl(0, { name = "Pmenu", link = false }).bg or p.panel
-	vim.api.nvim_set_hl(0, "LspSignatureHint", { fg = signature_hint })
-	-- Layer this background-only group over each Tree-sitter capture. This gives
-	-- the virtual signature the same visual surface as Blink without replacing
-	-- token foregrounds with a single colour.
-	vim.api.nvim_set_hl(0, "LspSignatureVirtual", { bg = popup_bg })
-	vim.api.nvim_set_hl(0, "LspSignatureActiveParameter", {
-		bg = palette.blend(p.hint, popup_bg, 0.16),
-		bold = true,
+	-- Virtual signatures keep Tree-sitter foregrounds but sit on the same raised
+	-- surface as Blink's popup, so they remain distinct from source text.
+	local signature_bg = vim.api.nvim_get_hl(0, { name = "Pmenu", link = false }).bg or p.panel
+	vim.api.nvim_set_hl(0, "BlinkCmpSignatureVirtual", {
+		bg = signature_bg,
+	})
+	-- Mark the active parameter with a quiet neutral lift instead of the default
+	-- blue/cyan LspSignatureActiveParameter background. With no foreground here,
+	-- the signature's Tree-sitter colours remain visible.
+	vim.api.nvim_set_hl(0, "BlinkCmpSignatureHelpActiveParameter", {
+		bg = palette.blend(p.fg, signature_bg, 0.16),
 	})
 	vim.api.nvim_set_hl(0, "BqfPreviewFloat", { link = "Pmenu" })
 	vim.api.nvim_set_hl(0, "BqfPreviewBorder", { link = "Pmenu" })

@@ -52,3 +52,20 @@ require("lazy").setup({
 		},
 	},
 })
+
+-- Lazy's manager is a floating application window, so the generic transient
+-- popup closer deliberately ignores it. Add the conventional close key beside
+-- Lazy's built-in `q` without reaching into its private view state.
+vim.api.nvim_create_autocmd("FileType", {
+	group = vim.api.nvim_create_augroup("user_lazy_escape", { clear = true }),
+	pattern = "lazy",
+	desc = "Close Lazy manager with Escape",
+	callback = function(event)
+		vim.keymap.set("n", "<Esc>", "<Cmd>close<CR>", {
+			buffer = event.buf,
+			desc = "Close Lazy manager",
+			nowait = true,
+			silent = true,
+		})
+	end,
+})

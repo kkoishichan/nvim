@@ -27,6 +27,13 @@ local function close()
 	state.win, state.autocmd = nil, nil
 end
 
+---Close the dictionary popup, returning whether it was visible.
+function M.close()
+	local visible = state.win ~= nil and vim.api.nvim_win_is_valid(state.win)
+	close()
+	return visible
+end
+
 -- Returns phonetic, translation (translation may contain embedded newlines).
 local function query(word)
 	if vim.fn.executable("sqlite3") == 0 then
