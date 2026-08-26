@@ -1,15 +1,17 @@
 local M = {
 	compact_height = 1,
-	indicator = "◀",
+	indicator = "󰊕",
 }
 
 local api = vim.api
 local virtual_namespace = api.nvim_create_namespace("user_blink_signature")
 local anchor_namespace = api.nvim_create_namespace("user_blink_signature_anchor")
+local full_indicator_namespace = api.nvim_create_namespace("user_blink_signature_full_indicator")
 local expanded = false
 local last_context
 local last_signature_help
 local virtual_buffer
+local full_indicator_buffer
 local signature_anchor
 local cached_syntax_key
 local cached_syntax_spans
@@ -118,6 +120,15 @@ local function syntax_spans(text, filetype)
 	return cached_syntax_spans
 end
 
+local function function_highlight(spans)
+	for _, span in ipairs(spans) do
+		if vim.startswith(span.highlight, "@function") then
+			return span.highlight
+		end
+	end
+	return "@function"
+end
+
 ---Build syntax-coloured virtual text and retain Blink's active-parameter mark.
 ---@param label string
 ---@param filetype string
@@ -125,13 +136,7 @@ end
 ---@return table[]
 function M.virtual_chunks(label, filetype, active_range)
 	local spans = syntax_spans(label, filetype)
-	local indicator_highlight = "@function"
-	for _, span in ipairs(spans) do
-		if vim.startswith(span.highlight, "@function") then
-			indicator_highlight = span.highlight
-			break
-		end
-	end
+	local indicator_highlight = function_highlight(spans)
 	local boundary_set = { [0] = true, [#label] = true }
 	for _, span in ipairs(spans) do
 		boundary_set[span.start_col] = true
@@ -257,6 +262,49 @@ local function clear_virtual()
 		api.nvim_buf_clear_namespace(virtual_buffer, virtual_namespace, 0, -1)
 	end
 	virtual_buffer = nil
+end
+
+local function clear_full_indicators()
+	if full_indicator_buffer and api.nvim_buf_is_valid(full_indicator_buffer) then
+		api.nvim_buf_clear_namespace(full_indicator_buffer, full_indicator_namespace, 0, -1)
+	end
+	full_indicator_buffer = nil
+end
+
+---Add the function marker to the first physical line of every rendered
+---overload. Multiline signature continuations and documentation remain plain.
+local function render_full_indicators(signature_window, signature_help, context)
+	clear_full_indicators()
+	if
+		not signature_window.win:is_open()
+		or type(signature_help) ~= "table"
+		or type(signature_help.signatures) ~= "table"
+	then
+		return
+	end
+
+	local bufnr = signature_window.win:get_buf()
+	local filetype = context and context.bufnr and vim.bo[context.bufnr].filetype or vim.bo.filetype
+	local docs = require("blink.cmp.lib.window.docs")
+	local seen = {}
+	local row = 0
+	for _, signature in ipairs(signature_help.signatures) do
+		local label = signature.label
+		if type(label) == "string" and not seen[label] then
+			seen[label] = true
+			local lines = docs.split_lines(label)
+			if #lines > 0 then
+				api.nvim_buf_set_extmark(bufnr, full_indicator_namespace, row, 0, {
+					virt_text = { { M.indicator .. " ", function_highlight(syntax_spans(label, filetype)) } },
+					virt_text_pos = "inline",
+					hl_mode = "combine",
+					priority = vim.hl.priorities.user,
+				})
+				row = row + #lines
+			end
+		end
+	end
+	full_indicator_buffer = bufnr
 end
 
 local function clear_anchor()
@@ -506,6 +554,21 @@ local function completion_direction(source_win)
 	end
 end
 
+local function update_full_window_size(win)
+	win:update_size()
+	if full_indicator_buffer ~= win:get_buf() then
+		return
+	end
+
+	local width = win:get_content_width() + vim.fn.strdisplaywidth(M.indicator .. " ")
+	width = math.max(width, win.config.min_width or 1)
+	if win.config.max_width then
+		width = math.min(width, win.config.max_width)
+	end
+	win:set_width(width)
+	win:set_height(math.max(1, math.min(win:get_content_height(), win.config.max_height)))
+end
+
 ---Let Blink choose the full window's size and side once, then convert its
 ---cursor-relative position into a buffer-relative call anchor. Later cursor
 ---movement may update the contents but cannot move the window.
@@ -539,11 +602,14 @@ local function position_full_window(signature_window, original_update)
 			return
 		end
 		winid = win:get_win()
+		local constrained_height = api.nvim_win_get_height(winid)
+		update_full_window_size(win)
+		win:set_height(math.min(constrained_height, api.nvim_win_get_height(winid)))
 		signature_anchor.full_win = winid
 		signature_anchor.full_direction = opposite_direction or infer_full_direction(winid, source_win)
 		signature_anchor.full_height = api.nvim_win_get_height(winid)
 	else
-		win:update_size()
+		update_full_window_size(win)
 		if opposite_direction then
 			local direction = opposite_direction == -1 and "n" or "s"
 			local layout = win:get_vertical_direction_and_height({ direction }, win.config.max_height)
@@ -758,9 +824,15 @@ function M.setup()
 		last_signature_help = signature_help
 		if expanded then
 			clear_virtual()
-			return original_open(context, M.signature_help_view(signature_help, true))
+			clear_full_indicators()
+			local view = M.signature_help_view(signature_help, true)
+			local result = original_open(context, view)
+			render_full_indicators(signature_window, view, context)
+			signature_window.update_position()
+			return result
 		end
 
+		clear_full_indicators()
 		reset_full_layout()
 		signature_window.context = nil
 		signature_window.shown_signature = nil
@@ -775,6 +847,7 @@ function M.setup()
 	trigger._user_signature_reset = function()
 		discovery_generation = discovery_generation + 1
 		clear_virtual()
+		clear_full_indicators()
 		clear_anchor()
 		last_context = nil
 		last_signature_help = nil

@@ -258,7 +258,7 @@ do
 			end
 		end
 	end
-	assert(virtual_label == " ◀ pick(value: number, base: number) ", "Virtual signature text changed")
+	assert(virtual_label == " 󰊕 pick(value: number, base: number) ", "Virtual signature text changed")
 	assert(
 		virtual_chunks[1][1] == " " and virtual_chunks[1][2] == "BlinkCmpSignatureVirtual",
 		"Virtual signature has no background-coloured left padding"
@@ -437,7 +437,30 @@ do
 	blink_signature_window.open_with_signature_help(anchored_context, anchored_help)
 	signature_renderer.set_expanded(true)
 	assert(blink_signature_window.win:is_open(), "C-k full signature fixture did not open")
+	local full_indicator_namespace = vim.api.nvim_get_namespaces().user_blink_signature_full_indicator
+	local full_indicator_marks = vim.api.nvim_buf_get_extmarks(
+		blink_signature_window.win:get_buf(),
+		full_indicator_namespace,
+		0,
+		-1,
+		{ details = true }
+	)
+	assert(#full_indicator_marks == 2, "Full signature window does not mark every overload")
+	for index, mark in ipairs(full_indicator_marks) do
+		local indicator_chunk = mark[4].virt_text and mark[4].virt_text[1]
+		assert(
+			mark[2] == index - 1
+				and indicator_chunk[1] == signature_renderer.indicator .. " "
+				and vim.startswith(indicator_chunk[2], "@function"),
+			"Full signature overload has an incorrect function marker"
+		)
+	end
 	local anchored_window = blink_signature_window.win:get_win()
+	assert(
+		vim.api.nvim_win_get_width(anchored_window)
+			>= #anchored_help.signatures[1].label + vim.fn.strdisplaywidth(signature_renderer.indicator .. " "),
+		"Full signature window did not reserve room for its function marker"
+	)
 	local anchored_config = vim.api.nvim_win_get_config(anchored_window)
 	assert(
 		anchored_config.relative == "win"
