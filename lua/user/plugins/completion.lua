@@ -1,7 +1,7 @@
 local blink_signature = require("user.core.blink_signature")
 
 local function dismiss_popups(cmp)
-	return require("user.core.popups").close({ blink = cmp })
+	require("user.core.popups").close({ blink = cmp })
 end
 
 return {
@@ -17,10 +17,11 @@ return {
 				-- IDE-style completion: Tab accepts the selected (or first) item,
 				-- then advances through snippet placeholders. Enter only accepts an
 				-- explicitly selected item, so an untouched menu cannot steal a
-				-- newline. Escape dismisses the menu before leaving Insert mode.
+				-- newline. Escape dismisses every popup and leaves Insert mode in the
+				-- same keypress; the callback deliberately falls through afterward.
 				preset = "super-tab",
 				["<CR>"] = { "accept", "fallback" },
-				["<Esc>"] = { dismiss_popups, "cancel", "fallback" },
+				["<Esc>"] = { dismiss_popups, "fallback" },
 				["<C-k>"] = { blink_signature.toggle, "fallback" },
 				["<C-b>"] = { "scroll_signature_up", "scroll_documentation_up", "fallback" },
 				["<C-f>"] = { "scroll_signature_down", "scroll_documentation_down", "fallback" },

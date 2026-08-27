@@ -151,35 +151,30 @@ do
 	)
 	local completion_escape = completion_opts.keymap["<Esc>"]
 	assert(
-		type(completion_escape[1]) == "function"
-			and completion_escape[2] == "cancel"
-			and completion_escape[3] == "fallback",
-		"Escape no longer dismisses all completion popups before leaving Insert mode"
+		type(completion_escape[1]) == "function" and completion_escape[2] == "fallback" and completion_escape[3] == nil,
+		"Escape no longer dismisses popups and leaves Insert mode in one keypress"
 	)
 	local blink_closed = {}
-	assert(
-		completion_escape[1]({
-			is_documentation_visible = function()
-				return true
-			end,
-			hide_documentation = function()
-				blink_closed.documentation = true
-			end,
-			is_signature_visible = function()
-				return true
-			end,
-			hide_signature = function()
-				blink_closed.signature = true
-			end,
-			is_visible = function()
-				return true
-			end,
-			cancel = function()
-				blink_closed.completion = true
-			end,
-		}),
-		"Escape did not report a visible Blink popup"
-	)
+	assert(completion_escape[1]({
+		is_documentation_visible = function()
+			return true
+		end,
+		hide_documentation = function()
+			blink_closed.documentation = true
+		end,
+		is_signature_visible = function()
+			return true
+		end,
+		hide_signature = function()
+			blink_closed.signature = true
+		end,
+		is_visible = function()
+			return true
+		end,
+		cancel = function()
+			blink_closed.completion = true
+		end,
+	}) == nil, "Escape popup closer consumed the key before Blink's fallback")
 	assert(
 		blink_closed.completion and blink_closed.documentation and blink_closed.signature,
 		"Escape did not close every overlapping Blink popup"
