@@ -53,6 +53,8 @@ local function set_float_highlights()
 	vim.api.nvim_set_hl(0, "BlinkCmpDocSeparator", { fg = p.gray, bg = vim.api.nvim_get_hl(0, { name = "Pmenu" }).bg })
 	vim.api.nvim_set_hl(0, "BlinkCmpSignatureHelp", { link = "Pmenu" })
 	vim.api.nvim_set_hl(0, "BlinkCmpSignatureHelpBorder", { link = "Pmenu" })
+	-- Match the purple function-kind marker used by Blink's completion menu.
+	vim.api.nvim_set_hl(0, "BlinkCmpSignatureIndicator", { link = "BlinkCmpKindFunction" })
 	-- Virtual signatures keep Tree-sitter foregrounds but sit on the same raised
 	-- surface as Blink's popup, so they remain distinct from source text.
 	local signature_bg = vim.api.nvim_get_hl(0, { name = "Pmenu", link = false }).bg or p.panel
@@ -116,11 +118,21 @@ local function set_scrollview_highlights()
 	vim.api.nvim_set_hl(0, "ScrollViewKeywordsXxx", { fg = p.warn, bold = true })
 end
 
+local function set_snippet_highlights()
+	local p = palette.get()
+	-- Native snippet tabstops default to Visual, which makes editable
+	-- placeholders look like editor selections. Give them their own neutral,
+	-- theme-derived surface so Visual can retain the colorscheme's accent.
+	vim.api.nvim_set_hl(0, "SnippetTabstop", { bg = p.subtle })
+	vim.api.nvim_set_hl(0, "SnippetTabstopActive", { link = "SnippetTabstop" })
+end
+
 ---Apply all theme-derived UI highlights from the current colorscheme.
 function M.apply()
 	set_notify_highlights()
 	set_float_highlights()
 	set_scrollview_highlights()
+	set_snippet_highlights()
 	local p = palette.get()
 	vim.api.nvim_set_hl(0, "MatchParen", { bg = p.strong, fg = p.warn, bold = true })
 end

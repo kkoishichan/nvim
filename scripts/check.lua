@@ -6,6 +6,18 @@ assert(
 	vim.api.nvim_get_hl(0, { name = "Pmenu", link = false }).bg == 0x2d2d30,
 	"vscode popup background override was not applied"
 )
+do
+	local visual = vim.api.nvim_get_hl(0, { name = "Visual", link = false })
+	local snippet = vim.api.nvim_get_hl(0, { name = "SnippetTabstop", link = false })
+	local active_snippet = vim.api.nvim_get_hl(0, { name = "SnippetTabstopActive", link = true })
+	assert(visual.bg == 0x264f78, "vscode Visual selection colour was overridden")
+	assert(
+		snippet.bg == require("user.core.palette").get().subtle and snippet.fg == nil,
+		"Native snippet placeholders are not using the theme-derived neutral grey"
+	)
+	assert(snippet.bg ~= visual.bg, "Native snippet placeholders still inherit Visual")
+	assert(active_snippet.link == "SnippetTabstop", "Active snippet placeholder does not inherit snippet grey")
+end
 assert(vim.o.shada:match("<0"), "ShaDa still persists register contents")
 assert(vim.g.user_lsp_preview_patched == nil, "LSP floating-preview API was monkeypatched")
 assert(
@@ -233,7 +245,7 @@ do
 	local virtual_label = ""
 	local active_parameter = ""
 	local has_syntax = false
-	local indicator_uses_function_colour = false
+	local indicator_uses_purple = false
 	for _, chunk in ipairs(virtual_chunks) do
 		virtual_label = virtual_label .. chunk[1]
 		if type(chunk[2]) == "table" then
@@ -247,8 +259,7 @@ do
 			for _, highlight in ipairs(chunk[2]) do
 				has_syntax = has_syntax or vim.startswith(highlight, "@")
 				if chunk[1]:find(signature_renderer.indicator, 1, true) then
-					indicator_uses_function_colour = indicator_uses_function_colour
-						or vim.startswith(highlight, "@function")
+					indicator_uses_purple = indicator_uses_purple or highlight == "BlinkCmpSignatureIndicator"
 				end
 			end
 		end
@@ -262,7 +273,11 @@ do
 		vim.fn.strdisplaywidth(signature_renderer.indicator) == 1,
 		"Virtual signature indicator is not one cell wide"
 	)
-	assert(indicator_uses_function_colour, "Virtual signature indicator does not use the function colour")
+	assert(indicator_uses_purple, "Virtual signature indicator does not use its purple highlight")
+	assert(
+		vim.api.nvim_get_hl(0, { name = "BlinkCmpSignatureIndicator", link = false }).fg == 0xc586c0,
+		"Signature indicator is not VS Code purple"
+	)
 	assert(active_parameter == "base: number", "Virtual signature lost its active parameter")
 	assert(has_syntax, "Virtual signature lost Tree-sitter highlighting")
 	local signature_background = vim.api.nvim_get_hl(0, { name = "BlinkCmpSignatureVirtual", link = false }).bg
@@ -337,6 +352,98 @@ do
 		vim.deep_equal(signature_renderer.find_call_anchor(position_buffer, { 1, #qualified_call }), { 1, 0 }),
 		"Signature anchor has no lexical fallback when a Tree-sitter parser is unavailable"
 	)
+
+	local function overload(label, parameters)
+		return {
+			label = label,
+			-- Reproduce a stale signature-local value, which Neovim gives
+			-- precedence over SignatureHelp.activeParameter.
+			activeParameter = 1,
+			parameters = vim.tbl_map(function(parameter)
+				return { label = parameter }
+			end, parameters),
+		}
+	end
+	local cpp_overloads = {
+		-- Reproduce clangd/Blink retaining the two-argument overload even after
+		-- the call grows beyond every available fixed arity.
+		activeSignature = 1,
+		activeParameter = 0,
+		signatures = {
+			overload("int foo(int b)", { "int b" }),
+			overload("int foo(int c, int d)", { "int c", "int d" }),
+			overload("int foo(int e, int f, int g)", { "int e", "int f", "int g" }),
+			overload("int foo(int h, int i, int j, int k)", { "int h", "int i", "int j", "int k" }),
+			overload("float foo(float p)", { "float p" }),
+			overload("int foo(float m, float n)", { "float m", "float n" }),
+		},
+	}
+	local function assert_corrected_call(
+		call,
+		expected_signature,
+		expected_parameter,
+		label,
+		cursor,
+		expected_argument_count
+	)
+		local lines = vim.split(call, "\n", { plain = true })
+		vim.api.nvim_buf_set_lines(position_buffer, 0, -1, false, lines)
+		vim.bo[position_buffer].filetype = "cpp"
+		cursor = cursor or { #lines, #lines[#lines] }
+		vim.api.nvim_win_set_cursor(0, cursor)
+		local call_state = assert(signature_renderer.call_arguments(position_buffer, cursor))
+		assert(
+			call_state.active_parameter == expected_parameter,
+			("Signature argument scanner chose parameter %d for %s"):format(call_state.active_parameter, call)
+		)
+		assert(
+			call_state.argument_count == (expected_argument_count or expected_parameter + 1),
+			("Signature argument scanner counted %d arguments for %s"):format(call_state.argument_count, call)
+		)
+		-- A Normal-mode test cursor cannot occupy the insertion cell just after
+		-- EOL. Hide the fixture buffer so the renderer uses the supplied Insert
+		-- cursor snapshot instead of that one-cell-short Normal cursor.
+		vim.api.nvim_set_current_buf(source_buffer)
+		local corrected =
+			signature_renderer.normalize_signature_help({ bufnr = position_buffer, cursor = cursor }, cpp_overloads)
+		vim.api.nvim_set_current_buf(position_buffer)
+		assert(corrected ~= cpp_overloads, "Signature correction mutated the LSP response in place")
+		assert(
+			corrected.activeSignature == expected_signature and corrected.activeParameter == expected_parameter,
+			("Signature correction chose overload %d parameter %d for %s"):format(
+				corrected.activeSignature,
+				corrected.activeParameter,
+				call
+			)
+		)
+		local selected = corrected.signatures[expected_signature + 1]
+		assert(selected.label == label, "Signature correction selected the wrong overload for " .. call)
+		assert(
+			selected.activeParameter == expected_parameter,
+			"Signature-local activeParameter still overrides the corrected live parameter"
+		)
+	end
+	assert_corrected_call("foo(1, ", 1, 1, "int foo(int c, int d)")
+	assert_corrected_call("foo(1, 2, ", 2, 2, "int foo(int e, int f, int g)")
+	assert_corrected_call("foo(1, 2, 3, ", 3, 3, "int foo(int h, int i, int j, int k)")
+	assert_corrected_call("foo(1.0f", 0, 0, "int foo(int b)")
+	assert_corrected_call("foo(1.0f, ", 1, 1, "int foo(int c, int d)")
+	assert_corrected_call("foo(\n  1,\n  2,\n  ", 2, 2, "int foo(int e, int f, int g)")
+	assert_corrected_call("foo(std::pair<int, int>{1, 2}, ", 1, 1, "int foo(int c, int d)")
+	local overflow_call = "int a = foo(a, d, f, g, h)"
+	assert_corrected_call(overflow_call, 3, 4, "int foo(int h, int i, int j, int k)", { 1, #overflow_call - 1 }, 5)
+	local complete_call = "foo(1, 2, 3)"
+	local first_comma = assert(complete_call:find(",", 1, true))
+	local second_comma = assert(complete_call:find(",", first_comma + 1, true))
+	assert_corrected_call(complete_call, 2, 0, "int foo(int e, int f, int g)", { 1, first_comma - 1 }, 3)
+	assert_corrected_call(complete_call, 2, 1, "int foo(int e, int f, int g)", { 1, second_comma - 1 }, 3)
+	assert_corrected_call(complete_call, 2, 2, "int foo(int e, int f, int g)", { 1, #complete_call - 1 }, 3)
+	assert(cpp_overloads.activeSignature == 1, "Overload correction changed the original activeSignature")
+	assert(
+		cpp_overloads.signatures[2].activeParameter == 1,
+		"Parameter correction changed the original signature-local activeParameter"
+	)
+
 	vim.api.nvim_set_current_buf(source_buffer)
 	vim.api.nvim_buf_delete(position_buffer, { force = true })
 	local toggle_signature = completion_opts.keymap["<C-k>"][1]
@@ -446,7 +553,7 @@ do
 		assert(
 			mark[2] == index - 1
 				and indicator_chunk[1] == signature_renderer.indicator .. " "
-				and vim.startswith(indicator_chunk[2], "@function"),
+				and indicator_chunk[2] == "BlinkCmpSignatureIndicator",
 			"Full signature overload has an incorrect function marker"
 		)
 	end

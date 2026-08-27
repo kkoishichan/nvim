@@ -18,6 +18,7 @@ local cached_syntax_spans
 local refresh_scheduled = false
 local discovery_generation = 0
 local last_text_change
+local redraw_current_signature
 
 local function full_height()
 	return math.max(1, vim.api.nvim_win_get_height(0))
@@ -32,7 +33,8 @@ function M.signature_help_view(signature_help, show_all)
 		return signature_help
 	end
 
-	local active_index = (signature_help.activeSignature or 0) + 1
+	local selected = type(signature_help.activeSignature) == "number" and signature_help.activeSignature or 0
+	local active_index = selected + 1
 	local active_signature = signature_help.signatures[active_index]
 	if not active_signature then
 		return signature_help
@@ -120,15 +122,6 @@ local function syntax_spans(text, filetype)
 	return cached_syntax_spans
 end
 
-local function function_highlight(spans)
-	for _, span in ipairs(spans) do
-		if vim.startswith(span.highlight, "@function") then
-			return span.highlight
-		end
-	end
-	return "@function"
-end
-
 ---Build syntax-coloured virtual text and retain Blink's active-parameter mark.
 ---@param label string
 ---@param filetype string
@@ -136,7 +129,6 @@ end
 ---@return table[]
 function M.virtual_chunks(label, filetype, active_range)
 	local spans = syntax_spans(label, filetype)
-	local indicator_highlight = function_highlight(spans)
 	local boundary_set = { [0] = true, [#label] = true }
 	for _, span in ipairs(spans) do
 		boundary_set[span.start_col] = true
@@ -163,7 +155,7 @@ function M.virtual_chunks(label, filetype, active_range)
 	table.sort(boundaries)
 	local chunks = {
 		{ " ", "BlinkCmpSignatureVirtual" },
-		{ M.indicator .. " ", { indicator_highlight, "BlinkCmpSignatureVirtual" } },
+		{ M.indicator .. " ", { "BlinkCmpSignatureIndicator", "BlinkCmpSignatureVirtual" } },
 	}
 	for index = 1, #boundaries - 1 do
 		local start_col = boundaries[index]
@@ -273,7 +265,7 @@ end
 
 ---Add the function marker to the first physical line of every rendered
 ---overload. Multiline signature continuations and documentation remain plain.
-local function render_full_indicators(signature_window, signature_help, context)
+local function render_full_indicators(signature_window, signature_help)
 	clear_full_indicators()
 	if
 		not signature_window.win:is_open()
@@ -284,7 +276,6 @@ local function render_full_indicators(signature_window, signature_help, context)
 	end
 
 	local bufnr = signature_window.win:get_buf()
-	local filetype = context and context.bufnr and vim.bo[context.bufnr].filetype or vim.bo.filetype
 	local docs = require("blink.cmp.lib.window.docs")
 	local seen = {}
 	local row = 0
@@ -295,7 +286,7 @@ local function render_full_indicators(signature_window, signature_help, context)
 			local lines = docs.split_lines(label)
 			if #lines > 0 then
 				api.nvim_buf_set_extmark(bufnr, full_indicator_namespace, row, 0, {
-					virt_text = { { M.indicator .. " ", function_highlight(syntax_spans(label, filetype)) } },
+					virt_text = { { M.indicator .. " ", "BlinkCmpSignatureIndicator" } },
 					virt_text_pos = "inline",
 					hl_mode = "combine",
 					priority = vim.hl.priorities.user,
@@ -331,6 +322,10 @@ end
 local function node_field(node, name)
 	local ok, nodes = pcall(node.field, node, name)
 	return ok and nodes and nodes[1] or nil
+end
+
+local function position_before(left, right)
+	return left[1] < right[1] or (left[1] == right[1] and left[2] < right[2])
 end
 
 ---Find the syntax node immediately before an opening parenthesis. This also
@@ -373,12 +368,87 @@ local function callee_before_parenthesis(root, bufnr, row, open_col)
 	return start_col and { row + 1, start_col - 1 } or nil
 end
 
----Find the innermost call containing the cursor and return the beginning of
----its callable expression (for example `inner` or `torch` in `torch.arange`).
----@param bufnr integer
----@param cursor integer[] (1,0)-indexed buffer cursor.
----@return integer[]?
-function M.find_call_anchor(bufnr, cursor)
+local function lexical_call_site(bufnr, cursor)
+	local cursor_row = cursor[1] - 1
+	local first_row = math.max(0, cursor_row - 199)
+	local lines = api.nvim_buf_get_lines(bufnr, first_row, cursor_row + 1, false)
+	local stack = {}
+	local state = "code"
+	local quote
+	local escaped = false
+
+	for line_index, line in ipairs(lines) do
+		local row = first_row + line_index - 1
+		local limit = row == cursor_row and math.min(cursor[2], #line) or #line
+		local column = 1
+		while column <= limit do
+			local character = line:sub(column, column)
+			local following = line:sub(column + 1, column + 1)
+			if state == "block_comment" then
+				if character == "*" and following == "/" then
+					state = "code"
+					column = column + 1
+				end
+			elseif state == "string" then
+				if escaped then
+					escaped = false
+				elseif character == "\\" then
+					escaped = true
+				elseif character == quote then
+					state = "code"
+					quote = nil
+				end
+			elseif
+				(character == "/" and following == "/")
+				or (character == "-" and following == "-")
+				or character == "#"
+			then
+				break
+			elseif character == "/" and following == "*" then
+				state = "block_comment"
+				column = column + 1
+			elseif character == '"' or character == "'" or character == "`" then
+				state = "string"
+				quote = character
+				escaped = false
+			elseif character == "(" or character == "[" or character == "{" then
+				local anchor
+				if character == "(" then
+					local prefix = line:sub(1, column - 1)
+					local start_col = prefix:find("[%a_][%w_%.:]*%s*$")
+					if start_col then
+						anchor = { row + 1, start_col - 1 }
+					end
+				end
+				stack[#stack + 1] = {
+					character = character,
+					open = { row + 1, column - 1 },
+					anchor = anchor,
+				}
+			elseif character == ")" or character == "]" or character == "}" then
+				local matching = character == ")" and "(" or character == "]" and "[" or "{"
+				if stack[#stack] and stack[#stack].character == matching then
+					table.remove(stack)
+				end
+			end
+			column = column + 1
+		end
+		if state == "string" then
+			state = "code"
+			quote = nil
+			escaped = false
+		end
+	end
+
+	for index = #stack, 1, -1 do
+		local candidate = stack[index]
+		if candidate.character == "(" and candidate.anchor then
+			return candidate
+		end
+	end
+end
+
+local function find_call_site(bufnr, cursor)
 	if not api.nvim_buf_is_valid(bufnr) or not api.nvim_buf_is_loaded(bufnr) then
 		return nil
 	end
@@ -408,30 +478,309 @@ function M.find_call_anchor(bufnr, cursor)
 				local parent = node:parent()
 				local callee = parent and (node_field(parent, "function") or node_field(parent, "name"))
 				callee = callee or node:prev_named_sibling()
-				return callee and node_start(callee) or callee_before_parenthesis(root, bufnr, start_row, start_col)
+				local anchor = callee and node_start(callee)
+					or callee_before_parenthesis(root, bufnr, start_row, start_col)
+				if anchor then
+					return {
+						anchor = anchor,
+						open = { start_row + 1, start_col },
+						argument_node = node,
+					}
+				end
 			end
 		end
 		node = node:parent()
 	end
 
-	-- In an incomplete call there may be no argument-list node yet. Walk
-	-- backwards over unmatched parentheses until one has a callable before it.
+	-- A just-typed `(` may not have an argument-list node yet. The lexical
+	-- fallback also covers multiline calls when a parser is unavailable.
+	return lexical_call_site(bufnr, cursor)
+end
+
+---Find the innermost call containing the cursor and return the beginning of
+---its callable expression (for example `inner` or `torch` in `torch.arange`).
+---@param bufnr integer
+---@param cursor integer[] (1,0)-indexed buffer cursor.
+---@return integer[]?
+function M.find_call_anchor(bufnr, cursor)
+	local site = find_call_site(bufnr, cursor)
+	return site and site.anchor or nil
+end
+
+local function text_between(bufnr, start_position, end_position)
+	if position_before(end_position, start_position) then
+		return ""
+	end
+	local lines =
+		api.nvim_buf_get_text(bufnr, start_position[1] - 1, start_position[2], end_position[1] - 1, end_position[2], {})
+	return table.concat(lines, "\n")
+end
+
+local function looks_like_template_open(text, column)
+	local previous = text:sub(column - 1, column - 1)
+	if not previous:match("[%w_:>]") then
+		return false
+	end
+	local following = text:sub(column + 1):match("^%s*(.)")
+	return following ~= nil and following:match("[%w_:]") ~= nil and text:find(">", column + 1, true) ~= nil
+end
+
+local function split_arguments(text)
+	local arguments = {}
+	local start_col = 1
+	local stack = {}
+	local state = "code"
+	local quote
+	local escaped = false
+	local column = 1
+
+	while column <= #text do
+		local character = text:sub(column, column)
+		local following = text:sub(column + 1, column + 1)
+		if state == "line_comment" then
+			if character == "\n" then
+				state = "code"
+			end
+		elseif state == "block_comment" then
+			if character == "*" and following == "/" then
+				state = "code"
+				column = column + 1
+			end
+		elseif state == "string" then
+			if escaped then
+				escaped = false
+			elseif character == "\\" then
+				escaped = true
+			elseif character == quote then
+				state = "code"
+				quote = nil
+			end
+		elseif (character == "/" and following == "/") or (character == "-" and following == "-") then
+			state = "line_comment"
+			column = column + 1
+		elseif character == "#" then
+			state = "line_comment"
+		elseif character == "/" and following == "*" then
+			state = "block_comment"
+			column = column + 1
+		elseif character == '"' or character == "'" or character == "`" then
+			state = "string"
+			quote = character
+			escaped = false
+		elseif character == ">" and stack[#stack] == "<" then
+			table.remove(stack)
+		elseif
+			character == "("
+			or character == "["
+			or character == "{"
+			or (character == "<" and looks_like_template_open(text, column))
+		then
+			stack[#stack + 1] = character
+		elseif character == ")" or character == "]" or character == "}" then
+			local matching = character == ")" and "(" or character == "]" and "[" or "{"
+			if stack[#stack] == matching then
+				table.remove(stack)
+			end
+		elseif character == "," and #stack == 0 then
+			arguments[#arguments + 1] = text:sub(start_col, column - 1)
+			start_col = column + 1
+		end
+		column = column + 1
+	end
+
+	arguments[#arguments + 1] = text:sub(start_col)
+	return arguments
+end
+
+---Read both the cursor's parameter index and the complete argument list.
+---They must remain independent: moving inside an existing call changes the
+---highlighted parameter, but must not make later arguments disappear when an
+---overload is chosen.
+---@param bufnr integer
+---@param cursor integer[] (1,0)-indexed buffer cursor.
+---@return { active_parameter: integer, argument_count: integer, arguments: string[], anchor: integer[], open: integer[] }?
+function M.call_arguments(bufnr, cursor)
+	local site = find_call_site(bufnr, cursor)
+	if not site then
+		return nil
+	end
+	local argument_start = { site.open[1], site.open[2] + 1 }
+	if position_before(cursor, argument_start) then
+		return nil
+	end
+
+	local cursor_arguments = split_arguments(text_between(bufnr, argument_start, cursor))
+	local arguments = cursor_arguments
+	if site.argument_node then
+		local node_text = vim.treesitter.get_node_text(site.argument_node, bufnr)
+		if type(node_text) == "string" and node_text:sub(1, 1) == "(" then
+			node_text = node_text:sub(2)
+			if node_text:sub(-1) == ")" then
+				node_text = node_text:sub(1, -2)
+			end
+			arguments = split_arguments(node_text)
+		end
+	end
+	local argument_count = #arguments
+	if argument_count == 1 and arguments[1]:match("^%s*$") then
+		argument_count = 0
+	end
+
+	return {
+		active_parameter = #cursor_arguments - 1,
+		argument_count = argument_count,
+		arguments = arguments,
+		anchor = site.anchor,
+		open = site.open,
+	}
+end
+
+local function trim(text)
+	return (text:gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
+local function parameter_label(signature, parameter)
+	if type(parameter) ~= "table" then
+		return ""
+	end
+	if type(parameter.label) == "string" then
+		return parameter.label
+	end
+	if
+		type(parameter.label) == "table"
+		and type(parameter.label[1]) == "number"
+		and type(parameter.label[2]) == "number"
+		and type(signature.label) == "string"
+	then
+		return signature.label:sub(parameter.label[1] + 1, parameter.label[2])
+	end
+	return ""
+end
+
+local function label_parameter_list(label)
+	local open = label:find("(", 1, true)
+	if not open then
+		return nil
+	end
 	local depth = 0
-	for byte_col = math.min(cursor[2], #line), 1, -1 do
-		local character = line:sub(byte_col, byte_col)
-		if character == ")" then
+	for column = open, #label do
+		local character = label:sub(column, column)
+		if character == "(" then
 			depth = depth + 1
-		elseif character == "(" then
+		elseif character == ")" then
+			depth = depth - 1
 			if depth == 0 then
-				local anchor = callee_before_parenthesis(root, bufnr, row, byte_col - 1)
-				if anchor then
-					return anchor
-				end
-			else
-				depth = depth - 1
+				local contents = label:sub(open + 1, column - 1)
+				return trim(contents) == "" and {} or split_arguments(contents)
 			end
 		end
 	end
+end
+
+local function signature_parameters(signature)
+	local labels = {}
+	if type(signature.parameters) == "table" then
+		for _, parameter in ipairs(signature.parameters) do
+			labels[#labels + 1] = parameter_label(signature, parameter)
+		end
+		return labels
+	end
+	if type(signature.label) == "string" then
+		return label_parameter_list(signature.label)
+	end
+end
+
+local function signature_descriptor(signature)
+	local parameters = signature_parameters(signature)
+	if not parameters then
+		return { known_arity = false, parameters = {} }
+	end
+	local variadic_at
+	for index, label in ipairs(parameters) do
+		if label:find("...", 1, true) or label:match("^%s*%*%*?[%a_]") then
+			variadic_at = index - 1
+			break
+		end
+	end
+	return {
+		known_arity = true,
+		parameters = parameters,
+		count = #parameters,
+		variadic_at = variadic_at,
+	}
+end
+
+local function signature_fit(descriptor, argument_count)
+	if not descriptor.known_arity then
+		return 2, math.huge
+	end
+	if descriptor.count >= argument_count then
+		return 0, descriptor.count
+	end
+	if descriptor.variadic_at then
+		return 1, descriptor.count
+	end
+	-- Nothing can make a fixed-arity overload valid once the call contains too
+	-- many arguments. Still show the closest useful signature instead of an
+	-- unrelated server fallback: the smallest shortfall is the largest arity.
+	return 3, argument_count - descriptor.count
+end
+
+local function choose_signature(signature_help, argument_count)
+	local server_index = type(signature_help.activeSignature) == "number" and signature_help.activeSignature or 0
+	if server_index < 0 or server_index >= #signature_help.signatures then
+		server_index = 0
+	end
+	local best_index
+	local best_tier
+	local best_rank
+	for index, signature in ipairs(signature_help.signatures) do
+		local descriptor = signature_descriptor(signature)
+		local tier, rank = signature_fit(descriptor, argument_count)
+		if tier and (not best_tier or tier < best_tier or (tier == best_tier and rank < best_rank)) then
+			best_index = index - 1
+			best_tier = tier
+			best_rank = rank
+		end
+	end
+	return best_index or server_index
+end
+
+---Correct stale parameter indices and select the shortest server-ordered
+---signature that can hold the complete call. If none can, select the largest
+---fixed arity as the closest useful hint. No client-side type guessing is
+---performed.
+---@param context? blink.cmp.SignatureHelpContext
+---@param signature_help? lsp.SignatureHelp
+---@return lsp.SignatureHelp?
+function M.normalize_signature_help(context, signature_help)
+	if
+		type(signature_help) ~= "table"
+		or type(signature_help.signatures) ~= "table"
+		or #signature_help.signatures == 0
+	then
+		return signature_help
+	end
+	local bufnr = context and context.bufnr
+	if not bufnr or not api.nvim_buf_is_valid(bufnr) or not api.nvim_buf_is_loaded(bufnr) then
+		return signature_help
+	end
+	local cursor = M.display_cursor(bufnr, context and context.cursor)
+	local call = cursor and M.call_arguments(bufnr, cursor)
+	if not call then
+		return signature_help
+	end
+
+	local normalized = vim.deepcopy(signature_help)
+	normalized.activeParameter = call.active_parameter
+	normalized.activeSignature = choose_signature(normalized, call.argument_count)
+	local active_signature = normalized.signatures[normalized.activeSignature + 1]
+	if active_signature then
+		-- Neovim intentionally gives this signature-local field precedence over
+		-- SignatureHelp.activeParameter, so both must describe the live cursor.
+		active_signature.activeParameter = call.active_parameter
+	end
+	return normalized
 end
 
 local function anchor_position()
@@ -634,8 +983,11 @@ local function position_full_window(signature_window, original_update)
 	})
 end
 
-local function render_virtual(context, signature_help)
+local function render_virtual(context, signature_help, already_normalized)
 	clear_virtual()
+	if not already_normalized then
+		signature_help = M.normalize_signature_help(context, signature_help)
+	end
 	local view = M.signature_help_view(signature_help, false)
 	local active_signature = view and view.signatures and view.signatures[1]
 	if not active_signature or type(active_signature.label) ~= "string" then
@@ -686,16 +1038,19 @@ local function render_virtual(context, signature_help)
 end
 
 local function redraw_virtual_at_cursor()
-	if expanded or not last_context or not last_signature_help then
+	if not last_context or not last_signature_help then
 		return false
 	end
 	if api.nvim_get_current_buf() ~= last_context.bufnr then
 		return false
 	end
+	if expanded then
+		return redraw_current_signature()
+	end
 	return render_virtual(last_context, last_signature_help)
 end
 
-local function schedule_virtual_refresh()
+local function schedule_signature_refresh()
 	if refresh_scheduled then
 		return
 	end
@@ -733,7 +1088,7 @@ local function schedule_signature_discovery(bufnr)
 	end, 60)
 end
 
-local function redraw_current_signature()
+redraw_current_signature = function()
 	local signature_window = require("blink.cmp.signature.window")
 	if not last_context or not last_signature_help then
 		return false
@@ -802,6 +1157,7 @@ end
 
 function M.setup()
 	local signature_window = require("blink.cmp.signature.window")
+	local trigger = require("blink.cmp.signature.trigger")
 	-- Preserve Blink's renderer across config reloads instead of wrapping our own
 	-- wrapper repeatedly.
 	signature_window._user_original_open_with_signature_help = signature_window._user_original_open_with_signature_help
@@ -822,12 +1178,19 @@ function M.setup()
 		update_signature_anchor(context)
 		last_context = context
 		last_signature_help = signature_help
+		local normalized = M.normalize_signature_help(context, signature_help)
+		if normalized and context then
+			context.active_signature_help = normalized
+			if trigger.context and trigger.context.id == context.id then
+				trigger.set_active_signature_help(normalized)
+			end
+		end
 		if expanded then
 			clear_virtual()
 			clear_full_indicators()
-			local view = M.signature_help_view(signature_help, true)
+			local view = M.signature_help_view(normalized, true)
 			local result = original_open(context, view)
-			render_full_indicators(signature_window, view, context)
+			render_full_indicators(signature_window, view)
 			signature_window.update_position()
 			return result
 		end
@@ -837,10 +1200,9 @@ function M.setup()
 		signature_window.context = nil
 		signature_window.shown_signature = nil
 		signature_window.close()
-		return render_virtual(context, signature_help)
+		return render_virtual(context, normalized, true)
 	end
 
-	local trigger = require("blink.cmp.signature.trigger")
 	if trigger._user_signature_reset then
 		trigger.hide_emitter:off(trigger._user_signature_reset)
 	end
@@ -860,7 +1222,7 @@ function M.setup()
 	local refresh_group = api.nvim_create_augroup("user_blink_signature_virtual", { clear = true })
 	api.nvim_create_autocmd("TextChangedI", {
 		group = refresh_group,
-		desc = "Keep virtual signature aligned while typing arguments",
+		desc = "Refresh signature help while typing arguments",
 		callback = function(event)
 			discovery_generation = discovery_generation + 1
 			last_text_change = {
@@ -869,16 +1231,16 @@ function M.setup()
 				cursor = api.nvim_win_get_cursor(0),
 			}
 			if last_context and event.buf == last_context.bufnr then
-				schedule_virtual_refresh()
+				schedule_signature_refresh()
 			end
 		end,
 	})
 	api.nvim_create_autocmd("CursorMovedI", {
 		group = refresh_group,
-		desc = "Refresh or discover virtual signature after cursor movement",
+		desc = "Refresh or discover signature help after cursor movement",
 		callback = function(event)
 			if last_context and event.buf == last_context.bufnr then
-				schedule_virtual_refresh()
+				schedule_signature_refresh()
 			end
 			local cursor = api.nvim_win_get_cursor(0)
 			local follows_text_change = last_text_change
@@ -895,12 +1257,12 @@ function M.setup()
 		group = refresh_group,
 		pattern = { "BlinkCmpShow", "BlinkCmpHide" },
 		desc = "Keep virtual signature clear of the completion menu",
-		callback = schedule_virtual_refresh,
+		callback = schedule_signature_refresh,
 	})
 	api.nvim_create_autocmd("WinResized", {
 		group = refresh_group,
 		desc = "Reflow virtual signature after resizing",
-		callback = schedule_virtual_refresh,
+		callback = schedule_signature_refresh,
 	})
 end
 
