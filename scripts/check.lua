@@ -158,6 +158,18 @@ do
 	assert(completion_opts.completion.menu.border == "padded", "Completion menu lost its borderless style")
 	assert(completion_opts.keymap.preset == "super-tab", "Completion no longer uses IDE-style Tab acceptance")
 	assert(
+		type(completion_opts.keymap["<C-Space>"][1]) == "function"
+			and completion_opts.keymap["<C-Space>"][1]() == true
+			and completion_opts.keymap["<C-Space>"][2] == nil
+			and type(completion_opts.cmdline.keymap["<C-Space>"][1]) == "function"
+			and completion_opts.cmdline.keymap["<C-Space>"][1]() == true,
+		"Ctrl-Space is no longer reserved exclusively for the input method"
+	)
+	assert(
+		vim.deep_equal(completion_opts.keymap["<M-Space>"], { "show", "show_documentation", "hide_documentation" }),
+		"Manual completion was not moved to Alt-Space"
+	)
+	assert(
 		vim.deep_equal(completion_opts.keymap["<CR>"], { "accept", "fallback" }),
 		"Enter no longer safely confirms an explicitly selected completion"
 	)

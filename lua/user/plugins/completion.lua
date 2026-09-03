@@ -4,6 +4,12 @@ local function dismiss_popups(cmp)
 	require("user.core.popups").close({ blink = cmp })
 end
 
+local function reserve_for_input_method()
+	-- The desktop input method handles this first; consume the copy that reaches
+	-- Neovim so it neither opens Blink nor invokes Insert-mode <C-@>.
+	return true
+end
+
 return {
 	{
 		"saghen/blink.cmp",
@@ -20,6 +26,8 @@ return {
 				-- newline. Escape dismisses every popup and leaves Insert mode in the
 				-- same keypress; the callback deliberately falls through afterward.
 				preset = "super-tab",
+				["<C-Space>"] = { reserve_for_input_method },
+				["<M-Space>"] = { "show", "show_documentation", "hide_documentation" },
 				["<CR>"] = { "accept", "fallback" },
 				["<Esc>"] = { dismiss_popups, "fallback" },
 				["<C-k>"] = { blink_signature.toggle, "fallback" },
@@ -70,6 +78,10 @@ return {
 				},
 			},
 			cmdline = {
+				keymap = {
+					preset = "cmdline",
+					["<C-Space>"] = { reserve_for_input_method },
+				},
 				completion = {
 					-- Pop the candidate menu automatically while typing `:`, like
 					-- wildmenu. Border comes from the global completion.menu ("padded").
