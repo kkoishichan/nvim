@@ -1,6 +1,7 @@
 local M = {
 	compact_height = 1,
 	indicator = "󰊕",
+	virtual_indicator = "◀",
 }
 
 local api = vim.api
@@ -155,7 +156,10 @@ function M.virtual_chunks(label, filetype, active_range)
 	table.sort(boundaries)
 	local chunks = {
 		{ " ", "BlinkCmpSignatureVirtual" },
-		{ M.indicator .. " ", { "BlinkCmpSignatureIndicator", "BlinkCmpSignatureVirtual" } },
+		{
+			M.virtual_indicator .. " ",
+			{ "BlinkCmpSignatureVirtualIndicator", "BlinkCmpSignatureVirtual" },
+		},
 	}
 	for index = 1, #boundaries - 1 do
 		local start_col = boundaries[index]

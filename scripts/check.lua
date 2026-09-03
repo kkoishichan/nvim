@@ -257,7 +257,7 @@ do
 	local virtual_label = ""
 	local active_parameter = ""
 	local has_syntax = false
-	local indicator_uses_purple = false
+	local indicator_uses_yellow = false
 	for _, chunk in ipairs(virtual_chunks) do
 		virtual_label = virtual_label .. chunk[1]
 		if type(chunk[2]) == "table" then
@@ -270,25 +270,30 @@ do
 			end
 			for _, highlight in ipairs(chunk[2]) do
 				has_syntax = has_syntax or vim.startswith(highlight, "@")
-				if chunk[1]:find(signature_renderer.indicator, 1, true) then
-					indicator_uses_purple = indicator_uses_purple or highlight == "BlinkCmpSignatureIndicator"
+				if chunk[1]:find(signature_renderer.virtual_indicator, 1, true) then
+					indicator_uses_yellow = indicator_uses_yellow or highlight == "BlinkCmpSignatureVirtualIndicator"
 				end
 			end
 		end
 	end
-	assert(virtual_label == " 󰊕 pick(value: number, base: number) ", "Virtual signature text changed")
+	assert(virtual_label == " ◀ pick(value: number, base: number) ", "Virtual signature text changed")
 	assert(
 		virtual_chunks[1][1] == " " and virtual_chunks[1][2] == "BlinkCmpSignatureVirtual",
 		"Virtual signature has no background-coloured left padding"
 	)
 	assert(
-		vim.fn.strdisplaywidth(signature_renderer.indicator) == 1,
+		vim.fn.strdisplaywidth(signature_renderer.virtual_indicator) == 1,
 		"Virtual signature indicator is not one cell wide"
 	)
-	assert(indicator_uses_purple, "Virtual signature indicator does not use its purple highlight")
+	assert(indicator_uses_yellow, "Virtual signature indicator does not use its yellow highlight")
+	assert(
+		vim.api.nvim_get_hl(0, { name = "BlinkCmpSignatureVirtualIndicator", link = false }).fg
+			== require("user.core.palette").get().warn,
+		"Virtual signature indicator is not theme yellow"
+	)
 	assert(
 		vim.api.nvim_get_hl(0, { name = "BlinkCmpSignatureIndicator", link = false }).fg == 0xc586c0,
-		"Signature indicator is not VS Code purple"
+		"Full signature indicator is not VS Code purple"
 	)
 	assert(active_parameter == "base: number", "Virtual signature lost its active parameter")
 	assert(has_syntax, "Virtual signature lost Tree-sitter highlighting")

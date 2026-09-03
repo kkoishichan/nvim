@@ -53,8 +53,10 @@ local function set_float_highlights()
 	vim.api.nvim_set_hl(0, "BlinkCmpDocSeparator", { fg = p.gray, bg = vim.api.nvim_get_hl(0, { name = "Pmenu" }).bg })
 	vim.api.nvim_set_hl(0, "BlinkCmpSignatureHelp", { link = "Pmenu" })
 	vim.api.nvim_set_hl(0, "BlinkCmpSignatureHelpBorder", { link = "Pmenu" })
-	-- Match the purple function-kind marker used by Blink's completion menu.
+	-- The full signature popup matches Blink's purple function-kind marker;
+	-- its compact virtual line uses a distinct yellow directional marker.
 	vim.api.nvim_set_hl(0, "BlinkCmpSignatureIndicator", { link = "BlinkCmpKindFunction" })
+	vim.api.nvim_set_hl(0, "BlinkCmpSignatureVirtualIndicator", { fg = p.warn })
 	-- Virtual signatures keep Tree-sitter foregrounds but sit on the same raised
 	-- surface as Blink's popup, so they remain distinct from source text.
 	local signature_bg = vim.api.nvim_get_hl(0, { name = "Pmenu", link = false }).bg or p.panel
