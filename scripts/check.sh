@@ -12,7 +12,8 @@ usage() {
 Usage: ./scripts/check.sh [--group NAME | NAME] ...
 
 Groups: static, integration, performance, ai, languages, projects,
-        project_actions, toolchain, terminals, workflow_actions, signature, lifecycle, pdf_lifecycle
+        project_actions, toolchain, terminals, workflow_actions, signature, lifecycle, pdf_lifecycle,
+        windows, layout_session, ui_themes
 Optional real-tool groups: workflow_python_js, workflow_native, workflow_java_docs
 With no arguments, run the fast groups above. Real-tool groups require their SDKs.
 Examples: ./scripts/check.sh performance
@@ -24,7 +25,7 @@ groups=()
 add_group() {
 	local existing
 	case "$1" in
-	static | integration | performance | ai | languages | projects | project_actions | toolchain | terminals | workflow_actions | signature | lifecycle | pdf_lifecycle | workflow_python_js | workflow_native | workflow_java_docs) ;;
+	static | integration | performance | ai | languages | projects | project_actions | toolchain | terminals | workflow_actions | signature | lifecycle | pdf_lifecycle | windows | layout_session | ui_themes | workflow_python_js | workflow_native | workflow_java_docs) ;;
 	*)
 		printf 'Unknown check group: %s\n' "$1" >&2
 		usage >&2
@@ -56,7 +57,7 @@ while [ $# -gt 0 ]; do
 	shift
 done
 if [ "${#groups[@]}" -eq 0 ]; then
-	groups=(static integration performance ai languages projects project_actions toolchain terminals workflow_actions signature lifecycle pdf_lifecycle)
+	groups=(static integration performance ai languages projects project_actions toolchain terminals workflow_actions signature lifecycle pdf_lifecycle windows layout_session ui_themes)
 fi
 
 tool() {

@@ -76,6 +76,7 @@ local function normalize_open_managers()
 end
 
 function M.setup()
+	require("user.core.panels").setup()
 	local group = vim.api.nvim_create_augroup("user_manager_float_layout", { clear = true })
 	vim.api.nvim_create_autocmd("FileType", {
 		group = group,

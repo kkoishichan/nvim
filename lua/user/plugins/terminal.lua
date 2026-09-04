@@ -276,6 +276,10 @@ local function set_terminal_keymaps(term)
 	map("<C-/>", function()
 		M.toggle()
 	end, "Toggle terminal")
+	-- Legacy xterm/SSH sends Ctrl-/ as the US byte, decoded as Ctrl-_.
+	map("<C-_>", function()
+		M.toggle()
+	end, "Toggle terminal")
 	vim.keymap.set("n", "q", function()
 		term:close()
 	end, vim.tbl_extend("force", opts, { desc = "Hide terminal" }))
@@ -325,6 +329,13 @@ return {
 			require("toggleterm").setup(opts)
 		end,
 		keys = {
+			{
+				"<C-_>",
+				function()
+					M.toggle()
+				end,
+				desc = "Toggle terminal (legacy terminal)",
+			},
 			{
 				"<C-/>",
 				function()

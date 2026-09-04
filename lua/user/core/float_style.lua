@@ -2,35 +2,7 @@ local M = {}
 
 local padded_border = { " ", "", "", " ", "", "", " ", " " }
 
--- These are workspace-sized applications rather than transient popups. They
--- keep their own layout and border treatment even if the terminal is small.
-local panel_filetypes = {
-	Glance = true,
-	["fzflua_backdrop"] = true,
-	fzf = true,
-	lazy = true,
-	["lazy_backdrop"] = true,
-	lazygit = true,
-	mason = true,
-	["mason_backdrop"] = true,
-	["neo-tree"] = true,
-	["neo-tree-preview"] = true,
-	oil = true,
-	["snacks_dashboard"] = true,
-}
-
--- Notifications keep nvim-notify's own animation, colours, and frame. They are
--- intentionally outside the generic small-popup fallback.
-local untouched_filetypes = {
-	notify = true,
-	["snacks_notif"] = true,
-}
-
-local popup_filetypes = {
-	["neotest-output"] = true,
-	["neo-tree-popup"] = true,
-	trouble = true,
-}
+local window_roles = require("user.core.window_roles")
 
 local styled_window_highlights = {
 	Normal = "Pmenu",
@@ -45,16 +17,6 @@ local function border_character(item)
 	return type(item) == "table" and item[1] or item
 end
 
--- Tree-sitter Context and nvim-scrollview are implemented as tiny floating
--- windows, but they are persistent editor chrome rather than dismissible UI.
--- Keep them out of both the popup styling fallback and the global Esc closer.
-local function is_editor_chrome(winid)
-	if vim.w[winid].treesitter_context or vim.w[winid].treesitter_context_line_number then
-		return true
-	end
-	return vim.w[winid].scrollview_key == "scrollview_val"
-end
-
 local function merge_winhighlight(current)
 	local entries = {}
 	for entry in (current or ""):gmatch("[^,]+") do
@@ -67,33 +29,6 @@ local function merge_winhighlight(current)
 		entries[#entries + 1] = source .. ":" .. styled_window_highlights[source]
 	end
 	return table.concat(entries, ",")
-end
-
-local function is_panel(winid)
-	local bufnr = vim.api.nvim_win_get_buf(winid)
-	local filetype = vim.bo[bufnr].filetype
-	if
-		is_editor_chrome(winid)
-		or vim.bo[bufnr].buftype == "terminal"
-		or panel_filetypes[filetype]
-		or untouched_filetypes[filetype]
-	then
-		return true
-	end
-	-- Glance's preview shows the source buffer's real filetype, so its window
-	-- highlight is the reliable way to distinguish it from an LSP hover.
-	return vim.wo[winid].winhighlight:find("Glance", 1, true) ~= nil
-end
-
-local function is_small_float(winid)
-	local config = vim.api.nvim_win_get_config(winid)
-	if config.relative == "" or is_panel(winid) then
-		return false
-	end
-	local max_width = math.min(100, math.max(30, math.floor(vim.o.columns * 0.72)))
-	local usable_lines = math.max(1, vim.o.lines - vim.o.cmdheight)
-	local max_height = math.min(24, math.max(6, math.floor(usable_lines * 0.55)))
-	return config.width <= max_width and config.height <= max_height
 end
 
 ---Return a fresh copy suitable for plugin options that accept an 8-part border.
@@ -134,12 +69,7 @@ function M.is_transient(winid)
 	if not winid or not vim.api.nvim_win_is_valid(winid) then
 		return false
 	end
-	local bufnr = vim.api.nvim_win_get_buf(winid)
-	local config = vim.api.nvim_win_get_config(winid)
-	if config.relative == "" or is_panel(winid) then
-		return false
-	end
-	return M.is_padded(winid) or popup_filetypes[vim.bo[bufnr].filetype] or is_small_float(winid)
+	return vim.api.nvim_win_get_config(winid).relative ~= "" and window_roles.is_transient(winid)
 end
 
 ---Apply the shared border and Pmenu background after a popup is created.
@@ -157,8 +87,8 @@ function M.apply_padded(winid)
 	return true
 end
 
----Apply the style only when the window is already opted in or is genuinely a
----small transient float. The size guard keeps application-like panels intact.
+---Style transient windows identified by ownership, preserving editable floats.
+---The legacy function name remains available to plugin integrations.
 function M.style_if_small(winid)
 	if not winid or not vim.api.nvim_win_is_valid(winid) then
 		return false

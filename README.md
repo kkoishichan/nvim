@@ -71,6 +71,7 @@ Selene、Stylelint、golangci-lint 仅在项目存在对应配置时运行，避
 │       │   ├── ai_terminal.lua -- AI CLI 的 toggleterm 生命周期与通信
 │       │   ├── autocmds.lua   -- 通用自动命令与生命周期
 │       │   ├── backdrop.lua   -- 浮窗背景调暗
+│       │   ├── buffers.lua    -- 保留分屏的文件关闭与保存选择
 │       │   ├── blink_signature.lua -- 签名提示稳定入口
 │       │   ├── signature/     -- 调用解析、参数选择、渲染与 Blink 适配
 │       │   ├── commands.lua   -- 自定义命令
@@ -91,6 +92,8 @@ Selene、Stylelint、golangci-lint 仅在项目存在对应配置时运行，避
 │       │   ├── pdf_preview.lua -- PDF 渲染、缓存、按键与文件监听
 │       │   ├── popups.lua     -- Esc 统一关闭临时弹窗
 │       │   ├── sensitive.lua  -- 密钥文件与剪贴板保护
+│       │   ├── session.lua    -- 多标签工作区会话与项目元数据
+│       │   ├── window_roles.lua -- 正文、面板与临时窗口角色
 │       │   ├── statuscolumn.lua -- IDE 风格 gutter 排布
 │       │   ├── testing.lua    -- 按项目/语言加载 neotest adapter
 │       │   ├── theme.lua      -- 主题切换与持久化
@@ -291,6 +294,15 @@ Claude 原生 IDE 集成在一个 Neovim 中只有一个终端：首次打开时
 修改后运行 `:ToolsRefresh`；无效值采用默认设置，并在健康报告中说明。
 项目自身的格式化和检查规则继续放在项目原生配置文件中。
 
+侧栏和输出面板会为正文保留默认 40 列、8 行；可在偏好中设置
+`ui.min_editor_width` / `ui.min_editor_height`。小屏会收起辅助面板，终端进程继续运行；
+修改中的面板和手工建立的正文分屏受到保护。
+
+文件关闭入口保留各标签页的分屏，未保存文件提供保存、放弃、取消选择。
+`Esc` 只收起临时提示，编辑浮窗使用自己的关闭操作。会话保存整个多标签工作区及各自项目目录，
+继续兼容旧 Persistence 会话；恢复前检查未保存内容。行为边界及终端验收见
+[窗口与会话验收](docs/ui-validation.md)。
+
 `:TaskBuild`、`:TaskRun`、`:TaskTest`（`<leader>jb` / `jx` / `jT`）根据当前项目发现常用入口，
 在 Overseer 中保留输出和结果，构建错误可从 quickfix 跳转。
 支持 package scripts、Cargo、Go、Maven/Gradle、CMake/Make、pytest，以及当前 Python/Shell 文件与 TeX/Typst 构建。
@@ -328,7 +340,7 @@ Go 汇编仅在 `.s`、Go 项目和 Plan 9 指令特征同时匹配时使用 asm
 - `gd` / `gD` / `gi` / `gy` / `gr` ：Peek 定义 / 声明 / 实现 / 类型 / 引用
 - `gsa` / `gsd` / `gsr` ：添加 / 删除 / 替换 surround
 - `<M-1>` … `<M-9>` ：跳到第 N 个 buffer，`<M-0>` 跳到最后一个
-- `<C-/>` ：切换底部终端
+- `<C-/>` ：切换底部终端（兼容传统终端的 `<C-_>` 编码）
 - `<leader>k` ：离线词典；`<leader>ut` ：选择并持久保存主题
 - `<leader>ghB` ：切换当前行 Git blame
 - `zR` / `zM` / `zr` / `zm` / `zK` ：折叠开关与预览
@@ -373,3 +385,5 @@ Go 汇编仅在 `.s`、Go 项目和 Plan 9 指令特征同时匹配时使用 asm
   可用 `./scripts/check.sh performance` 或 `./scripts/check.sh --group static --group ai` 仅运行指定组。
 - `python3 scripts/benchmark.py` 保留启动输入、各次日志与结果 JSON；默认每场景四次、丢弃首轮。
   启动报错会使测量失败。此工具只测无头启动，补全、语言服务就绪和终端绘制分别验收。
+- `python3 scripts/ui-smoke.py` 在三个尺寸的真实 PTY 中检查按键、终端模式和补全菜单，
+  保存终端日志与窗口数据。它模拟无图片协议与 SSH 环境变量，不连接远程主机。

@@ -888,6 +888,7 @@ do
 
 	local small_buffer = vim.api.nvim_create_buf(false, true)
 	local small = open_float(small_buffer, 24, 4)
+	require("user.core.window_roles").mark(small, "transient")
 	vim.wo[small].winhighlight = "Normal:ErrorMsg,CursorLine:Visual"
 	assert(
 		vim.wait(200, function()
@@ -904,6 +905,7 @@ do
 	local large_width = math.max(1, vim.o.columns - 4)
 	local large_height = math.max(1, vim.o.lines - vim.o.cmdheight - 4)
 	local large = open_float(large_buffer, large_width, large_height)
+	require("user.core.window_roles").mark(large, "editor_float")
 	vim.wait(50)
 	assert(not float_style.is_padded(large), "application-sized float was mistaken for a popup")
 	assert(not float_style.is_transient(large), "application-sized float is dismissible")

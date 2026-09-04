@@ -17,6 +17,9 @@ assert(
 		"signature",
 		"lifecycle",
 		"pdf_lifecycle",
+		"windows",
+		"layout_session",
+		"ui_themes",
 	}, group),
 	"Unknown behavior check group: " .. group
 )

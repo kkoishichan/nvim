@@ -62,7 +62,7 @@ local function close_dictionary()
 end
 
 local function close_transient_floats()
-	local float_style = require("user.core.float_style")
+	local window_roles = require("user.core.window_roles")
 	local closed = false
 	for _, winid in ipairs(api.nvim_tabpage_list_wins(0)) do
 		if api.nvim_win_is_valid(winid) then
@@ -71,8 +71,12 @@ local function close_transient_floats()
 			local plugin_owned = vim.startswith(filetype, "blink-cmp-")
 				or filetype == "notify"
 				or filetype == "snacks_notif"
-			if not plugin_owned and float_style.is_transient(winid) then
-				local ok = pcall(api.nvim_win_close, winid, true)
+			if
+				not plugin_owned
+				and window_roles.is_transient(winid)
+				and api.nvim_win_get_config(winid).relative ~= ""
+			then
+				local ok = pcall(api.nvim_win_close, winid, false)
 				closed = ok or closed
 			end
 		end

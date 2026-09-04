@@ -33,33 +33,41 @@ return {
 	{
 		"folke/persistence.nvim",
 		event = "BufReadPre",
-		opts = {},
+		opts = { branch = false },
+		config = function(_, opts)
+			local persistence = require("persistence")
+			persistence.setup(opts)
+			-- Workspace sessions preserve every tab and their project metadata.
+			-- Only the shared session service owns automatic saves.
+			persistence.stop()
+			require("user.core.session").setup({ dir = opts.dir })
+		end,
 		keys = {
 			{
 				"<leader>ss",
 				function()
-					require("persistence").load()
+					require("user.core.session").load()
 				end,
 				desc = "Restore session",
 			},
 			{
 				"<leader>sS",
 				function()
-					require("persistence").select()
+					require("user.core.session").select()
 				end,
 				desc = "Select session",
 			},
 			{
 				"<leader>sl",
 				function()
-					require("persistence").load({ last = true })
+					require("user.core.session").load({ last = true })
 				end,
 				desc = "Restore last session",
 			},
 			{
 				"<leader>sd",
 				function()
-					require("persistence").stop()
+					require("user.core.session").stop()
 				end,
 				desc = "Stop saving session",
 			},

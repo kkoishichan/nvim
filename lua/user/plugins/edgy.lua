@@ -16,6 +16,12 @@
 -- core/options.lua.
 local panels = require("user.core.panels")
 
+local function dock_size(side)
+	return function()
+		return math.max(1, panels.budget()[side])
+	end
+end
+
 local function pattern_escape(value)
 	return (value:gsub("([^%w])", "%%%1"))
 end
@@ -52,6 +58,11 @@ return {
 			-- Snap panels into place; no slide animation (matches the config's
 			-- restrained feel and avoids jank in terminals under load).
 			animate = { enabled = false },
+			options = {
+				left = { size = dock_size("left") },
+				right = { size = dock_size("right") },
+				bottom = { size = dock_size("bottom") },
+			},
 			left = {
 				{
 					title = "Explorer",
@@ -59,7 +70,7 @@ return {
 					filter = function(buf)
 						return vim.b[buf].neo_tree_source == "filesystem"
 					end,
-					size = { width = panels.left_panel_width, height = 0.6 },
+					size = { width = dock_size("left"), height = 0.6 },
 				},
 				{
 					title = "Outline",
@@ -73,17 +84,17 @@ return {
 				{
 					title = "Terminal",
 					ft = "toggleterm",
-					size = { height = 0.35 },
+					size = { height = dock_size("bottom") },
 					-- Only dock non-floating toggleterms; the floating quick-REPL
 					-- terminal stays a floating overlay.
 					filter = function(buf, win)
 						return vim.api.nvim_win_get_config(win).relative == "" and vim.b[buf].user_ai_terminal == nil
 					end,
 				},
-				{ title = "Problems", ft = "trouble", size = { height = 0.35 } },
-				{ title = "Tasks", ft = "OverseerList", size = { height = 0.35 } },
-				{ title = "Task Output", ft = "OverseerOutput", size = { height = 0.35 } },
-				{ title = "QuickFix", ft = "qf", size = { height = 0.35 } },
+				{ title = "Problems", ft = "trouble", size = { height = dock_size("bottom") } },
+				{ title = "Tasks", ft = "OverseerList", size = { height = dock_size("bottom") } },
+				{ title = "Task Output", ft = "OverseerOutput", size = { height = dock_size("bottom") } },
+				{ title = "QuickFix", ft = "qf", size = { height = dock_size("bottom") } },
 			},
 			right = {
 				{
@@ -92,7 +103,7 @@ return {
 					filter = function(buf)
 						return ai_terminal(buf, "codex")
 					end,
-					size = { width = 0.40 },
+					size = { width = dock_size("right") },
 				},
 				{
 					title = "Claude Code",
@@ -100,7 +111,7 @@ return {
 					filter = function(buf)
 						return ai_terminal(buf, "claude")
 					end,
-					size = { width = 0.40 },
+					size = { width = dock_size("right") },
 				},
 				{
 					title = "OpenCode",
@@ -108,7 +119,7 @@ return {
 					filter = function(buf)
 						return ai_terminal(buf, "opencode")
 					end,
-					size = { width = 0.40 },
+					size = { width = dock_size("right") },
 				},
 			},
 		},

@@ -245,7 +245,7 @@ return {
 							icon = " ",
 							key = "s",
 							desc = "Restore Session",
-							action = ":lua require('persistence').load()",
+							action = ":lua require('user.core.session').load()",
 						},
 						{ icon = " ", key = "q", desc = "Quit", action = ":qa" },
 					},
@@ -570,10 +570,10 @@ return {
 				themable = true,
 				numbers = "none",
 				close_command = function(bufnr)
-					vim.api.nvim_buf_delete(bufnr, { force = false })
+					require("user.core.buffers").close(bufnr)
 				end,
 				right_mouse_command = function(bufnr)
-					vim.api.nvim_buf_delete(bufnr, { force = false })
+					require("user.core.buffers").close(bufnr)
 				end,
 				left_mouse_command = "buffer %d",
 				middle_mouse_command = nil,
@@ -647,7 +647,7 @@ return {
 			{
 				"<leader>bd",
 				function()
-					vim.api.nvim_buf_delete(0, { force = false })
+					require("user.core.buffers").close()
 				end,
 				desc = "Close current buffer",
 			},
