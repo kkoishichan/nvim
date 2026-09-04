@@ -2,10 +2,19 @@ local root = assert(vim.env.NVIM_TEST_ROOT, "NVIM_TEST_ROOT is required")
 local tmp = assert(vim.env.NVIM_TEST_TMP, "NVIM_TEST_TMP is required")
 local group = assert(vim.env.NVIM_TEST_GROUP, "NVIM_TEST_GROUP is required")
 assert(
-	vim.tbl_contains(
-		{ "performance", "ai", "languages", "projects", "project_actions", "toolchain", "terminals" },
-		group
-	),
+	vim.tbl_contains({
+		"performance",
+		"ai",
+		"languages",
+		"projects",
+		"project_actions",
+		"toolchain",
+		"terminals",
+		"workflow_actions",
+		"workflow_python_js",
+		"workflow_native",
+		"workflow_java_docs",
+	}, group),
 	"Unknown behavior check group: " .. group
 )
 

@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.16)
+project(nvim_native_workflow LANGUAGES C CXX)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+add_executable(native_c main.c)
+add_executable(native_cpp main.cpp)
+enable_testing()
+add_test(NAME native_c_pass COMMAND native_c)
+add_test(NAME native_cpp_pass COMMAND native_cpp)

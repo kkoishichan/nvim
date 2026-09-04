@@ -123,7 +123,7 @@ return function(tmp)
 	write(settings .. "/preferences.json", { '{"format":{"timeout_ms":-1},"execute":"arbitrary command"}' })
 	preferences.refresh()
 	assert(
-		preferences.get("format").timeout_ms == 2000 and #preferences.errors() == 2,
+		preferences.get("format").timeout_ms == 800 and #preferences.errors() == 2,
 		"Invalid preferences did not fall back with explanations"
 	)
 	write(settings .. "/preferences.json", { "invalid json" })

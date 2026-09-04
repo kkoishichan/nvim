@@ -340,7 +340,16 @@ return {
 	},
 	{
 		"chomosuke/typst-preview.nvim",
-		ft = "typst",
+		cmd = {
+			"TypstPreview",
+			"TypstPreviewUpdate",
+			"TypstPreviewToggle",
+			"TypstPreviewStop",
+			"TypstPreviewFollowCursor",
+			"TypstPreviewNoFollowCursor",
+			"TypstPreviewFollowCursorToggle",
+			"TypstPreviewSyncCursor",
+		},
 		version = "1.*",
 		opts = {
 			dependencies_bin = {
@@ -348,9 +357,7 @@ return {
 			},
 			follow_cursor = true,
 		},
-		config = function(_, opts)
-			require("typst-preview").setup(opts)
-
+		init = function()
 			local function map_typst_keys(bufnr)
 				local function map(lhs, rhs, desc)
 					vim.keymap.set("n", lhs, rhs, { buffer = bufnr, desc = desc, silent = true })
@@ -371,7 +378,12 @@ return {
 				end,
 			})
 
-			map_typst_keys(vim.api.nvim_get_current_buf())
+			if vim.bo.filetype == "typst" then
+				map_typst_keys(vim.api.nvim_get_current_buf())
+			end
+		end,
+		config = function(_, opts)
+			require("typst-preview").setup(opts)
 		end,
 	},
 }

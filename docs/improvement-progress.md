@@ -7,7 +7,7 @@
 | --- | --- | --- |
 | 1. 性能边界与工作流修复 | 完成 | 静态、原集成、performance、ai、languages 组通过 |
 | 2. 项目与工具上下文 | 完成 | 全部 9 组检查通过；真实 health 烟雾通过 |
-| 3. 语言完整工作流 | 待实施 | — |
+| 3. 语言完整工作流 | 完成 | 三组真实工作流与普通回归通过；实际断点和正反例通过 |
 | 4. 模块与资源生命周期 | 待实施 | — |
 | 5. 窗口与会话交互 | 待实施 | — |
 | 6. 部署、CI 与维护 | 待实施 | — |
@@ -33,3 +33,15 @@
 - `:checkhealth user` 显示来源、版本、缺项及当前 LSP；`preferences.json` 提供经过类型校验的机器偏好。
 
 验证覆盖项目 A/B、多 tab、嵌套仓库、Mason 安装/卸载、PATH 和偏好变化、失效 LSP 命令、终端异常退出、异步换项目取消与精确目标通道。全套 static、integration、performance、ai、languages、projects、project_actions、toolchain、terminals 通过；真实健康检查通过。AI 外发全程使用替身。
+
+## 阶段三
+
+完整证据及准备、复跑入口见 [工作流矩阵](workflow-matrix.md)。三组真实工具检查分别通过；涵盖 Python/JS/TS/Vue、C/C++/Go/Rust、Java/TeX/Typst/PDF。断点均核对实际栈帧文件与行号，测试均包含预期通过和故意失败，没有把适配器注册视为实际支持。
+
+- 修复真实验收揭示的问题：Neotest 新加载适配器同步到解析子进程；Python 测试服从项目解释器；js-debug 使用原生 DAP 服务协议，移除失配桥接插件；源码映射等待就绪。
+- Java 测试包 0.45.0 与 JDTLS 1.60.0 的 ASM 范围不兼容。已更新锁定值至实际验证通过的 0.46.0，并通过 Mason 定向恢复本机该单包。原包和链接备份位于 `/tmp/nvim-java-test-backup-irfxyo9c`；其它工具未升级。JDTLS 命令入口检查服务真实能力。
+- 新增 `:TaskBuild` / `:TaskRun` / `:TaskTest`，任务失败进入 quickfix；Typst 编译错误解析真实源位置。Typst 预览改为命令加载，普通打开和编译不触发下载。
+- 普通保存格式化默认 800 ms；TeX 保存后异步格式化，并验证不会覆盖期间的新编辑。asmfmt 限定于 Go Plan 9 汇编。
+- 快速组新增 `workflow_actions`；`check-workflows.sh` 显式运行重型真实检查，依赖准备与检查分离。
+
+本机真实工作流需要允许本地调试端口和调试样例子进程，已在相应执行环境通过。视觉体验、跨系统部署与所有真实项目的编译参数不由这些样例保证，分别留在后两类验收记录中。

@@ -12,15 +12,28 @@ local build_markers = {
 }
 
 function M.project_root(source)
-	-- All build descriptors have equal priority, so vim.fs.root chooses the
-	-- nearest one. VCS metadata is considered only when no build file exists.
-	local root = vim.fs.root(source, { build_markers, { ".git", ".jj" } })
-	if root then
-		return vim.fs.normalize(root)
+	local project = require("user.core.project")
+	local context = project.context(source)
+	-- Keep Java's build-specific roots while sharing canonical paths and the
+	-- repository boundary. A nested repository must not import an outer build.
+	local root = project.canonical(vim.fs.root(context.directory, { build_markers }))
+	if root and (not context.repository or project.contains(context.repository, root)) then
+		return root
 	end
+	return context.repository or context.directory
+end
 
-	local path = type(source) == "number" and vim.api.nvim_buf_get_name(source) or source
-	return path and path ~= "" and vim.fs.dirname(vim.fs.normalize(path)) or vim.fn.getcwd()
+function M.supports_command(bufnr, commands)
+	for _, client in ipairs(vim.lsp.get_clients({ bufnr = bufnr, name = "jdtls" })) do
+		local provider = client.server_capabilities.executeCommandProvider
+		local available = type(provider) == "table" and provider.commands or {}
+		for _, command in ipairs(commands) do
+			if vim.tbl_contains(available, command) then
+				return true
+			end
+		end
+	end
+	return false
 end
 
 local java_version_cache = {}
@@ -95,6 +108,7 @@ function M.python_runtime()
 end
 
 function M.workspace_dir(root)
+	root = assert(require("user.core.project").canonical(root))
 	local project = vim.fn.fnamemodify(root, ":t"):gsub("[^%w._-]", "_")
 	if project == "" then
 		project = "root"

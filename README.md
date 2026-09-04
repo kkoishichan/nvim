@@ -213,7 +213,7 @@ formatter / linter、Neotest、DAP 与预览工具则按语言独立配置。表
 
 | 语言 / 文件类型 | LSP / 语义支持 | 格式化 / 检查 | 测试 / 调试 / 预览 | 项目环境 / 限制 |
 | --- | --- | --- | --- | --- |
-| Assembly / RISC-V | asm-lsp | asmfmt（Assembly） | — | 对应汇编工具链 |
+| Assembly / RISC-V | asm-lsp | asmfmt 仅用于识别到的 Go Plan 9 汇编 | — | 对应汇编工具链 |
 | C / C++ | clangd | clang-format、clang-tidy | codelldb 调试 | C / C++ 工具链；调试前先构建可执行文件 |
 | CMake、Make、Autotools | neocmake、autotools-language-server | cmake-format、cmakelint、checkmake | — | 对应构建工具 |
 | Go | gopls | goimports、gofumpt、staticcheck；按项目启用 golangci-lint | neotest-golang；Delve 调试 | Go toolchain |
@@ -281,12 +281,22 @@ Claude 原生 IDE 集成在一个 Neovim 中只有一个终端：首次打开时
 ```json
 {
   "tools": { "prefer_mason": false },
-  "format": { "timeout_ms": 2000 }
+  "format": { "timeout_ms": 800 }
 }
 ```
 
 修改后运行 `:ToolsRefresh`；无效值采用默认设置，并在健康报告中说明。
 项目自身的格式化和检查规则继续放在项目原生配置文件中。
+
+`:TaskBuild`、`:TaskRun`、`:TaskTest`（`<leader>jb` / `jx` / `jT`）根据当前项目发现常用入口，
+在 Overseer 中保留输出和结果，构建错误可从 quickfix 跳转。
+支持 package scripts、Cargo、Go、Maven/Gradle、CMake/Make、pytest，以及当前 Python/Shell 文件与 TeX/Typst 构建。
+CMake 初次执行先生成 `build/`，再次构建；自定义任务继续使用 `:OverseerRun` 或 `:OverseerShell`。
+
+普通保存格式化默认限时 800 ms，`<leader>cf` 可手动异步格式化。
+TeX 在保存后异步格式化，期间的新编辑会受到保护；完成后的格式化结果会再写入磁盘。
+Go 汇编仅在 `.s`、Go 项目和 Plan 9 指令特征同时匹配时使用 asmfmt，
+可用 `vim.b.user_go_asm = true/false` 明确指定；GNU/RISC-V 汇编不自动交给它。
 
 `leader` = `<Space>`，`localleader` = `\`。下面是各组入口，完整列表见
 `:WhichKey` 或下方的 cheatsheet。

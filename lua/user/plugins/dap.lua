@@ -26,11 +26,11 @@ local adapter_by_filetype = {
 	cpp = { command = "codelldb", package = "codelldb" },
 	go = { command = "dlv", package = "delve", plugin = "nvim-dap-go" },
 	python = { check = debugpy_python, package = "debugpy", plugin = "nvim-dap-python" },
-	javascript = { command = "js-debug-adapter", package = "js-debug-adapter", plugin = "nvim-dap-vscode-js" },
-	javascriptreact = { command = "js-debug-adapter", package = "js-debug-adapter", plugin = "nvim-dap-vscode-js" },
-	typescript = { command = "js-debug-adapter", package = "js-debug-adapter", plugin = "nvim-dap-vscode-js" },
-	typescriptreact = { command = "js-debug-adapter", package = "js-debug-adapter", plugin = "nvim-dap-vscode-js" },
-	vue = { command = "js-debug-adapter", package = "js-debug-adapter", plugin = "nvim-dap-vscode-js" },
+	javascript = { command = "js-debug-adapter", package = "js-debug-adapter", plugin = "nvim-dap" },
+	javascriptreact = { command = "js-debug-adapter", package = "js-debug-adapter", plugin = "nvim-dap" },
+	typescript = { command = "js-debug-adapter", package = "js-debug-adapter", plugin = "nvim-dap" },
+	typescriptreact = { command = "js-debug-adapter", package = "js-debug-adapter", plugin = "nvim-dap" },
+	vue = { command = "js-debug-adapter", package = "js-debug-adapter", plugin = "nvim-dap" },
 }
 
 local function adapter_executable(requirement)
@@ -74,6 +74,67 @@ local function load_dap_ui(open)
 			dapui.open()
 		end
 	end
+end
+
+local function configure_javascript(dap)
+	-- Mason ships the standalone DAP server. nvim-dap handles its standard
+	-- startDebugging requests directly, including child sessions and source maps.
+	for _, kind in ipairs({ "pwa-node", "pwa-chrome", "pwa-msedge", "node-terminal", "pwa-extensionHost" }) do
+		dap.adapters[kind] = function(callback)
+			local command = adapter_executable(adapter_by_filetype.javascript)
+			if command then
+				callback({
+					type = "server",
+					host = "127.0.0.1",
+					port = "${port}",
+					executable = { command = command, args = { "${port}", "127.0.0.1" } },
+				})
+			end
+		end
+	end
+	local node_launch = {
+		{
+			name = "Launch current JavaScript file",
+			type = "pwa-node",
+			request = "launch",
+			program = "${file}",
+			cwd = "${workspaceFolder}",
+			sourceMaps = true,
+			pauseForSourceMap = true,
+			console = "integratedTerminal",
+		},
+	}
+	local node_attach = {
+		{
+			name = "Attach to Node process",
+			type = "pwa-node",
+			request = "attach",
+			processId = require("dap.utils").pick_process,
+			cwd = "${workspaceFolder}",
+			sourceMaps = true,
+			pauseForSourceMap = true,
+		},
+	}
+	local browser_attach = {
+		{
+			name = "Attach Chrome on :9222",
+			type = "pwa-chrome",
+			request = "attach",
+			port = 9222,
+			webRoot = "${workspaceFolder}",
+			sourceMaps = true,
+			pauseForSourceMap = true,
+		},
+	}
+
+	local javascript = vim.list_extend(vim.deepcopy(node_launch), vim.deepcopy(node_attach))
+	vim.list_extend(javascript, vim.deepcopy(browser_attach))
+	dap.configurations.javascript = javascript
+	local attach_only = vim.list_extend(vim.deepcopy(node_attach), vim.deepcopy(browser_attach))
+	dap.configurations.javascriptreact = vim.deepcopy(attach_only)
+	dap.configurations.typescript = vim.deepcopy(attach_only)
+	dap.configurations.typescriptreact = vim.deepcopy(attach_only)
+	dap.configurations.vue = vim.deepcopy(browser_attach)
 end
 
 return {
@@ -169,6 +230,7 @@ return {
 		},
 		config = function()
 			local dap = require("dap")
+			configure_javascript(dap)
 
 			dap.adapters.codelldb = function(callback)
 				local command = adapter_executable(adapter_by_filetype.c)
@@ -325,63 +387,6 @@ return {
 			end
 			dap.adapters.python = resolve_adapter
 			dap.adapters.debugpy = resolve_adapter
-		end,
-	},
-	{
-		"mxsdev/nvim-dap-vscode-js",
-		lazy = true,
-		dependencies = { "mfussenegger/nvim-dap" },
-		config = function()
-			local command = adapter_executable(adapter_by_filetype.javascript)
-			if not command then
-				return
-			end
-			require("dap-vscode-js").setup({
-				debugger_cmd = { command },
-				adapters = { "pwa-node", "pwa-chrome", "pwa-msedge", "node-terminal", "pwa-extensionHost" },
-			})
-
-			local dap = require("dap")
-			local node_launch = {
-				{
-					name = "Launch current JavaScript file",
-					type = "pwa-node",
-					request = "launch",
-					program = "${file}",
-					cwd = "${workspaceFolder}",
-					sourceMaps = true,
-					console = "integratedTerminal",
-				},
-			}
-			local node_attach = {
-				{
-					name = "Attach to Node process",
-					type = "pwa-node",
-					request = "attach",
-					processId = require("dap.utils").pick_process,
-					cwd = "${workspaceFolder}",
-					sourceMaps = true,
-				},
-			}
-			local browser_attach = {
-				{
-					name = "Attach Chrome on :9222",
-					type = "pwa-chrome",
-					request = "attach",
-					port = 9222,
-					webRoot = "${workspaceFolder}",
-					sourceMaps = true,
-				},
-			}
-
-			local javascript = vim.list_extend(vim.deepcopy(node_launch), vim.deepcopy(node_attach))
-			vim.list_extend(javascript, vim.deepcopy(browser_attach))
-			dap.configurations.javascript = javascript
-			local attach_only = vim.list_extend(vim.deepcopy(node_attach), vim.deepcopy(browser_attach))
-			dap.configurations.javascriptreact = vim.deepcopy(attach_only)
-			dap.configurations.typescript = vim.deepcopy(attach_only)
-			dap.configurations.typescriptreact = vim.deepcopy(attach_only)
-			dap.configurations.vue = vim.deepcopy(browser_attach)
 		end,
 	},
 }

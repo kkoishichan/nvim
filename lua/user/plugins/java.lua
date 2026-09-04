@@ -55,6 +55,14 @@ local function setup_java_keys(bufnr, jdtls, has_debug, has_test)
 			install_hint(feature or "debugging", { "java-debug-adapter" })
 			return nil
 		end
+		if not java_core.supports_command(bufnr, { "vscode.java.startDebugSession" }) then
+			vim.notify(
+				"JDTLS did not load Java debugging. Check :LspLog for bundle compatibility errors; restore matching java-debug-adapter and jdtls versions with :MasonToolsInstall.",
+				vim.log.levels.WARN,
+				{ title = "Java" }
+			)
+			return nil
+		end
 		require("lazy").load({ plugins = { "nvim-dap" } })
 		local ok, dap = pcall(require, "dap")
 		if not ok then
@@ -68,6 +76,19 @@ local function setup_java_keys(bufnr, jdtls, has_debug, has_test)
 		return function()
 			if not has_debug or not has_test then
 				install_hint("testing", { "java-debug-adapter", "java-test" })
+				return
+			end
+			if
+				not java_core.supports_command(
+					bufnr,
+					{ "vscode.java.test.search.codelens", "vscode.java.test.findTestTypesAndMethods" }
+				)
+			then
+				vim.notify(
+					"JDTLS did not load Java testing. Check :LspLog for bundle compatibility errors; restore matching java-test and jdtls versions with :MasonToolsInstall.",
+					vim.log.levels.WARN,
+					{ title = "Java" }
+				)
 				return
 			end
 			if not ensure_dap("testing") then

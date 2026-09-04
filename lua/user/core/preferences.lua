@@ -2,7 +2,7 @@ local M = {}
 local defaults = {
 	tools = { prefer_mason = false },
 	ui = { min_editor_width = 40, min_editor_height = 8 },
-	format = { timeout_ms = 2000 },
+	format = { timeout_ms = 800 },
 }
 local cached
 local errors = {}

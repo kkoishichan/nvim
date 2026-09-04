@@ -114,13 +114,13 @@ end
 
 local debug_plugins = {
 	go = "nvim-dap-go",
-	javascript = "nvim-dap-vscode-js",
-	javascriptreact = "nvim-dap-vscode-js",
+	javascript = "nvim-dap",
+	javascriptreact = "nvim-dap",
 	python = "nvim-dap-python",
 	rust = "nvim-dap",
-	typescript = "nvim-dap-vscode-js",
-	typescriptreact = "nvim-dap-vscode-js",
-	vue = "nvim-dap-vscode-js",
+	typescript = "nvim-dap",
+	typescriptreact = "nvim-dap",
+	vue = "nvim-dap",
 }
 
 local definitions = {
@@ -129,7 +129,12 @@ local definitions = {
 			plugin = "neotest-python",
 			module = "neotest-python",
 			create = function(adapter)
-				return adapter({ dap = { justMyCode = false } })
+				return adapter({
+					dap = { justMyCode = false },
+					python = function(root)
+						return assert(toolchain.python_executable(root), "No Python interpreter was found for " .. root)
+					end,
+				})
 			end,
 		},
 	},
@@ -246,6 +251,22 @@ local function load_adapter(definition)
 			return nil
 		end
 		adapter = created
+	end
+	if adapter.discover_positions then
+		local discover = adapter.discover_positions
+		local plugin = require("lazy.core.config").plugins[definition.plugin]
+		local synchronized = false
+		adapter = vim.tbl_extend("force", {}, adapter)
+		adapter.discover_positions = function(...)
+			-- Neotest snapshots loaded adapters when its parsing subprocess starts.
+			-- A later language must also be visible there before remote discovery.
+			local subprocess = require("neotest.lib").subprocess
+			if not synchronized and plugin and subprocess.enabled() then
+				subprocess.add_paths_to_rtp({ plugin.dir })
+				synchronized = true
+			end
+			return discover(...)
+		end
 	end
 	if definition.cache ~= false then
 		loaded[definition.plugin] = adapter

@@ -92,7 +92,7 @@ local packages = {
 	{ "delve", version = "v1.27.0" },
 	{ "js-debug-adapter", version = "v1.117.0" },
 	{ "java-debug-adapter", version = "0.59.0" },
-	{ "java-test", version = "0.45.0" },
+	{ "java-test", version = "0.46.0" },
 }
 
 M.packages = packages

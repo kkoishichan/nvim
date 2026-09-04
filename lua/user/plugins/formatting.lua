@@ -81,7 +81,7 @@ return {
 				-- No zsh: shfmt parses bash and can mangle zsh-specific syntax.
 			},
 			formatters = {
-				asmfmt = { command = command("asmfmt") },
+				asmfmt = { command = command("asmfmt"), condition = require("user.core.format_policy").go_assembly },
 				biome = {
 					command = node_command("biome"),
 					require_cwd = true,
@@ -108,11 +108,8 @@ return {
 				verible = { command = command("verible-verilog-format") },
 			},
 			format_on_save = function(bufnr)
-				if
-					vim.g.disable_autoformat
-					or vim.b[bufnr].disable_autoformat
-					or not require("user.core.buffer_policy").allow(bufnr)
-				then
+				local policy = require("user.core.format_policy")
+				if not policy.enabled(bufnr) or policy.after_save(bufnr) then
 					return
 				end
 
@@ -120,6 +117,12 @@ return {
 					timeout_ms = require("user.core.preferences").get("format").timeout_ms,
 					lsp_format = "fallback",
 				}
+			end,
+			format_after_save = function(bufnr)
+				local policy = require("user.core.format_policy")
+				if policy.enabled(bufnr) and policy.after_save(bufnr) then
+					return { timeout_ms = 10000, lsp_format = "never" }
+				end
 			end,
 		},
 	},

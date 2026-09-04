@@ -117,10 +117,18 @@ return {
 			"OverseerTaskAction",
 			"OverseerShell",
 			"OverseerRestartLast",
+			"TaskBuild",
+			"TaskRun",
+			"TaskTest",
 		},
 		opts = {},
 		config = function(_, opts)
 			require("overseer").setup(opts)
+			for _, action in ipairs({ "build", "run", "test" }) do
+				vim.api.nvim_create_user_command("Task" .. action:gsub("^%l", string.upper), function()
+					require("user.core.workflows").run(action)
+				end, { desc = "Discover and run the current project's " .. action .. " task" })
+			end
 			vim.api.nvim_create_user_command("OverseerRun", run_workspace_task, {
 				nargs = "*",
 				desc = "Run a task in the current workspace",
@@ -137,6 +145,9 @@ return {
 			})
 		end,
 		keys = {
+			{ "<leader>jb", "<cmd>TaskBuild<cr>", desc = "Build project" },
+			{ "<leader>jx", "<cmd>TaskRun<cr>", desc = "Run project" },
+			{ "<leader>jT", "<cmd>TaskTest<cr>", desc = "Test project" },
 			{ "<leader>jr", "<cmd>OverseerRun<cr>", desc = "Run task" },
 			{ "<leader>jt", "<cmd>OverseerToggle<cr>", desc = "Toggle task list" },
 			{ "<leader>jo", "<cmd>OverseerOpen<cr>", desc = "Open task list" },

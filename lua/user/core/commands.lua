@@ -393,14 +393,18 @@ local function current_file_or_notify(title)
 	return file
 end
 
-local function open_build_errors(title, file, output)
+local function open_build_errors(title, cwd, output)
 	local items = {}
 	for line in output:gmatch("[^\r\n]+") do
-		table.insert(items, {
-			filename = file,
-			lnum = 1,
-			text = line,
-		})
+		local path, row, column, message = line:match("^(.-):(%d+):(%d+):%s*(.*)$")
+		if path then
+			if not path:match("^[/\\]") and not path:match("^%a:[/\\]") then
+				path = vim.fs.joinpath(cwd, path)
+			end
+			table.insert(items, { filename = path, lnum = tonumber(row), col = tonumber(column), text = message })
+		else
+			table.insert(items, { text = line, valid = 0 })
+		end
 	end
 
 	if #items > 0 then
@@ -409,10 +413,11 @@ local function open_build_errors(title, file, output)
 	end
 end
 
-local function run_pdf_build(title, file, output, args)
+local function run_pdf_build(title, output, args)
 	vim.notify("Building " .. vim.fn.fnamemodify(output, ":~:."), vim.log.levels.INFO, { title = title })
+	local cwd = project.root()
 
-	vim.system(args, { text = true, cwd = project.root() }, function(result)
+	vim.system(args, { text = true, cwd = cwd }, function(result)
 		vim.schedule(function()
 			if result.code == 0 then
 				vim.notify("Wrote " .. vim.fn.fnamemodify(output, ":~:."), vim.log.levels.INFO, { title = title })
@@ -423,7 +428,7 @@ local function run_pdf_build(title, file, output, args)
 				result.stderr or "",
 				result.stdout or "",
 			}, "\n")
-			open_build_errors(title, file, message)
+			open_build_errors(title, cwd, message)
 			vim.notify("Build failed. See quickfix for details.", vim.log.levels.ERROR, { title = title })
 		end)
 	end)
@@ -442,9 +447,11 @@ vim.api.nvim_create_user_command("TypstCompilePdf", function()
 	end
 
 	local output = vim.fn.fnamemodify(file, ":p:r") .. ".pdf"
-	run_pdf_build(title, file, output, {
+	run_pdf_build(title, output, {
 		"typst",
 		"compile",
+		"--diagnostic-format",
+		"short",
 		file,
 		output,
 	})
