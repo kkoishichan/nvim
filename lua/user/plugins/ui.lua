@@ -73,8 +73,8 @@ local function bufferline_highlights()
 	local highlights = {}
 
 	-- Bufferline normally derives these foregrounds from Comment, which can be
-	-- a saturated syntax colour. Derive neutral greys from the active theme
-	-- instead, while leaving selected buffers and diagnostics untouched.
+	-- a saturated syntax colour. Derive neutral greys from the active theme,
+	-- while keeping selected buffer labels on the theme defaults.
 	for _, name in ipairs({ "background", "buffer", "numbers", "duplicate", "hint", "info", "warning", "error" }) do
 		highlights[name] = { fg = inactive }
 	end
@@ -88,6 +88,17 @@ local function bufferline_highlights()
 		"error_visible",
 	}) do
 		highlights[name] = { fg = visible }
+	end
+	highlights.trunc_marker = { fg = visible }
+	for _, diagnostic in ipairs({
+		{ "hint", p.hint },
+		{ "info", p.info },
+		{ "warning", p.warn },
+		{ "error", p.error },
+	}) do
+		for _, suffix in ipairs({ "_diagnostic", "_diagnostic_visible", "_diagnostic_selected" }) do
+			highlights[diagnostic[1] .. suffix] = { fg = diagnostic[2] }
+		end
 	end
 	for _, name in ipairs({
 		"buffer_selected",
@@ -103,7 +114,7 @@ local function bufferline_highlights()
 		"error_selected",
 		"error_diagnostic_selected",
 	}) do
-		highlights[name] = { italic = false }
+		highlights[name] = vim.tbl_extend("force", highlights[name] or {}, { italic = false })
 	end
 
 	return highlights
@@ -557,7 +568,7 @@ return {
 			options = {
 				mode = "buffers",
 				themable = true,
-				numbers = "ordinal",
+				numbers = "none",
 				close_command = function(bufnr)
 					vim.api.nvim_buf_delete(bufnr, { force = false })
 				end,

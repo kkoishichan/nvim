@@ -43,6 +43,7 @@ do
 
 	local bufferline_opts = plugins["bufferline.nvim"].opts
 	local indicator = bufferline_opts.options.diagnostics_indicator
+	assert(bufferline_opts.options.numbers == "none", "Bufferline numbers are still visible")
 	assert(indicator(0, 0, { info = 2 }):match("2"), "Bufferline hides info-only diagnostics")
 	assert(indicator(0, 0, { hint = 3 }):match("3"), "Bufferline hides hint-only diagnostics")
 	assert(bufferline_opts.options.indicator.style == "none", "Current Bufferline item still has an indicator")
@@ -66,6 +67,18 @@ do
 	}) do
 		assert(bufferline_highlights[name].fg == visible, "Bufferline " .. name .. " is not neutral grey")
 	end
+	assert(bufferline_highlights.trunc_marker.fg == visible, "Bufferline truncation arrows are not neutral grey")
+	for _, diagnostic in ipairs({
+		{ "hint", p.hint },
+		{ "info", p.info },
+		{ "warning", p.warn },
+		{ "error", p.error },
+	}) do
+		for _, suffix in ipairs({ "_diagnostic", "_diagnostic_visible", "_diagnostic_selected" }) do
+			local name = diagnostic[1] .. suffix
+			assert(bufferline_highlights[name].fg == diagnostic[2], "Bufferline " .. name .. " has the wrong colour")
+		end
+	end
 	assert(
 		inactive ~= vim.api.nvim_get_hl(0, { name = "Comment", link = false }).fg,
 		"Inactive Bufferline text still inherits the VS Code comment green"
@@ -85,6 +98,17 @@ do
 		"error_diagnostic_selected",
 	}) do
 		assert(bufferline_highlights[name].italic == false, "Bufferline " .. name .. " is still italic")
+	end
+	for _, name in ipairs({
+		"buffer_selected",
+		"numbers_selected",
+		"duplicate_selected",
+		"diagnostic_selected",
+		"hint_selected",
+		"info_selected",
+		"warning_selected",
+		"error_selected",
+	}) do
 		assert(bufferline_highlights[name].fg == nil, "Bufferline " .. name .. " colour was unintentionally overridden")
 	end
 end
