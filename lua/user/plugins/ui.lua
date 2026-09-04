@@ -1,6 +1,7 @@
 local layout = require("user.core.layout")
 local float_style = require("user.core.float_style")
 local theme = require("user.core.theme")
+local palette = require("user.core.palette")
 local lsp_progress = require("user.core.lsp_progress")
 local active_theme = theme.saved()
 local scrollview_symbols = {
@@ -63,6 +64,49 @@ end
 
 local function pdf_zoom()
 	return require("user.core.pdf").zoom()
+end
+
+local function bufferline_highlights()
+	local p = palette.get()
+	local inactive = palette.blend(p.fg, p.bg, 0.60)
+	local visible = palette.blend(p.fg, p.bg, 0.72)
+	local highlights = {}
+
+	-- Bufferline normally derives these foregrounds from Comment, which can be
+	-- a saturated syntax colour. Derive neutral greys from the active theme
+	-- instead, while leaving selected buffers and diagnostics untouched.
+	for _, name in ipairs({ "background", "buffer", "numbers", "duplicate", "hint", "info", "warning", "error" }) do
+		highlights[name] = { fg = inactive }
+	end
+	for _, name in ipairs({
+		"buffer_visible",
+		"numbers_visible",
+		"duplicate_visible",
+		"hint_visible",
+		"info_visible",
+		"warning_visible",
+		"error_visible",
+	}) do
+		highlights[name] = { fg = visible }
+	end
+	for _, name in ipairs({
+		"buffer_selected",
+		"numbers_selected",
+		"duplicate_selected",
+		"diagnostic_selected",
+		"hint_selected",
+		"hint_diagnostic_selected",
+		"info_selected",
+		"info_diagnostic_selected",
+		"warning_selected",
+		"warning_diagnostic_selected",
+		"error_selected",
+		"error_diagnostic_selected",
+	}) do
+		highlights[name] = { italic = false }
+	end
+
+	return highlights
 end
 
 return {
@@ -509,6 +553,7 @@ return {
 		event = "VeryLazy",
 		dependencies = { "nvim-mini/mini.icons" },
 		opts = {
+			highlights = bufferline_highlights,
 			options = {
 				mode = "buffers",
 				themable = true,

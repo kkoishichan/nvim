@@ -41,9 +41,51 @@ do
 	end
 	assert(codex and codex.ft == "toggleterm", "Codex is not docked as a toggleterm panel")
 
-	local indicator = plugins["bufferline.nvim"].opts.options.diagnostics_indicator
+	local bufferline_opts = plugins["bufferline.nvim"].opts
+	local indicator = bufferline_opts.options.diagnostics_indicator
 	assert(indicator(0, 0, { info = 2 }):match("2"), "Bufferline hides info-only diagnostics")
 	assert(indicator(0, 0, { hint = 3 }):match("3"), "Bufferline hides hint-only diagnostics")
+	assert(type(bufferline_opts.highlights) == "function", "Bufferline has no theme-derived inactive colours")
+	local bufferline_highlights = bufferline_opts.highlights()
+	local palette = require("user.core.palette")
+	local p = palette.get()
+	local inactive = palette.blend(p.fg, p.bg, 0.60)
+	local visible = palette.blend(p.fg, p.bg, 0.72)
+	for _, name in ipairs({ "background", "buffer", "numbers", "duplicate", "hint", "info", "warning", "error" }) do
+		assert(bufferline_highlights[name].fg == inactive, "Bufferline " .. name .. " is not neutral grey")
+	end
+	for _, name in ipairs({
+		"buffer_visible",
+		"numbers_visible",
+		"duplicate_visible",
+		"hint_visible",
+		"info_visible",
+		"warning_visible",
+		"error_visible",
+	}) do
+		assert(bufferline_highlights[name].fg == visible, "Bufferline " .. name .. " is not neutral grey")
+	end
+	assert(
+		inactive ~= vim.api.nvim_get_hl(0, { name = "Comment", link = false }).fg,
+		"Inactive Bufferline text still inherits the VS Code comment green"
+	)
+	for _, name in ipairs({
+		"buffer_selected",
+		"numbers_selected",
+		"duplicate_selected",
+		"diagnostic_selected",
+		"hint_selected",
+		"hint_diagnostic_selected",
+		"info_selected",
+		"info_diagnostic_selected",
+		"warning_selected",
+		"warning_diagnostic_selected",
+		"error_selected",
+		"error_diagnostic_selected",
+	}) do
+		assert(bufferline_highlights[name].italic == false, "Bufferline " .. name .. " is still italic")
+		assert(bufferline_highlights[name].fg == nil, "Bufferline " .. name .. " colour was unintentionally overridden")
+	end
 end
 
 do
