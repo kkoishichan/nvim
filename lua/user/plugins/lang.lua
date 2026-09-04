@@ -50,6 +50,13 @@ return {
 					float_win_config = float_style.padded(),
 				},
 				server = {
+					on_init = require("user.core.buffer_policy").lsp_init(),
+					auto_attach = function(bufnr)
+						return vim.api.nvim_buf_get_name(bufnr) ~= ""
+							and vim.bo[bufnr].buftype == ""
+							and toolchain.executable("rust-analyzer") ~= nil
+							and require("user.core.buffer_policy").allow(bufnr)
+					end,
 					cmd = { toolchain.executable("rust-analyzer") or "rust-analyzer" },
 					on_attach = function(_, bufnr)
 						local function debug_continue()

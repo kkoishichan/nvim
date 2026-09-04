@@ -135,7 +135,11 @@ local function setup_java_keys(bufnr, jdtls, has_debug, has_test)
 end
 
 local function start_jdtls(bufnr)
-	if not vim.api.nvim_buf_is_valid(bufnr) or vim.bo[bufnr].filetype ~= "java" or vim.b[bufnr].bigfile then
+	if
+		not vim.api.nvim_buf_is_valid(bufnr)
+		or vim.bo[bufnr].filetype ~= "java"
+		or not require("user.core.buffer_policy").allow(bufnr)
+	then
 		return
 	end
 
@@ -173,7 +177,9 @@ local function start_jdtls(bufnr)
 		return
 	end
 
-	local cmd = { executable, "-data", workspace }
+	-- Pass the exact runtime that passed preflight. The launcher otherwise
+	-- reselects JAVA_HOME independently and can choose an older project JDK.
+	local cmd = { executable, "--java-executable", java, "-data", workspace }
 	local lombok = vim.fs.joinpath(vim.fn.stdpath("data"), "mason", "share", "jdtls", "lombok.jar")
 	if vim.uv.fs_stat(lombok) then
 		table.insert(cmd, "--jvm-arg=-javaagent:" .. lombok)
@@ -190,6 +196,7 @@ local function start_jdtls(bufnr)
 
 	local config = {
 		name = "jdtls",
+		on_init = require("user.core.buffer_policy").lsp_init(),
 		cmd = cmd,
 		root_dir = root,
 		capabilities = capabilities,

@@ -308,14 +308,6 @@ return {
 				cmd = node_lsp_command("biome", { "lsp-proxy" }),
 			})
 
-			vim.lsp.config("ruff", {
-				init_options = {
-					settings = {
-						lineLength = 100,
-					},
-				},
-			})
-
 			vim.lsp.config("typos_lsp", {
 				-- Prose uses Neovim's spell checker. Restrict typos-lsp to code and
 				-- structured data so the two systems do not duplicate diagnostics.
@@ -456,6 +448,13 @@ return {
 			local enabled_servers = {}
 			for _, server in ipairs(servers) do
 				local config = vim.lsp.config[server]
+				if config then
+					local policy = require("user.core.buffer_policy")
+					vim.lsp.config(
+						server,
+						{ root_dir = policy.lsp_root(config), on_init = policy.lsp_init(config.on_init) }
+					)
+				end
 				local cmd = config and config.cmd
 				if type(cmd) == "table" and type(cmd[1]) == "string" then
 					local resolved = toolchain.executable(cmd[1])

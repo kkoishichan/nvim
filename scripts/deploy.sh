@@ -16,6 +16,7 @@ set -euo pipefail
 REPO_HTTPS="https://github.com/kkoishichan/nvim.git"
 REPO_SSH="git@github.com:kkoishichan/nvim.git"
 NVIM_MIN_MINOR=12 # Require nvim >= 0.12
+FZF_MIN_MINOR=36 # Pinned fzf-lua requires fzf >= 0.36.0.
 
 # Offline dictionary used by lua/user/core/dict.lua. The configuration expects
 # it under ~/.local/share.
@@ -243,7 +244,7 @@ install_toolchain_prerequisites() {
 install_deps() {
 	detect_pkg_mgr
 	if [ -z "$PKG_MGR" ]; then
-		warn "Could not detect a package manager. Install these manually: git neovim>=0.12 ripgrep fd a C compiler unzip curl tar"
+		warn "Could not detect a package manager. Install these manually: git neovim>=0.12 fzf>=0.$FZF_MIN_MINOR.0 ripgrep fd a C compiler unzip curl tar"
 		if [ "$with_toolchain" -eq 1 ]; then
 			validate_toolchain_prerequisites
 		fi
@@ -254,28 +255,28 @@ install_deps() {
 	local required extras toolchain_deps
 	case "$PKG_MGR" in
 	pacman)
-		required=(git neovim ripgrep fd gcc unzip curl tar)
+		required=(git neovim fzf ripgrep fd gcc unzip curl tar)
 		extras=(lazygit nodejs npm poppler sqlite imagemagick typst texlive-binextra)
 		toolchain_deps=(nodejs npm python python-pip go rust jdk21-openjdk perl)
 		;;
 	apt)
 		$SUDO apt-get update
-		required=(git neovim ripgrep fd-find build-essential unzip curl tar)
+		required=(git neovim fzf ripgrep fd-find build-essential unzip curl tar)
 		extras=(lazygit nodejs npm poppler-utils sqlite3 imagemagick typst latexmk)
 		toolchain_deps=(nodejs npm python3 python3-venv python3-pip golang-go cargo openjdk-21-jdk perl)
 		;;
 	dnf)
-		required=(git neovim ripgrep fd-find gcc unzip curl tar)
+		required=(git neovim fzf ripgrep fd-find gcc unzip curl tar)
 		extras=(lazygit nodejs poppler-utils sqlite ImageMagick typst latexmk)
 		toolchain_deps=(nodejs npm python3 python3-pip golang rust cargo java-21-openjdk-devel perl)
 		;;
 	zypper)
-		required=(git neovim ripgrep fd gcc unzip curl tar)
+		required=(git neovim fzf ripgrep fd gcc unzip curl tar)
 		extras=(lazygit nodejs poppler-tools sqlite3 ImageMagick typst texlive-latexmk)
 		toolchain_deps=(nodejs npm python3 python3-pip go rust cargo java-21-openjdk-devel perl)
 		;;
 	brew)
-		required=(git neovim ripgrep fd)
+		required=(git neovim fzf ripgrep fd)
 		extras=(lazygit node poppler sqlite imagemagick typst latexmk)
 		toolchain_deps=(node python go rust openjdk@21)
 		;;
@@ -301,6 +302,18 @@ install_deps() {
 		ensure_local_bin_path
 		info "Linked fdfind -> $LOCAL_BIN/fd"
 	fi
+}
+
+# Validate even with --no-deps: some distributions ship an older fzf package.
+# User search flags must not interfere with probing the executable's version.
+fzf_ok() {
+	command -v fzf >/dev/null || return 1
+	local output major minor
+	output=$(FZF_DEFAULT_OPTS='' FZF_DEFAULT_OPTS_FILE='' fzf --version 2>/dev/null) || return 1
+	[[ "$output" =~ ^([0-9]+)\.([0-9]+)(\.[0-9]+)?([[:space:]]|\+|-|$) ]] || return 1
+	major=$((10#${BASH_REMATCH[1]}))
+	minor=$((10#${BASH_REMATCH[2]}))
+	[ "$major" -gt 0 ] || [ "$minor" -ge "$FZF_MIN_MINOR" ]
 }
 
 # ------------------------------------------------------ Neovim version fallback
@@ -411,6 +424,8 @@ sync_plugins() {
 # ------------------------------------------------------------------- Main flow
 
 [ "$skip_deps" -eq 1 ] || install_deps
+
+fzf_ok || die "fzf >= 0.$FZF_MIN_MINOR.0 is required for file and symbol search. Install or upgrade fzf, check PATH, then rerun deployment."
 
 if ! nvim_ok; then
 	warn "Neovim >= 0.$NVIM_MIN_MINOR was not found; trying the official release"

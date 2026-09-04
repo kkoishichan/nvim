@@ -5,6 +5,112 @@ local float_style = require("user.core.float_style")
 local loaded = {}
 local configured = false
 local projects = {}
+local javascript_choices = {}
+local javascript_contexts = {}
+
+local function javascript_context(path)
+	if not path or path == "" then
+		return nil
+	end
+	path = vim.uv.fs_realpath(path) or vim.fs.abspath(path)
+	local stat = vim.uv.fs_stat(path)
+	local directory = stat and stat.type == "directory" and path or vim.fs.dirname(path)
+	if javascript_contexts[directory] then
+		return javascript_contexts[directory]
+	end
+	local start = directory
+	while directory do
+		local frameworks = {}
+		-- A package-local configuration is more specific than dependencies shared
+		-- at the workspace root. Never consult Neovim's unrelated working directory.
+		for _, framework in ipairs({ "jest", "vitest" }) do
+			for _, extension in ipairs({ "js", "ts", "cjs", "mjs", "cts", "mts", "json" }) do
+				if vim.uv.fs_stat(vim.fs.joinpath(directory, framework .. ".config." .. extension)) then
+					frameworks[framework] = true
+				end
+			end
+		end
+		local ok_read, lines = pcall(vim.fn.readfile, vim.fs.joinpath(directory, "package.json"))
+		local ok_json, package = false, nil
+		if ok_read then
+			ok_json, package = pcall(vim.json.decode, table.concat(lines, "\n"))
+		end
+		if ok_json and type(package) == "table" then
+			if package.jest ~= nil then
+				frameworks.jest = true
+			end
+			if not next(frameworks) then
+				for _, field in ipairs({ "dependencies", "devDependencies" }) do
+					local dependencies = type(package[field]) == "table" and package[field] or {}
+					frameworks.jest = frameworks.jest or dependencies.jest ~= nil
+					frameworks.vitest = frameworks.vitest
+						or dependencies.vitest ~= nil
+						or dependencies["@vitest/ui"] ~= nil
+				end
+				for _, script in pairs(type(package.scripts) == "table" and package.scripts or {}) do
+					if type(script) == "string" then
+						frameworks.jest = frameworks.jest or script == "jest" or script:match("^jest%s") ~= nil
+						frameworks.vitest = frameworks.vitest or script == "vitest" or script:match("^vitest%s") ~= nil
+					end
+				end
+			end
+		end
+		if frameworks.jest or frameworks.vitest then
+			local context = { root = directory, frameworks = frameworks }
+			javascript_contexts[start] = context
+			return context
+		end
+		if vim.uv.fs_stat(vim.fs.joinpath(directory, ".git")) or vim.uv.fs_stat(vim.fs.joinpath(directory, ".jj")) then
+			break
+		end
+		local parent = vim.fs.dirname(directory)
+		if parent == directory then
+			break
+		end
+		directory = parent
+	end
+	return nil
+end
+
+local function javascript_framework(context)
+	if not context then
+		return nil
+	end
+	local choice = javascript_choices[context.root]
+	if choice and context.frameworks[choice] then
+		return choice
+	end
+	if context.frameworks.jest ~= context.frameworks.vitest then
+		return context.frameworks.jest and "jest" or "vitest"
+	end
+end
+
+local function javascript_adapter(adapter, framework)
+	local wrapped = vim.tbl_extend("force", {}, adapter)
+	wrapped.root = function(path)
+		local context = javascript_context(path)
+		return javascript_framework(context) == framework and context.root or nil
+	end
+	wrapped.is_test_file = function(path)
+		if not path or javascript_framework(javascript_context(path)) ~= framework then
+			return false
+		end
+		-- The upstream dependency checks fall back to process cwd. Use a
+		-- filename-only check after selecting the framework from this file's tree.
+		if path:match("[/\\]__tests__[/\\]") then
+			return true
+		end
+		for _, suffix in ipairs(framework == "vitest" and { "test", "spec", "e2e" } or { "test", "spec" }) do
+			for _, extension in ipairs({ "js", "jsx", "ts", "tsx", "cjs", "mjs", "cts", "mts", "coffee" }) do
+				if path:match("%." .. suffix .. "%." .. extension .. "$") then
+					return true
+				end
+			end
+		end
+		return false
+	end
+	return wrapped
+end
 
 local debug_plugins = {
 	go = "nvim-dap-go",
@@ -43,15 +149,17 @@ local definitions = {
 		{
 			plugin = "neotest-jest",
 			module = "neotest-jest",
+			framework = "jest",
 			create = function(adapter)
-				return adapter({})
+				return javascript_adapter(adapter({}), "jest")
 			end,
 		},
 		{
 			plugin = "neotest-vitest",
 			module = "neotest-vitest",
+			framework = "vitest",
 			create = function(adapter)
-				return adapter({})
+				return javascript_adapter(adapter({}), "vitest")
 			end,
 		},
 	},
@@ -69,6 +177,33 @@ local function configure_once()
 			floating = { border = float_style.border() },
 		})
 		configured = true
+		local group = vim.api.nvim_create_augroup("user_test_projects", { clear = true })
+		vim.api.nvim_create_autocmd({ "FocusGained", "BufWritePost" }, {
+			group = group,
+			callback = function()
+				javascript_contexts = {}
+			end,
+		})
+		vim.api.nvim_create_user_command("TestAdapter", function(args)
+			local context = javascript_context(vim.api.nvim_buf_get_name(0))
+			if not context then
+				vim.notify("No Jest or Vitest project was found for this buffer", vim.log.levels.WARN)
+				return
+			end
+			if args.args ~= "auto" and not context.frameworks[args.args] then
+				vim.notify("This project does not declare " .. args.args, vim.log.levels.WARN)
+				return
+			end
+			javascript_choices[context.root] = args.args ~= "auto" and args.args or nil
+			projects[context.root] = nil
+			require("neotest").setup_project(context.root, { adapters = {} })
+		end, {
+			nargs = 1,
+			complete = function()
+				return { "jest", "vitest", "auto" }
+			end,
+			desc = "Choose the test framework for this JavaScript project",
+		})
 	end
 end
 
@@ -164,9 +299,25 @@ local function ensure_adapter()
 	end
 
 	local available = false
+	local framework
+	if requested == definitions.javascript then
+		local context = javascript_context(vim.api.nvim_buf_get_name(0))
+		framework = javascript_framework(context)
+		if not framework then
+			if context then
+				vim.notify(
+					"Both Jest and Vitest are declared here; choose :TestAdapter jest or :TestAdapter vitest",
+					vim.log.levels.WARN
+				)
+			end
+			return false
+		end
+	end
 	for _, definition in ipairs(requested) do
-		local adapter = load_adapter(definition)
-		available = adapter and register_adapter(definition, adapter) or available
+		if not definition.framework or definition.framework == framework then
+			local adapter = load_adapter(definition)
+			available = adapter and register_adapter(definition, adapter) or available
+		end
 	end
 	return available
 end

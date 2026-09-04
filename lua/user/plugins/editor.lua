@@ -26,12 +26,7 @@ for _, filetype in ipairs(color_filetypes) do
 end
 
 local function expensive_buffer(bufnr)
-	if vim.b[bufnr].bigfile or vim.api.nvim_buf_line_count(bufnr) > 10000 then
-		return true
-	end
-	local name = vim.api.nvim_buf_get_name(bufnr)
-	local stat = name ~= "" and vim.uv.fs_stat(name) or nil
-	return stat ~= nil and stat.size > 1.5 * 1024 * 1024
+	return not require("user.core.buffer_policy").allow(bufnr)
 end
 
 return {

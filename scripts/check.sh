@@ -1,11 +1,61 @@
 #!/usr/bin/env bash
-# Run static checks and a clean, non-interactive Neovim startup.
+# Run static checks and independent, non-interactive Neovim regression groups.
 
 set -euo pipefail
 
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$ROOT"
 MASON_BIN="${XDG_DATA_HOME:-$HOME/.local/share}/nvim/mason/bin"
+
+usage() {
+	cat <<'EOF'
+Usage: ./scripts/check.sh [--group NAME | NAME] ...
+
+Groups: static, integration, performance, ai, languages
+With no arguments, run every group in the order above.
+Examples: ./scripts/check.sh performance
+          ./scripts/check.sh --group static --group ai
+EOF
+}
+
+groups=()
+add_group() {
+	local existing
+	case "$1" in
+	static | integration | performance | ai | languages) ;;
+	*)
+		printf 'Unknown check group: %s\n' "$1" >&2
+		usage >&2
+		exit 2
+		;;
+	esac
+	for existing in ${groups[@]+"${groups[@]}"}; do
+		[ "$existing" != "$1" ] || return 0
+	done
+	groups+=("$1")
+}
+
+while [ $# -gt 0 ]; do
+	case "$1" in
+	--group)
+		if [ $# -lt 2 ]; then
+			printf '%s\n' '--group requires a group name' >&2
+			exit 2
+		fi
+		add_group "$2"
+		shift
+		;;
+	-h | --help)
+		usage
+		exit 0
+		;;
+	*) add_group "$1" ;;
+	esac
+	shift
+done
+if [ "${#groups[@]}" -eq 0 ]; then
+	groups=(static integration performance ai languages)
+fi
 
 tool() {
 	if command -v "$1" >/dev/null 2>&1; then
@@ -18,30 +68,43 @@ tool() {
 	fi
 }
 
-STYLUA=$(tool stylua)
-SELENE=$(tool selene)
+check_static() {
+	local stylua selene
+	stylua=$(tool stylua)
+	selene=$(tool selene)
+	bash -n "$ROOT/scripts/deploy.sh" "$ROOT/scripts/check.sh"
+	if command -v shellcheck >/dev/null 2>&1 || [ -x "$MASON_BIN/shellcheck" ]; then
+		"$(tool shellcheck)" "$ROOT/scripts/deploy.sh" "$ROOT/scripts/check.sh"
+	fi
+	"$stylua" --check "$ROOT/init.lua" "$ROOT/lua" "$ROOT/after" "$ROOT/scripts"
+	"$selene" "$ROOT/init.lua" "$ROOT/lua" "$ROOT/after" "$ROOT/scripts"
 
-bash -n "$ROOT/scripts/deploy.sh" "$ROOT/scripts/check.sh"
-if command -v shellcheck >/dev/null 2>&1 || [ -x "$MASON_BIN/shellcheck" ]; then
-	"$(tool shellcheck)" "$ROOT/scripts/deploy.sh" "$ROOT/scripts/check.sh"
-fi
-"$STYLUA" --check "$ROOT/init.lua" "$ROOT/lua" "$ROOT/after" "$ROOT/scripts"
-"$SELENE" "$ROOT/init.lua" "$ROOT/lua" "$ROOT/after" "$ROOT/scripts"
-
-if rg -n 'vim\.validate\s*=|open_floating_preview\s*=|vim\.treesitter\._|vim\.highlight' \
-	"$ROOT/init.lua" "$ROOT/lua" "$ROOT/after"; then
-	printf 'Unsupported/private Neovim API patch found.\n' >&2
-	exit 1
-fi
-
-if command -v jq >/dev/null 2>&1; then
-	jq --exit-status 'type == "object"' "$ROOT/lazy-lock.json" >/dev/null
-fi
+	if rg -n 'vim\.validate\s*=|open_floating_preview\s*=|vim\.treesitter\._|vim\.highlight' \
+		"$ROOT/init.lua" "$ROOT/lua" "$ROOT/after"; then
+		printf 'Unsupported/private Neovim API patch found.\n' >&2
+		return 1
+	fi
+	if command -v jq >/dev/null 2>&1; then
+		jq --exit-status 'type == "object"' "$ROOT/lazy-lock.json" >/dev/null
+	fi
+}
 
 TMP_ROOT=$(mktemp -d)
 trap 'rm -rf "$TMP_ROOT"' EXIT
-NVIM_TEST_TMP="$TMP_ROOT" XDG_CACHE_HOME="$TMP_ROOT/cache" XDG_STATE_HOME="$TMP_ROOT/state" \
-	nvim --headless --cmd "set runtimepath^=$ROOT" -u "$ROOT/init.lua" -i NONE \
-	-l "$ROOT/scripts/check.lua"
+for group in "${groups[@]}"; do
+	printf 'Running %s checks...\n' "$group"
+	if [ "$group" = static ]; then
+		check_static
+		continue
+	fi
+	group_tmp="$TMP_ROOT/$group"
+	mkdir -p "$group_tmp/cache" "$group_tmp/state"
+	script="$ROOT/scripts/run-check.lua"
+	[ "$group" != integration ] || script="$ROOT/scripts/check.lua"
+	NVIM_TEST_ROOT="$ROOT" NVIM_TEST_GROUP="$group" NVIM_TEST_TMP="$group_tmp" \
+		XDG_CACHE_HOME="$group_tmp/cache" XDG_STATE_HOME="$group_tmp/state" NVIM_LOG_FILE="$group_tmp/nvim.log" \
+		nvim --headless --cmd 'lua vim.opt.runtimepath:prepend(vim.env.NVIM_TEST_ROOT)' \
+		-u "$ROOT/init.lua" -i NONE -l "$script"
+done
 
-printf 'All checks passed.\n'
+printf 'All selected checks passed.\n'

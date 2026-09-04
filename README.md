@@ -9,7 +9,7 @@ Neovim 打磨成接近 IDE 的日常工作流。
 - `glance.nvim` 提供定义、声明、实现、类型与引用的双栏 Peek 界面。
 - `oil.nvim` 像编辑 buffer 一样管理文件系统；`neo-tree.nvim` 提供侧边文件树。
 - `blink.cmp` 负责补全、snippet 与签名帮助；`Tab` / `Enter` 确认候选，方向键选择，
-	`Ctrl-Space` 主动唤起；当前重载默认以带函数标记的虚拟文本显示，并在空间允许时借用相邻行，
+	`Alt-Space` 主动唤起（`Ctrl-Space` 留给输入法）；当前重载默认以带函数标记的虚拟文本显示，并在空间允许时借用相邻行，
 	`Ctrl-K` 切换完整签名浮窗，`Ctrl-B` / `Ctrl-F` 滚动超出屏幕的签名。
 - `nvim-lspconfig` + Mason 负责语言服务与外部工具安装。
 - `conform.nvim` 格式化，`nvim-lint` 静态检查。
@@ -31,7 +31,7 @@ Neovim 打磨成接近 IDE 的日常工作流。
 
 - Neovim `>= 0.12`
 - `git`、C 编译器（Tree-sitter 编译 parser 用）
-- `ripgrep`、`fd`（fzf-lua 查找 / grep）
+- `fzf >= 0.36.0`、`ripgrep`、`fd`（fzf-lua 查找 / grep；部署时检查 fzf 版本）
 - 一款 Nerd Font 字体（图标显示）
 
 推荐：
@@ -49,7 +49,7 @@ Neovim 打磨成接近 IDE 的日常工作流。
 `lua/user/toolchain.lua` 中带版本的语言服务器、formatter、linter 与 DAP 适配器；
 也可用 `:MasonInstall` / `:DapInstall` 单独安装（安装后重启 Neovim 以启用新工具）。
 部署脚本的 `--mason` 还会准备这些工具共用的 Node.js / npm、Python 3.9+ / pip、Go、
-Cargo、Perl、JDK 21+ 与 .NET SDK；项目自身锁定的版本和构建系统仍由项目管理。
+Cargo、Perl 与 JDK 21+；项目自身锁定的版本和构建系统仍由项目管理。
 Tree-sitter parser 的 revision 随 `lazy-lock.json` 锁定的 `nvim-treesitter` 定义一同固定。
 Selene、Stylelint、golangci-lint 仅在项目存在对应配置时运行，避免套用不存在的规则集。
 
@@ -120,7 +120,9 @@ Selene、Stylelint、golangci-lint 仅在项目存在对应配置时运行，避
 │           └── ui.lua
 ├── scripts/
 │   ├── check.lua              -- Neovim 集成回归
-│   ├── check.sh               -- 静态检查与无头启动入口
+│   ├── check.sh               -- 静态检查与分组回归入口
+│   ├── run-check.lua          -- 独立进程中的行为回归加载器
+│   ├── checks/                -- performance、ai、languages 行为回归
 │   └── deploy.sh              -- 跨设备部署脚本
 ├── spell/
 │   ├── en.utf-8.add           -- 自定义英文词表
@@ -177,8 +179,11 @@ nvim
 
 ## 性能策略
 
-`faster.nvim` 会为超过 1.5 MiB 或平均行长过高的 buffer 关闭 Tree-sitter、LSP、
-indent guide 等高成本功能。普通文件保留完整语言功能；lint 调度会按 buffer 去重、防抖并缓存
+共享 buffer 策略会在读取和编辑时识别超过 1.5 MiB、10,000 行、单行超过 2,000 字节，
+或平均行长过高的文件，按 buffer 关闭 Tree-sitter、LSP、颜色扫描和 indent guide 等高成本功能。
+保留文件类型和撤销；语言服务仅脱离该文件，不关闭其他文件共享的服务。
+`:BufferFeatures` 查看原因，`:BufferFeatures on|off|auto` 手动启用、停用或恢复自动判断。
+`faster.nvim` 继续负责宏执行优化。普通文件保留完整语言功能；lint 调度会按 buffer 去重、防抖并缓存
 工具和配置查找结果。聚焦 Neovim 时先检查可见文件，隐藏 buffer 按批次检查，避免长会话
 一次性 `stat` 所有文件。可按机器调整：
 
@@ -297,7 +302,7 @@ Biome、Stylelint、golangci-lint 与 Selene 只在项目存在对应配置时�
 | `<leader>tf` | 浮动终端 |
 | `<leader>te` / `<leader>tE` | 在文件目录 / cwd 打开外部终端 |
 
-终端模式内：`<Esc><Esc>` 回到普通模式，`<C-hjkl>` / `<C-方向键>` 切换窗口，
+终端模式内：`<Esc><Esc>` 回到普通模式，`<C-hjkl>` 切换窗口，`<C-方向键>` 调整窗口大小，
 普通模式 `q` 关闭。
 
 ## 行为与维护
@@ -311,4 +316,6 @@ Biome、Stylelint、golangci-lint 与 Selene 只在项目存在对应配置时�
   找不到时才使用 Mason 的绝对路径，因此普通终端不会继承 Mason 环境。
 - 写入不存在的父目录不会再静默创建目录；确认路径后使用 `:WriteCreateDirs`。
 - PDF PNG 缓存目录权限设为仅当前用户可访问，保留不超过 30 天且总量限制为 512 MiB。
-- 修改配置后运行 `./scripts/check.sh`，检查 Shell、Lua、YAML、lockfile 和无头启动。
+- 修改配置后运行 `./scripts/check.sh`，执行静态检查、原有集成回归及 performance、ai、languages
+  行为回归。每个 Neovim 组使用独立进程与临时 cache / state / log，复用已安装的插件和工具。
+  可用 `./scripts/check.sh performance` 或 `./scripts/check.sh --group static --group ai` 仅运行指定组。

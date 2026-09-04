@@ -105,10 +105,7 @@ return {
 					prepend_args = latexindent_args,
 				},
 				prettier = { command = node_command("prettier") },
-				ruff_format = {
-					command = command("ruff"),
-					append_args = { "--line-length", "100" },
-				},
+				ruff_format = { command = command("ruff") },
 				ruff_organize_imports = { command = command("ruff") },
 				shfmt = { command = command("shfmt") },
 				sqruff = { command = command("sqruff") },
@@ -118,7 +115,11 @@ return {
 				verible = { command = command("verible-verilog-format") },
 			},
 			format_on_save = function(bufnr)
-				if vim.g.disable_autoformat or vim.b[bufnr].disable_autoformat or vim.b[bufnr].bigfile then
+				if
+					vim.g.disable_autoformat
+					or vim.b[bufnr].disable_autoformat
+					or not require("user.core.buffer_policy").allow(bufnr)
+				then
 					return
 				end
 

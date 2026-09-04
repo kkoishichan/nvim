@@ -250,7 +250,7 @@ return {
 				if
 					not vim.api.nvim_buf_is_valid(bufnr)
 					or not vim.api.nvim_buf_is_loaded(bufnr)
-					or vim.b[bufnr].bigfile
+					or not require("user.core.buffer_policy").allow(bufnr)
 				then
 					return
 				end
@@ -273,10 +273,21 @@ return {
 						-- InsertLeave checks only in-memory text. Disk-only linters run
 						-- after reading/saving and are also withheld from modified buffers.
 						filter = function(linter)
-							if stdin_only then
-								return linter.stdin == true
+							-- ShellCheck advertises stdin but its adapter passes the existing
+							-- filename to preserve source-path/SCRIPTDIR. That makes it a disk
+							-- check for named files, regardless of the stdin flag.
+							local reads_buffer = linter.stdin == true
+								and not (
+									linter.name == "shellcheck"
+									and vim.fn.filereadable(vim.api.nvim_buf_get_name(bufnr)) == 1
+								)
+							if not reads_buffer and vim.bo[bufnr].modified then
+								vim.diagnostic.reset(lint.get_namespace(linter.name), bufnr)
 							end
-							return linter.stdin == true or not vim.bo[bufnr].modified
+							if stdin_only then
+								return reads_buffer
+							end
+							return reads_buffer or not vim.bo[bufnr].modified
 						end,
 						wrap_linter = function(linter)
 							linter.cmd = commands[linter.name]

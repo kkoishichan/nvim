@@ -19,6 +19,9 @@ return {
 			"rafamadriz/friendly-snippets",
 		},
 		opts = {
+			enabled = function()
+				return require("user.core.buffer_policy").allow(0)
+			end,
 			keymap = {
 				-- IDE-style completion: Tab accepts the selected (or first) item,
 				-- then advances through snippet placeholders. Enter only accepts an

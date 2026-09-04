@@ -113,7 +113,7 @@ function M.sync()
 end
 
 function M.enable(event)
-	if vim.b[event.buf].bigfile then
+	if not require("user.core.buffer_policy").allow(event.buf) then
 		return
 	end
 

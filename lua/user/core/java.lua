@@ -25,13 +25,9 @@ end
 
 local java_version_cache = {}
 
-function M.runtime()
-	local executable = vim.fn.exepath("java")
-	if executable == "" then
-		return nil, "Java 21 or newer is not available in PATH"
-	end
+local function java_version(executable)
 	if java_version_cache[executable] then
-		return executable, java_version_cache[executable]
+		return java_version_cache[executable]
 	end
 
 	local result = vim.system({ executable, "-version" }, { text = true }):wait(3000)
@@ -46,14 +42,36 @@ function M.runtime()
 		major = tonumber(second)
 	end
 	if result.code ~= 0 or not major then
-		return nil, "Could not determine the Java runtime version"
-	end
-	if major < 21 then
-		return nil, ("JDTLS requires Java 21 or newer; PATH currently resolves Java %d"):format(major)
+		return nil
 	end
 
 	java_version_cache[executable] = major
-	return executable, major
+	return major
+end
+
+function M.runtime()
+	local candidates = {}
+	if vim.env.JAVA_HOME and vim.env.JAVA_HOME ~= "" then
+		table.insert(
+			candidates,
+			vim.fs.joinpath(vim.env.JAVA_HOME, "bin", vim.fn.has("win32") == 1 and "java.exe" or "java")
+		)
+	end
+	table.insert(candidates, vim.fn.exepath("java"))
+	local found = {}
+	for _, candidate in ipairs(candidates) do
+		if candidate ~= "" and vim.fn.executable(candidate) == 1 then
+			local executable = vim.uv.fs_realpath(candidate) or candidate
+			local major = java_version(executable)
+			if major and major >= 21 then
+				return executable, major
+			end
+			table.insert(found, executable .. " (" .. (major and "Java " .. major or "unknown version") .. ")")
+		end
+	end
+	return nil,
+		"JDTLS requires Java 21 or newer in JAVA_HOME or PATH"
+			.. (#found > 0 and ": " .. table.concat(found, ", ") or "")
 end
 
 function M.python_runtime()

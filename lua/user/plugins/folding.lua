@@ -40,7 +40,11 @@ return {
 				},
 			},
 			provider_selector = function(bufnr, filetype, buftype)
-				if buftype ~= "" or vim.b[bufnr].bigfile or disabled_filetypes[filetype] then
+				if
+					buftype ~= ""
+					or not require("user.core.buffer_policy").allow(bufnr)
+					or disabled_filetypes[filetype]
+				then
 					return ""
 				end
 

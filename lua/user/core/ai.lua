@@ -121,11 +121,21 @@ local function set_chat_state(open, id)
 	vim.g.user_ai_chat_provider = chat_provider
 end
 
--- Best-effort interrupt of a provider's in-flight generation, so switching away
--- does not leave the previous agent working in the background.
+local function interrupt_claude()
+	-- ClaudeCodeStop shuts down the IDE connection, not the current response.
+	-- Escape cancels the CLI's current action without submitting or focusing it.
+	local terminal = package.loaded["claudecode.terminal"]
+	if not terminal or type(terminal.send_to_terminal) ~= "function" then
+		return false
+	end
+	local ok, sent = pcall(terminal.send_to_terminal, "\27", { submit = false, focus = false })
+	return ok and sent == true
+end
+
+-- Best-effort interrupt of a provider's in-flight generation before switching.
 local function stop_generation(id)
 	if id == "claude" then
-		pcall(vim.cmd, "ClaudeCodeStop")
+		return interrupt_claude()
 	elseif id == "opencode" then
 		opencode_command("session.interrupt")
 	elseif id == "codex" then
@@ -234,20 +244,20 @@ local function send_file_reference(id)
 end
 
 local function visual_selection_text()
-	local start_line = vim.fn.line("'<")
-	local end_line = vim.fn.line("'>")
-	if start_line <= 0 or end_line <= 0 then
+	local mode = vim.fn.mode()
+	if mode ~= "v" and mode ~= "V" and mode ~= "\22" then
 		return nil
 	end
-	if start_line > end_line then
-		start_line, end_line = end_line, start_line
-	end
 
-	local lines = vim.api.nvim_buf_get_lines(0, start_line - 1, end_line, false)
+	-- Visual marks describe the previous selection until Visual mode ends.
+	-- getregion handles reversed ranges, byte columns, block width and 'selection'.
+	local anchor, cursor = vim.fn.getpos("v"), vim.fn.getpos(".")
+	local lines = vim.fn.getregion(anchor, cursor, { type = mode })
 	if #lines == 0 then
 		return nil
 	end
 
+	local start_line, end_line = math.min(anchor[2], cursor[2]), math.max(anchor[2], cursor[2])
 	local path = vim.api.nvim_buf_get_name(0)
 	local ft = vim.bo.filetype
 	local header = ("Context from %s:%d-%d"):format(path ~= "" and path or "[No Name]", start_line, end_line)
@@ -417,7 +427,8 @@ end
 function M.send_selection()
 	local id = provider()
 	if id == "claude" then
-		vim.cmd("'<,'>ClaudeCodeSend")
+		-- The plugin captures the active selection before leaving Visual mode.
+		vim.cmd("ClaudeCodeSend")
 	elseif id == "opencode" then
 		opencode_prompt("@this ")
 	elseif is_cli(id) then
@@ -441,7 +452,9 @@ end
 function M.interrupt()
 	local id = provider()
 	if id == "claude" then
-		vim.cmd("ClaudeCodeStop")
+		if not interrupt_claude() then
+			notify("No running Claude Code terminal to interrupt", vim.log.levels.WARN)
+		end
 	elseif id == "opencode" then
 		opencode_command("session.interrupt")
 	elseif is_cli(id) then
