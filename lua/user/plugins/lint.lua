@@ -8,11 +8,9 @@ return {
 			local lint = require("lint")
 			local uv = vim.uv or vim.loop
 			local upward_cache = {}
-			local local_node_cache = {}
 			local stylelint_root_cache = {}
 			local function reset_lookup_caches()
 				upward_cache = {}
-				local_node_cache = {}
 				stylelint_root_cache = {}
 			end
 
@@ -145,33 +143,6 @@ return {
 				stylelint = stylelint_root,
 			}
 
-			local function local_node_command(bufnr, name)
-				local executable = vim.fn.has("win32") == 1 and name .. ".cmd" or name
-				local dir = buffer_dir(bufnr)
-				if not dir then
-					return nil
-				end
-				local cache_key = dir .. "\0" .. executable
-				local cached = local_node_cache[cache_key]
-				if cached ~= nil then
-					return cached or nil
-				end
-
-				while dir do
-					local candidate = vim.fs.joinpath(dir, "node_modules", ".bin", executable)
-					if vim.fn.executable(candidate) == 1 then
-						local_node_cache[cache_key] = candidate
-						return candidate
-					end
-					local parent = vim.fs.dirname(dir)
-					if not parent or parent == dir then
-						break
-					end
-					dir = parent
-				end
-				local_node_cache[cache_key] = false
-			end
-
 			local original_commands = {}
 			local function resolve_linter(name)
 				local linter = lint.linters[name]
@@ -190,16 +161,10 @@ return {
 
 			local function executable_available(bufnr, name)
 				if name == "stylelint" or name == "markdownlint-cli2" then
-					local local_cmd = local_node_command(bufnr, name)
-					if local_cmd then
-						return local_cmd
-					end
+					return toolchain.node_executable(name, bufnr)
 				end
 
-				-- Stylelint's upstream command function resolves node_modules from
-				-- Neovim's cwd, not the buffer. The buffer-aware lookup above has
-				-- already handled local installs, so fall back by logical name.
-				local cmd = name == "stylelint" and "stylelint" or original_commands[name]
+				local cmd = original_commands[name]
 				if type(cmd) == "function" then
 					local ok, resolved = pcall(cmd)
 					if not ok then
@@ -400,6 +365,11 @@ return {
 			})
 			vim.api.nvim_create_autocmd("FocusGained", {
 				group = group,
+				callback = reset_lookup_caches,
+			})
+			vim.api.nvim_create_autocmd("User", {
+				group = group,
+				pattern = "UserToolsChanged",
 				callback = reset_lookup_caches,
 			})
 

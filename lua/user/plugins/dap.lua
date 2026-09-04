@@ -17,38 +17,8 @@ local function missing_runtime(runtime, context)
 	vim.notify(("%s debugging requires %q on PATH."):format(context, runtime), vim.log.levels.ERROR, { title = "DAP" })
 end
 
-local debugpy_runtime
 local function debugpy_python()
-	if debugpy_runtime and vim.fn.executable(debugpy_runtime) == 1 then
-		return debugpy_runtime
-	end
-	-- Prefer an independently installed adapter/runtime. On Windows,
-	-- nvim-dap-python cannot treat a debugpy-adapter.cmd shim as the adapter
-	-- executable, so use a Python interpreter with the module instead.
-	if vim.fn.has("win32") ~= 1 then
-		local adapter = vim.fn.exepath("debugpy-adapter")
-		if adapter ~= "" then
-			debugpy_runtime = adapter
-			return debugpy_runtime
-		end
-	end
-	for _, name in ipairs({ "python3", "python" }) do
-		local python = vim.fn.exepath(name)
-		if python ~= "" then
-			local result = vim.system({ python, "-c", "import debugpy" }, { text = true }):wait(2000)
-			if result.code == 0 then
-				debugpy_runtime = python
-				return debugpy_runtime
-			end
-		end
-	end
-
-	local package = vim.fs.joinpath(vim.fn.stdpath("data"), "mason", "packages", "debugpy", "venv")
-	local python = vim.fs.joinpath(package, vim.fn.has("win32") == 1 and "Scripts/python.exe" or "bin/python")
-	if vim.fn.executable(python) == 1 then
-		debugpy_runtime = python
-		return debugpy_runtime
-	end
+	return toolchain.debugpy_host().path
 end
 
 local adapter_by_filetype = {
@@ -315,7 +285,46 @@ return {
 			if not python then
 				return
 			end
-			require("dap-python").setup(python)
+			local function target_python()
+				return toolchain.python_executable()
+			end
+			require("dap-python").setup(python, { pythonPath = target_python })
+			local dap = require("dap")
+			local adapter = dap.adapters.python
+			local function resolve_adapter(callback, config)
+				local host = debugpy_python()
+				if not host then
+					missing_adapter("debugpy")
+					return
+				end
+				if host ~= python then
+					-- Refresh the host for this launch without rebuilding the user's
+					-- configurations or changing a currently running debug session.
+					require("dap-python").setup(host, { include_configs = false })
+					adapter, python = dap.adapters.python, host
+					dap.adapters.python, dap.adapters.debugpy = resolve_adapter, resolve_adapter
+				end
+				adapter(function(resolved)
+					local enrich = resolved.enrich_config
+					resolved.enrich_config = function(configuration, on_config)
+						if
+							configuration.request == "launch"
+							and not configuration.pythonPath
+							and not configuration.python
+						then
+							local source = type(configuration.program) == "string"
+									and not configuration.program:find("${", 1, true)
+									and configuration.program
+								or nil
+							configuration.pythonPath = toolchain.python_executable(source)
+						end
+						enrich(configuration, on_config)
+					end
+					callback(resolved)
+				end, config)
+			end
+			dap.adapters.python = resolve_adapter
+			dap.adapters.debugpy = resolve_adapter
 		end,
 	},
 	{

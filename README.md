@@ -47,7 +47,8 @@ Neovim 打磨成接近 IDE 的日常工作流。
 
 普通文件不会加载 Mason、刷新 registry 或下载工具。`:MasonToolsInstall` 会显式恢复
 `lua/user/toolchain.lua` 中带版本的语言服务器、formatter、linter 与 DAP 适配器；
-也可用 `:MasonInstall` / `:DapInstall` 单独安装（安装后重启 Neovim 以启用新工具）。
+也可用 `:MasonInstall` / `:DapInstall` 单独安装。安装完成会刷新工具发现，也可运行
+`:ToolsRefresh`；新工具用于后续附加，已运行的语言服务保留当前进程，必要时用 `:LspRestart`。
 部署脚本的 `--mason` 还会准备这些工具共用的 Node.js / npm、Python 3.9+ / pip、Go、
 Cargo、Perl 与 JDK 21+；项目自身锁定的版本和构建系统仍由项目管理。
 Tree-sitter parser 的 revision 随 `lazy-lock.json` 锁定的 `nvim-treesitter` 定义一同固定。
@@ -252,6 +253,40 @@ Biome、Stylelint、golangci-lint 与 Selene 只在项目存在对应配置时�
 受限或未集成的测试可通过 `<leader>j` 的 Overseer 任务或终端运行。
 
 ## 键位
+
+### 项目和环境
+
+默认工作区取当前文件的仓库根，独立项目或单文件再回退到项目根或文件目录。
+`:ProjectPick`、`:DirectoryPick`、`:Cd <目录>` 和 `:FileDir` 会显式选择当前标签页的工作区；
+`:ProjectRoot` 重新按当前文件定位项目根。搜索、新终端和任务使用所选工作区，
+语言服务和项目工具仍根据文件所在的语言项目查找配置，支持 monorepo 的包级规则。
+
+`:ProjectContext` 显示工作区、语言项目、仓库和实际 cwd；`:checkhealth user` 解释工具来源、
+版本、缺失依赖及当前语言服务路径。`:ToolsRefresh` 刷新安装、PATH 和环境变更后的发现结果。
+项目内 Node 工具优先于系统/Mason；Python 目标解释器优先使用项目 `.venv` / `venv`，
+其次 `VIRTUAL_ENV`、PATH。debugpy 自身的宿主环境与目标解释器分开。
+JDTLS 先检查 JAVA_HOME，再检查 PATH，选取可用的 JDK 21+ 并明确传给启动器；项目 JDK 独立。
+
+Jest/Vitest 根据文件所属项目识别；两者同处一个范围且无法区分时，
+使用 `:TestAdapter jest` 或 `:TestAdapter vitest` 选择，`:TestAdapter auto` 恢复自动识别。
+重跑任务只选当前工作区最近完成的任务，模板已有的包级运行目录会保留。
+
+普通终端、Codex 和 OpenCode 按工作区保留进程，切换项目会选择该项目的会话。
+OpenCode 使用仅绑定本机的独立端口，并核对服务目录后再传递上下文。
+Claude 原生 IDE 集成在一个 Neovim 中只有一个终端：首次打开时绑定工作区，
+切到其他项目后会阻止误发；回到原项目继续使用，或另开 Neovim 为另一项目建立会话。
+
+机器偏好放在未跟踪的 `~/.config/nvim/preferences.json`，例如：
+
+```json
+{
+  "tools": { "prefer_mason": false },
+  "format": { "timeout_ms": 2000 }
+}
+```
+
+修改后运行 `:ToolsRefresh`；无效值采用默认设置，并在健康报告中说明。
+项目自身的格式化和检查规则继续放在项目原生配置文件中。
 
 `leader` = `<Space>`，`localleader` = `\`。下面是各组入口，完整列表见
 `:WhichKey` 或下方的 cheatsheet。

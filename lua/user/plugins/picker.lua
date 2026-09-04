@@ -4,6 +4,10 @@ local function fzf()
 	return require("fzf-lua")
 end
 
+local function workspace_opts(opts)
+	return vim.tbl_extend("keep", opts or {}, { cwd = require("user.core.project").root() })
+end
+
 return {
 	{
 		"ibhagwan/fzf-lua",
@@ -152,7 +156,7 @@ return {
 			{
 				"<leader><space>",
 				function()
-					fzf().global()
+					fzf().global(workspace_opts())
 				end,
 				desc = "Smart find",
 			},
@@ -166,7 +170,7 @@ return {
 			{
 				"<leader>/",
 				function()
-					fzf().live_grep()
+					fzf().live_grep(workspace_opts())
 				end,
 				desc = "Grep",
 			},
@@ -201,7 +205,7 @@ return {
 			{
 				"<leader>ff",
 				function()
-					fzf().files()
+					fzf().files(workspace_opts())
 				end,
 				desc = "Find files",
 			},
@@ -209,21 +213,21 @@ return {
 				"<leader>fF",
 				function()
 					-- Escape hatch: include .gitignored files (secrets, build, vendor).
-					fzf().files({ no_ignore = true, hidden = true })
+					fzf().files(workspace_opts({ no_ignore = true, hidden = true }))
 				end,
 				desc = "Find all files (incl. ignored)",
 			},
 			{
 				"<leader>fg",
 				function()
-					fzf().live_grep()
+					fzf().live_grep(workspace_opts())
 				end,
 				desc = "Grep",
 			},
 			{
 				"<leader>fG",
 				function()
-					fzf().live_grep_glob()
+					fzf().live_grep_glob(workspace_opts())
 				end,
 				desc = "Grep glob",
 			},
@@ -272,14 +276,14 @@ return {
 			{
 				"<leader>fw",
 				function()
-					fzf().grep_cword()
+					fzf().grep_cword(workspace_opts())
 				end,
 				desc = "Grep word",
 			},
 			{
 				"<leader>fw",
 				function()
-					fzf().grep_visual()
+					fzf().grep_visual(workspace_opts())
 				end,
 				mode = "x",
 				desc = "Grep selection",
@@ -287,14 +291,14 @@ return {
 			{
 				"<leader>gc",
 				function()
-					fzf().git_commits()
+					fzf().git_commits(workspace_opts())
 				end,
 				desc = "Git commits",
 			},
 			{
 				"<leader>gs",
 				function()
-					fzf().git_status()
+					fzf().git_status(workspace_opts())
 				end,
 				desc = "Git status",
 			},

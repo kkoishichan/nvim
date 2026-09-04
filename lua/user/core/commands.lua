@@ -1,3 +1,5 @@
+local project = require("user.core.project")
+
 vim.api.nvim_create_user_command("DiffDisk", function()
 	local source_win = vim.api.nvim_get_current_win()
 	local source_buf = vim.api.nvim_get_current_buf()
@@ -76,66 +78,16 @@ end, {
 	desc = "Create missing parent directories and write the current file",
 })
 
-local root_markers = {
-	".root",
-	{
-		"mvnw",
-		"gradlew",
-		"settings.gradle",
-		"settings.gradle.kts",
-		"pom.xml",
-		"build.gradle",
-		"build.gradle.kts",
-		"build.xml",
-		"compile_commands.json",
-		"CMakeLists.txt",
-		"Makefile",
-		"package.json",
-		"pyproject.toml",
-		"Cargo.toml",
-		"go.mod",
-		"typst.toml",
-	},
-	{ ".git", ".jj" },
-}
-
 local function cwd_display(path)
 	return vim.fn.fnamemodify(path, ":~")
 end
 
-local function expand_home(path)
-	if not path or path == "" then
-		return path
-	end
-
-	if path == "~" then
-		return vim.uv.os_homedir()
-	end
-
-	if path:sub(1, 2) == "~/" then
-		return vim.fs.joinpath(vim.uv.os_homedir(), path:sub(3))
-	end
-
-	return path
-end
-
 local function current_buffer_dir()
-	local file = vim.api.nvim_buf_get_name(0)
-	if file == "" or vim.bo.buftype ~= "" then
-		return vim.fn.getcwd()
-	end
-
-	file = vim.uv.fs_realpath(file) or file
-	local stat = vim.uv.fs_stat(file)
-	if stat and stat.type == "directory" then
-		return file
-	end
-
-	return vim.fs.dirname(file)
+	return project.context().directory
 end
 
 local function set_cwd(path, title)
-	vim.cmd("tcd " .. vim.fn.fnameescape(path))
+	project.set(path)
 	vim.notify("tab cwd: " .. cwd_display(vim.fn.getcwd()), vim.log.levels.INFO, { title = title })
 end
 
@@ -145,27 +97,19 @@ local function add_zoxide_path(path)
 	end
 end
 
-local function find_project_root()
-	local dir = current_buffer_dir()
-	local root = vim.fs.root(dir, root_markers)
-	return root, dir
-end
-
 local function project_root_from_path(path)
 	if not path or path == "" then
 		return nil
 	end
 
-	path = expand_home(path)
-	path = vim.uv.fs_realpath(path) or path
+	path = project.canonical(path)
 
 	local stat = vim.uv.fs_stat(path)
 	if not stat then
 		return nil
 	end
 
-	local dir = stat.type == "directory" and path or vim.fs.dirname(path)
-	return vim.fs.root(dir, root_markers)
+	return project.find_root(path)
 end
 
 local oldfiles_scan_limit = 100
@@ -181,7 +125,7 @@ local function collect_project_roots(callback)
 		end
 	end
 
-	add(find_project_root())
+	add(project.root())
 
 	for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
 		add(project_root_from_path(vim.api.nvim_buf_get_name(bufnr)))
@@ -214,18 +158,14 @@ local function collect_project_roots(callback)
 end
 
 vim.api.nvim_create_user_command("ProjectRoot", function()
-	local root, dir = find_project_root()
-	if not root then
-		vim.notify("No root marker found from " .. cwd_display(dir), vim.log.levels.WARN, { title = "Project root" })
-		return
-	end
-
+	local context = project.context()
+	local root = context.file and (project.find_root(context.directory) or context.directory) or context.cwd
 	set_cwd(root, "Project root")
 	vim.schedule(function()
 		require("user.core.panels").open_oil(root)
 	end)
 end, {
-	desc = "Set cwd to the current file's project root",
+	desc = "Select the current file's project root and open it",
 })
 
 vim.api.nvim_create_user_command("FileDir", function()
@@ -239,9 +179,21 @@ end, {
 })
 
 local function normalize_path(path)
-	path = expand_home(path)
-	return vim.fs.abspath(path)
+	return project.canonical(path)
 end
+
+vim.api.nvim_create_user_command("Cd", function(command)
+	local path = command.args ~= "" and normalize_path(command.args) or project.root()
+	if vim.fn.isdirectory(path) == 0 then
+		vim.notify("Directory not found: " .. cwd_display(path), vim.log.levels.WARN, { title = "Project directory" })
+		return
+	end
+	set_cwd(path, "Project directory")
+end, {
+	nargs = "?",
+	complete = "dir",
+	desc = "Select the current tab's workspace directory",
+})
 
 local function open_directory(path, title)
 	local stat = vim.uv.fs_stat(path)
@@ -328,6 +280,7 @@ local function pick_directory()
 	end
 
 	require("fzf-lua").files({
+		cwd = project.root(),
 		prompt = "Directories> ",
 		-- Respect ignore files by default; scanning vendor/build trees makes a
 		-- directory picker surprisingly expensive in large repositories.
@@ -459,7 +412,7 @@ end
 local function run_pdf_build(title, file, output, args)
 	vim.notify("Building " .. vim.fn.fnamemodify(output, ":~:."), vim.log.levels.INFO, { title = title })
 
-	vim.system(args, { text = true }, function(result)
+	vim.system(args, { text = true, cwd = project.root() }, function(result)
 		vim.schedule(function()
 			if result.code == 0 then
 				vim.notify("Wrote " .. vim.fn.fnamemodify(output, ":~:."), vim.log.levels.INFO, { title = title })

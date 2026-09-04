@@ -7,6 +7,7 @@ vim.g.maplocalleader = "\\"
 
 require("user.core.options")
 require("user.core.buffer_policy").setup()
+require("user.core.project").setup()
 require("user.core.commands")
 require("user.core.keymaps")
 require("user.core.conflicts").setup()

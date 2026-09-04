@@ -25,6 +25,10 @@ end
 
 local java_version_cache = {}
 
+function M.clear_runtime_cache()
+	java_version_cache = {}
+end
+
 local function java_version(executable)
 	if java_version_cache[executable] then
 		return java_version_cache[executable]

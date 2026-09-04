@@ -11,7 +11,8 @@ usage() {
 	cat <<'EOF'
 Usage: ./scripts/check.sh [--group NAME | NAME] ...
 
-Groups: static, integration, performance, ai, languages
+Groups: static, integration, performance, ai, languages, projects,
+        project_actions, toolchain, terminals
 With no arguments, run every group in the order above.
 Examples: ./scripts/check.sh performance
           ./scripts/check.sh --group static --group ai
@@ -22,7 +23,7 @@ groups=()
 add_group() {
 	local existing
 	case "$1" in
-	static | integration | performance | ai | languages) ;;
+	static | integration | performance | ai | languages | projects | project_actions | toolchain | terminals) ;;
 	*)
 		printf 'Unknown check group: %s\n' "$1" >&2
 		usage >&2
@@ -54,7 +55,7 @@ while [ $# -gt 0 ]; do
 	shift
 done
 if [ "${#groups[@]}" -eq 0 ]; then
-	groups=(static integration performance ai languages)
+	groups=(static integration performance ai languages projects project_actions toolchain terminals)
 fi
 
 tool() {

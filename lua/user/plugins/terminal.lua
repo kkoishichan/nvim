@@ -1,19 +1,17 @@
 local layout = require("user.core.layout")
 
--- VSCode-like terminal management on top of toggleterm:
---   * a bottom panel that holds multiple terminals
---   * new / split (side-by-side) / next / prev / select / kill / rename
---   * a floating terminal as a bonus
--- One bottom terminal is shown at a time (switch via next/prev/select), except
--- after `split`, which keeps the current one open and tiles a new one beside it.
+-- Each project keeps its own terminals and active selection. Hiding a panel
+-- preserves its process and cwd; switching projects never sends a shell `cd`.
+local states = {}
+local next_count = 1
 
-local state = {
-	bottom = {}, -- list of bottom Terminal objects
-	active = 1, -- index into state.bottom
-	next_count = 1, -- toggleterm count allocator for bottom terminals
-	float = nil,
-	float_count = 100,
-}
+local function state_for(root)
+	root = root or require("user.core.project").root()
+	if not states[root] then
+		states[root] = { root = root, bottom = {}, active = 1 }
+	end
+	return states[root]
+end
 
 local function bottom_size()
 	return math.max(10, math.min(18, math.floor((vim.o.lines or 40) * 0.28)))
@@ -31,87 +29,106 @@ local function Terminal()
 	return require("toggleterm.terminal").Terminal
 end
 
-local function next_available_count(start)
+local function allocate_count()
 	local terminals = require("toggleterm.terminal")
-	local count = start
-	while terminals.get(count) do
-		count = count + 1
+	while terminals.get(next_count, true) do
+		next_count = next_count + 1
 	end
+	local count = next_count
+	next_count = next_count + 1
 	return count
 end
 
-local function forget(term)
-	local removed
-	for index, t in ipairs(state.bottom) do
-		if t.id == term.id then
-			table.remove(state.bottom, index)
-			removed = index
-			break
-		end
+local function visible(term)
+	if not term or not term.bufnr then
+		return false
 	end
-	if not removed then
-		return
-	end
-	if #state.bottom == 0 then
-		state.active = 1
-	elseif removed < state.active then
-		state.active = state.active - 1
-	elseif removed == state.active then
-		state.active = math.min(removed, #state.bottom)
-	end
-end
-
-local function make_bottom()
-	state.next_count = next_available_count(state.next_count)
-	local term = Terminal():new({
-		count = state.next_count,
-		direction = "horizontal",
-		display_name = "term " .. state.next_count,
-		size = bottom_size(),
-		on_exit = function(t)
-			forget(t)
-		end,
-	})
-	state.next_count = state.next_count + 1
-	table.insert(state.bottom, term)
-	state.active = #state.bottom
-	return term
-end
-
-local function any_open()
-	for _, t in ipairs(state.bottom) do
-		if t:is_open() then
+	for _, window in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+		if vim.api.nvim_win_get_buf(window) == term.bufnr then
 			return true
 		end
 	end
 	return false
 end
 
-local function close_all()
-	for _, t in ipairs(state.bottom) do
-		if t:is_open() then
-			t:close()
+local function forget(state, term)
+	local removed
+	for index, candidate in ipairs(state.bottom) do
+		if candidate == term then
+			table.remove(state.bottom, index)
+			removed = index
+			break
+		end
+	end
+	if removed then
+		if removed < state.active then
+			state.active = state.active - 1
+		else
+			state.active = math.max(1, math.min(state.active, #state.bottom))
 		end
 	end
 end
 
-local function close_float()
-	if state.float and state.float:is_open() then
-		state.float:close()
+local function label(name, state)
+	return name .. " · " .. vim.fn.fnamemodify(state.root, ":~")
+end
+
+local function make_bottom(state)
+	local count = allocate_count()
+	local term = Terminal():new({
+		count = count,
+		dir = state.root,
+		direction = "horizontal",
+		display_name = label("term " .. count, state),
+		user_terminal_name = "term " .. count,
+		size = bottom_size(),
+		on_create = function(created)
+			vim.b[created.bufnr].user_project_root = state.root
+		end,
+		on_exit = function(exited)
+			forget(state, exited)
+		end,
+	})
+	table.insert(state.bottom, term)
+	state.active = #state.bottom
+	return term
+end
+
+local function any_open(state)
+	for _, term in ipairs(state.bottom) do
+		if visible(term) then
+			return true
+		end
+	end
+	return false
+end
+
+local function close_all(only)
+	for _, state in pairs(only and { only } or states) do
+		for _, term in ipairs(state.bottom) do
+			if visible(term) then
+				term:close()
+			end
+		end
 	end
 end
 
-local function show(term, keep_others)
-	-- toggleterm treats every terminal window (including a float) as a split
-	-- anchor. Close our float first so opening a bottom terminal never attempts
-	-- to split the floating window.
-	close_float()
+local function close_floats()
+	for _, state in pairs(states) do
+		if visible(state.float) then
+			state.float:close()
+		end
+	end
+end
+
+local function show(state, term, keep_others)
+	close_floats()
 	if not keep_others then
 		close_all()
 	end
 	term:open(bottom_size(), "horizontal")
-	for index, t in ipairs(state.bottom) do
-		if t.id == term.id then
+	for index, candidate in ipairs(state.bottom) do
+		if candidate == term then
 			state.active = index
 		end
 	end
@@ -120,36 +137,38 @@ end
 local M = {}
 
 function M.toggle()
-	if state.float and state.float:is_open() and state.float:is_focused() then
-		close_float()
-		show(state.bottom[state.active] or make_bottom(), false)
-		return
+	local state = state_for()
+	if visible(state.float) and state.float:is_focused() then
+		close_floats()
+		show(state, state.bottom[state.active] or make_bottom(state), false)
+	elseif any_open(state) then
+		close_all(state)
+	else
+		show(state, state.bottom[state.active] or make_bottom(state), false)
 	end
-	if any_open() then
-		close_all()
-		return
-	end
-	show(state.bottom[state.active] or make_bottom(), false)
 end
 
 function M.new()
-	show(make_bottom(), false)
+	local state = state_for()
+	show(state, make_bottom(state), false)
 end
 
 function M.split()
-	if not any_open() then
-		show(state.bottom[state.active] or make_bottom(), false)
+	local state = state_for()
+	if not any_open(state) then
+		show(state, state.bottom[state.active] or make_bottom(state), false)
 	end
-	show(make_bottom(), true)
+	show(state, make_bottom(state), true)
 end
 
 local function cycle(step)
+	local state = state_for()
 	if #state.bottom == 0 then
 		M.new()
 		return
 	end
 	state.active = ((state.active - 1 + step) % #state.bottom) + 1
-	show(state.bottom[state.active], false)
+	show(state, state.bottom[state.active], false)
 end
 
 function M.next()
@@ -161,77 +180,80 @@ function M.prev()
 end
 
 function M.select()
+	local state = state_for()
 	if #state.bottom == 0 then
 		M.new()
 		return
 	end
-
-	local choices = vim.list_slice(state.bottom)
-	vim.ui.select(choices, {
-		prompt = "Terminal",
+	vim.ui.select(vim.list_slice(state.bottom), {
+		prompt = "Terminal · " .. vim.fn.fnamemodify(state.root, ":~"),
 		format_item = function(term)
-			local current = state.bottom[state.active]
-			local marker = current and current.id == term.id and "  (current)" or ""
-			return ("%s  (#%d)%s"):format(term.display_name or "terminal", term.id, marker)
+			local marker = state.bottom[state.active] == term and "  (current)" or ""
+			return ("%s  (#%d)%s"):format(term.display_name, term.id, marker)
 		end,
 	}, function(term)
-		if not term then
-			return
-		end
-		for index, candidate in ipairs(state.bottom) do
-			if candidate.id == term.id then
-				state.active = index
-				show(candidate, false)
-				return
+		if term and require("user.core.project").root() == state.root then
+			for _, candidate in ipairs(state.bottom) do
+				if candidate == term then
+					show(state, term, false)
+					break
+				end
 			end
 		end
 	end)
 end
 
 function M.kill()
+	local state = state_for()
 	local term = state.bottom[state.active]
 	if not term then
 		return
 	end
-	pcall(function()
-		term:shutdown()
-	end)
-	forget(term)
+	local ok = pcall(term.shutdown, term)
+	if not ok then
+		return
+	end
+	forget(state, term)
 	if state.bottom[state.active] then
-		show(state.bottom[state.active], false)
+		show(state, state.bottom[state.active], false)
 	end
 end
 
 function M.rename()
+	local state = state_for()
 	local term = state.bottom[state.active]
-	if not term then
-		return
+	if term then
+		vim.ui.input({ prompt = "Terminal name: ", default = term.user_terminal_name or "terminal" }, function(name)
+			if name and name ~= "" then
+				term.user_terminal_name = name
+				term.display_name = label(name, state)
+			end
+		end)
 	end
-	vim.ui.input({ prompt = "Terminal name: ", default = term.display_name }, function(name)
-		if name and name ~= "" then
-			term.display_name = name
-		end
-	end)
 end
 
 function M.float()
+	local state = state_for()
 	if not state.float then
-		state.float_count = next_available_count(state.float_count)
 		state.float = Terminal():new({
-			count = state.float_count,
+			count = allocate_count(),
+			dir = state.root,
 			direction = "float",
-			display_name = "terminal",
-			float_opts = {
-				border = "rounded",
-				width = float_width,
-				height = float_height,
-				title_pos = "center",
-			},
+			display_name = label("terminal", state),
+			on_create = function(created)
+				vim.b[created.bufnr].user_project_root = state.root
+			end,
+			on_exit = function()
+				state.float = nil
+			end,
+			float_opts = { border = "rounded", width = float_width, height = float_height, title_pos = "center" },
 		})
-		state.float_count = state.float_count + 1
+	end
+	if not visible(state.float) then
+		close_floats()
 	end
 	state.float:toggle(nil, "float")
-	if state.float:is_open() then
+	if visible(state.float) then
 		require("user.core.backdrop").open(state.float.window)
 	end
 end

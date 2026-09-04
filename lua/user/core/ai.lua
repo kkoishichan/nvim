@@ -16,9 +16,8 @@ local providers = {
 		label = "OpenCode",
 		plugin = "opencode.nvim",
 		command = "opencode",
-		-- --port 0 (the CLI default) = listen on a random port so opencode.nvim
-		-- can attach; explicit because a bare "--port" is ambiguous.
-		terminal = "opencode --port 0",
+		-- Each workspace gets its own managed loopback server endpoint.
+		server = true,
 		count = 202,
 	},
 }
@@ -68,6 +67,51 @@ local function notify(message, level)
 	vim.notify(message, level or vim.log.levels.INFO, { title = "AI" })
 end
 
+local function same_project(root)
+	if require("user.core.project").root() == root then
+		return true
+	end
+	notify("AI action cancelled because the project changed", vim.log.levels.WARN)
+	return false
+end
+
+local function input_path(path, cwd)
+	if not vim.fs.isabs(path) and path:sub(1, 1) ~= "~" then
+		path = vim.fs.joinpath(cwd, path)
+	end
+	return require("user.core.project").canonical(path)
+end
+
+local function claude_project_matches(quiet)
+	local terminal = package.loaded["claudecode.terminal"]
+	local ok, bufnr = pcall(function()
+		return terminal and terminal.get_active_terminal_bufnr()
+	end)
+	if not ok or not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
+		return true
+	end
+	local project = require("user.core.project")
+	local owner = vim.b[bufnr].user_project_root
+	if not owner then
+		-- Only inspect the exact terminal supplied by Claude's native provider.
+		local directory = vim.api.nvim_buf_get_name(bufnr):match("^term://(.-)//%d+:")
+		owner = directory and project.canonical(directory) or nil
+		vim.b[bufnr].user_project_root = owner
+	end
+	if owner == project.root() then
+		return true
+	end
+	if not quiet then
+		notify(
+			"Claude Code has one IDE terminal per Neovim instance, currently owned by "
+				.. (owner or "an unknown project")
+				.. ". Return to that project or use a separate Neovim instance.",
+			vim.log.levels.WARN
+		)
+	end
+	return false
+end
+
 local function unsupported(action)
 	local _, p = provider()
 	notify(("%s does not support %s"):format(p.label, action), vim.log.levels.WARN)
@@ -88,6 +132,12 @@ local terminals = require("user.core.ai_terminal").new({
 
 local function opencode_api()
 	load(providers.opencode.plugin)
+	local server = package.loaded["opencode.server"]
+	if server and server.connected then
+		-- The plugin otherwise prefers its globally connected server over URL config.
+		-- Disconnect only the event subscription; the other project's CLI survives.
+		server.connected:disconnect()
+	end
 	local ok, opencode = pcall(require, "opencode")
 	if ok then
 		return opencode
@@ -99,6 +149,30 @@ end
 local function opencode_prompt(prompt)
 	local opencode = opencode_api()
 	if opencode then
+		-- Server discovery is asynchronous. Freeze file/range references before
+		-- it yields so another window or project cannot replace the source context.
+		if prompt == "@buffer " or prompt == "@this " then
+			local opts = { buf = vim.api.nvim_get_current_buf() }
+			if prompt == "@this " then
+				local mode = vim.fn.mode()
+				local visual = mode == "v" or mode == "V" or mode == "\22"
+				local from, to = vim.fn.getpos(visual and "v" or "."), vim.fn.getpos(".")
+				if from[2] > to[2] or (from[2] == to[2] and from[3] > to[3]) then
+					from, to = to, from
+				end
+				if mode == "\22" and from[3] > to[3] then
+					from[3], to[3] = to[3], from[3]
+				end
+				opts.from = { from[2], mode ~= "V" and from[3] or nil }
+				opts.to = { to[2], mode ~= "V" and to[3] or nil }
+			end
+			local reference = opencode.format(opts)
+			if not reference then
+				notify("No file context to send", vim.log.levels.WARN)
+				return
+			end
+			prompt = reference .. " "
+		end
 		opencode.prompt(prompt)
 	end
 end
@@ -124,6 +198,9 @@ end
 local function interrupt_claude()
 	-- ClaudeCodeStop shuts down the IDE connection, not the current response.
 	-- Escape cancels the CLI's current action without submitting or focusing it.
+	if not claude_project_matches(true) then
+		return false
+	end
 	local terminal = package.loaded["claudecode.terminal"]
 	if not terminal or type(terminal.send_to_terminal) ~= "function" then
 		return false
@@ -148,6 +225,9 @@ end
 
 local function provider_chat_visible(id)
 	if id == "claude" and package.loaded["claudecode.terminal"] then
+		if not claude_project_matches(true) then
+			return false
+		end
 		local ok, terminal = pcall(require, "claudecode.terminal")
 		if not ok then
 			return false
@@ -211,9 +291,16 @@ local function open_chat(id, focus)
 	end
 
 	if id == "claude" then
+		if not claude_project_matches() then
+			return false
+		end
 		load(providers.claude.plugin)
 		ok = pcall(vim.cmd, focus and "ClaudeCodeFocus" or "ClaudeCode")
 	elseif is_cli(id) then
+		local claude_terminal = package.loaded["claudecode.terminal"]
+		if claude_terminal and terminals.visible_buffer(claude_terminal.get_active_terminal_bufnr()) then
+			pcall(vim.cmd, "ClaudeCodeClose")
+		end
 		ok = terminals.open(id, focus) ~= nil
 	end
 	if ok then
@@ -279,31 +366,35 @@ local function cli_send_selection(id)
 end
 
 local function cli_mention_file(id)
+	local root = require("user.core.project").root()
+	local cwd = vim.fn.getcwd()
 	vim.ui.input({
 		prompt = "File for " .. providers[id].label .. ": ",
 		default = vim.api.nvim_buf_get_name(0),
 		completion = "file",
 	}, function(path)
-		if not path or path == "" then
+		if not path or path == "" or not same_project(root) then
 			return
 		end
-		terminals.send(id, paste_submit("Use this file as context: " .. vim.fn.fnamemodify(path, ":p")))
+		terminals.send(id, paste_submit("Use this file as context: " .. input_path(path, cwd)))
 	end)
 end
 
 local function opencode_mention_file()
+	local root = require("user.core.project").root()
+	local cwd = vim.fn.getcwd()
 	vim.ui.input({
 		prompt = "File for OpenCode: ",
 		default = vim.api.nvim_buf_get_name(0),
 		completion = "file",
 	}, function(path)
-		if not path or path == "" then
+		if not path or path == "" or not same_project(root) then
 			return
 		end
 
 		local opencode = opencode_api()
 		if opencode then
-			opencode.prompt(opencode.format({ path = vim.fn.fnamemodify(path, ":p") }) .. " ")
+			opencode.prompt(opencode.format({ path = input_path(path, cwd) }) .. " ")
 		end
 	end)
 end
@@ -325,6 +416,7 @@ end
 function M.pick()
 	local active = provider()
 	local open_provider = active_chat_provider()
+	local root = require("user.core.project").root()
 	vim.ui.select(order, {
 		prompt = "Select AI",
 		format_item = function(id)
@@ -332,7 +424,7 @@ function M.pick()
 			return marker .. providers[id].label
 		end,
 	}, function(id)
-		if not id then
+		if not id or not same_project(root) then
 			return
 		end
 
@@ -392,8 +484,15 @@ function M.open_cli(id, focus)
 	return terminals.open(id, focus ~= false)
 end
 
+function M.opencode_url()
+	return terminals.endpoint("opencode")
+end
+
 function M.add_buffer()
 	local id = provider()
+	if id == "claude" and not claude_project_matches() then
+		return
+	end
 	if id == "opencode" then
 		opencode_prompt("@buffer ")
 		return
@@ -412,6 +511,9 @@ end
 
 function M.send_context()
 	local id = provider()
+	if id == "claude" and not claude_project_matches() then
+		return
+	end
 	if tree_filetypes[vim.bo.filetype] then
 		if id == "claude" then
 			vim.cmd("ClaudeCodeSend")
@@ -427,6 +529,9 @@ end
 function M.send_selection()
 	local id = provider()
 	if id == "claude" then
+		if not claude_project_matches() then
+			return
+		end
 		-- The plugin captures the active selection before leaving Visual mode.
 		vim.cmd("ClaudeCodeSend")
 	elseif id == "opencode" then
@@ -438,6 +543,9 @@ end
 
 function M.attach_file()
 	local id = provider()
+	if id == "claude" and not claude_project_matches() then
+		return
+	end
 	if id == "claude" and tree_filetypes[vim.bo.filetype] then
 		vim.cmd("ClaudeCodeTreeAdd")
 	elseif id == "opencode" then
@@ -452,6 +560,9 @@ end
 function M.interrupt()
 	local id = provider()
 	if id == "claude" then
+		if not claude_project_matches() then
+			return
+		end
 		if not interrupt_claude() then
 			notify("No running Claude Code terminal to interrupt", vim.log.levels.WARN)
 		end
@@ -467,6 +578,9 @@ end
 
 function M.resume()
 	local id = provider()
+	if id == "claude" and not claude_project_matches() then
+		return
+	end
 	if id == "claude" then
 		vim.cmd("ClaudeCode --resume")
 	elseif id == "opencode" then
@@ -478,6 +592,9 @@ end
 
 function M.continue()
 	local id = provider()
+	if id == "claude" and not claude_project_matches() then
+		return
+	end
 	if id == "claude" then
 		vim.cmd("ClaudeCode --continue")
 	else
@@ -487,6 +604,9 @@ end
 
 function M.model()
 	local id = provider()
+	if id == "claude" and not claude_project_matches() then
+		return
+	end
 	if id == "claude" then
 		vim.cmd("ClaudeCodeSelectModel")
 	elseif id == "opencode" then
@@ -501,6 +621,9 @@ end
 
 function M.accept()
 	local id = provider()
+	if id == "claude" and not claude_project_matches() then
+		return
+	end
 	if id == "claude" then
 		vim.cmd("ClaudeCodeDiffAccept")
 	elseif id == "opencode" and has_buffer_keymap("da") then
@@ -512,6 +635,9 @@ end
 
 function M.deny()
 	local id = provider()
+	if id == "claude" and not claude_project_matches() then
+		return
+	end
 	if id == "claude" then
 		vim.cmd("ClaudeCodeDiffDeny")
 	elseif id == "opencode" and has_buffer_keymap("dr") then

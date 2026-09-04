@@ -172,6 +172,10 @@ return {
 	{
 		"mason-org/mason.nvim",
 		cmd = { "Mason", "MasonInstall", "MasonLog", "MasonUninstall", "MasonUninstallAll", "MasonUpdate" },
+		config = function(_, opts)
+			require("mason").setup(opts)
+			toolchain.watch_mason()
+		end,
 		opts = {
 			-- Resolve Mason binaries per plugin instead of changing Neovim's global
 			-- PATH (which would leak into every :terminal child process).
@@ -213,17 +217,9 @@ return {
 			setup_lsp_keymaps()
 
 			local function node_lsp_command(name, args)
-				local local_name = vim.fn.has("win32") == 1 and name .. ".cmd" or name
 				return function(dispatchers, config)
-					local command
 					local root = (config or {}).root_dir
-					if root then
-						local candidate = vim.fs.joinpath(root, "node_modules", ".bin", local_name)
-						if vim.fn.executable(candidate) == 1 then
-							command = candidate
-						end
-					end
-					command = command or toolchain.executable(name) or name
+					local command = toolchain.node_executable(name, root) or name
 					return vim.lsp.rpc.start(vim.list_extend({ command }, args), dispatchers)
 				end
 			end
@@ -445,34 +441,79 @@ return {
 
 			-- nvim-lspconfig defaults use command names. Resolve each command to an
 			-- absolute system-or-Mason path so Mason can keep PATH="skip".
-			local enabled_servers = {}
+			local original_commands = {}
+			local custom_node_commands = { biome = "biome", tailwindcss = "tailwindcss-language-server" }
 			for _, server in ipairs(servers) do
 				local config = vim.lsp.config[server]
 				if config then
 					local policy = require("user.core.buffer_policy")
+					local command = config.cmd
+					local node_name = custom_node_commands[server]
+					if type(command) == "table" and toolchain.node_commands[command[1]] then
+						node_name = command[1]
+						command = node_lsp_command(node_name, vim.list_slice(command, 2))
+					end
+					original_commands[server] = vim.deepcopy(command)
+					local root = policy.lsp_root(config)
+					if node_name then
+						local guarded_root = root
+						root = function(bufnr, on_dir)
+							local selected = toolchain.node_resolve(node_name, bufnr)
+							if not selected.path then
+								return
+							end
+							guarded_root(bufnr, function(directory)
+								if selected.source == "project" and directory then
+									local package_root = vim.fs.dirname(vim.fs.dirname(vim.fs.dirname(selected.path)))
+									if require("user.core.project").contains(directory, package_root) then
+										-- Separate package-local tool versions into separate clients.
+										directory = package_root
+									end
+								end
+								on_dir(directory)
+							end)
+						end
+					elseif type(command) == "table" and type(command[1]) == "string" then
+						local guarded_root = root
+						local executable_name = command[1]
+						root = function(bufnr, on_dir)
+							if toolchain.executable(executable_name, { bufnr = bufnr }) then
+								guarded_root(bufnr, on_dir)
+							end
+						end
+					end
 					vim.lsp.config(
 						server,
-						{ root_dir = policy.lsp_root(config), on_init = policy.lsp_init(config.on_init) }
+						{ cmd = command, root_dir = root, on_init = policy.lsp_init(config.on_init) }
 					)
 				end
-				local cmd = config and config.cmd
-				if type(cmd) == "table" and type(cmd[1]) == "string" then
-					local resolved = toolchain.executable(cmd[1])
-					if resolved then
-						cmd = vim.deepcopy(cmd)
-						cmd[1] = resolved
-						vim.lsp.config(server, { cmd = cmd })
+			end
+			local function refresh_servers()
+				local enabled_servers = {}
+				for _, server in ipairs(servers) do
+					local cmd = original_commands[server]
+					if type(cmd) == "table" and type(cmd[1]) == "string" then
+						local resolved = toolchain.executable(cmd[1])
+						if resolved then
+							cmd = vim.deepcopy(cmd)
+							cmd[1] = resolved
+							vim.lsp.config(server, { cmd = cmd })
+							table.insert(enabled_servers, server)
+						end
+					elseif type(cmd) == "function" then
 						table.insert(enabled_servers, server)
 					end
-				elseif type(cmd) == "function" then
-					table.insert(enabled_servers, server)
 				end
+				-- Enable newly installed servers without restarting any running client.
+				-- Root/on_init guards above are installed only once.
+				vim.lsp.enable(enabled_servers)
 			end
-
-			-- Enable only servers whose command already exists. This deliberately
-			-- avoids mason-lspconfig.setup(), which refreshes the registry whenever
-			-- LSP loads even with an empty ensure_installed list.
-			vim.lsp.enable(enabled_servers)
+			vim.api.nvim_create_autocmd("User", {
+				group = vim.api.nvim_create_augroup("user_lsp_tools", { clear = true }),
+				pattern = "UserToolsChanged",
+				callback = refresh_servers,
+			})
+			refresh_servers()
 		end,
 	},
 }

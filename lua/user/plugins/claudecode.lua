@@ -2,6 +2,8 @@
 -- `claude` CLI connects to (same protocol as the VS Code / JetBrains
 -- extensions), running Claude Code in a terminal split with selection sharing,
 -- @-mentions, and reviewable diffs.
+local spawn_root
+
 return {
 	{
 		"coder/claudecode.nvim",
@@ -14,6 +16,7 @@ return {
 			vim.api.nvim_create_autocmd("TermOpen", {
 				group = vim.api.nvim_create_augroup("user_claudecode_unlist", { clear = true }),
 				callback = function(args)
+					local project_root = spawn_root
 					vim.schedule(function()
 						if not vim.api.nvim_buf_is_valid(args.buf) or vim.bo[args.buf].buftype ~= "terminal" then
 							return
@@ -25,6 +28,12 @@ return {
 						local ok, managed = pcall(terminal.get_active_terminal_bufnr)
 						if ok and managed == args.buf then
 							vim.bo[args.buf].buflisted = false
+							vim.b[args.buf].user_project_root = project_root
+							vim.b[args.buf].user_ai_terminal = {
+								provider = "claude",
+								root = project_root,
+								label = "Claude Code · " .. (project_root or "unknown project"),
+							}
 						end
 					end)
 				end,
@@ -33,6 +42,10 @@ return {
 		opts = {
 			terminal = {
 				provider = "native",
+				cwd_provider = function()
+					spawn_root = require("user.core.project").root()
+					return spawn_root
+				end,
 				split_side = "right",
 				split_width_percentage = 0.40,
 				show_native_term_exit_tip = false,

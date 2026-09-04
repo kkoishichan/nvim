@@ -7,15 +7,8 @@ local function command(name, opts)
 end
 
 local function node_command(name)
-	local local_name = vim.fn.has("win32") == 1 and name .. ".cmd" or name
-	local resolver
-	return function(self, ctx)
-		resolver = resolver or require("conform.util").from_node_modules(local_name)
-		local candidate = resolver(self, ctx)
-		if candidate ~= local_name and vim.fn.executable(candidate) == 1 then
-			return candidate
-		end
-		return toolchain.executable(name) or candidate
+	return function(_, ctx)
+		return toolchain.node_executable(name, ctx.buf or ctx.filename) or name
 	end
 end
 
@@ -124,7 +117,7 @@ return {
 				end
 
 				return {
-					timeout_ms = 2000,
+					timeout_ms = require("user.core.preferences").get("format").timeout_ms,
 					lsp_format = "fallback",
 				}
 			end,

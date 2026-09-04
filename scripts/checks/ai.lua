@@ -120,6 +120,7 @@ return function(tmp)
 			closed = closed + 1
 			claude_visible = false
 		end, { force = true })
+		vim.b[claude_buffer].user_project_root = require("user.core.project").root()
 		ai = fresh_ai("claude")
 		ai.interrupt()
 		assert(#interrupts == 1 and interrupts[1].text == "\27", "Claude interrupt did not send Escape")
