@@ -567,7 +567,7 @@ return {
 				left_mouse_command = "buffer %d",
 				middle_mouse_command = nil,
 				indicator = {
-					style = "underline",
+					style = "none",
 				},
 				buffer_close_icon = "×",
 				close_icon = "×",

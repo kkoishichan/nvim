@@ -45,6 +45,7 @@ do
 	local indicator = bufferline_opts.options.diagnostics_indicator
 	assert(indicator(0, 0, { info = 2 }):match("2"), "Bufferline hides info-only diagnostics")
 	assert(indicator(0, 0, { hint = 3 }):match("3"), "Bufferline hides hint-only diagnostics")
+	assert(bufferline_opts.options.indicator.style == "none", "Current Bufferline item still has an indicator")
 	assert(type(bufferline_opts.highlights) == "function", "Bufferline has no theme-derived inactive colours")
 	local bufferline_highlights = bufferline_opts.highlights()
 	local palette = require("user.core.palette")
