@@ -136,7 +136,7 @@ return {
 			-- Make the peek panels use the completion menu's Pmenu block colours.
 			-- glance sets its groups with default = true, so these explicit
 			-- overrides win; re-applied on every colorscheme switch.
-			require("user.core.highlights").on_colorscheme(function()
+			require("user.core.highlights").on_colorscheme("glance", function()
 				local palette = require("user.core.palette")
 				local normal = vim.api.nvim_get_hl(0, { name = "Normal" })
 				local pmenu_bg = vim.api.nvim_get_hl(0, { name = "Pmenu" }).bg

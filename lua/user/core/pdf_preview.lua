@@ -1,8 +1,13 @@
 local M = {}
+local lifecycle_key = "_user_pdf_preview_lifecycle"
 
 function M.setup(context)
+	local previous_lifecycle = rawget(vim, lifecycle_key)
+	if previous_lifecycle and previous_lifecycle.cleanup then
+		previous_lifecycle.cleanup()
+	end
 	local augroup = context.augroup
-	local lifecycle = context.lifecycle
+	local lifecycle = { closed = context.lifecycle.closed, owner = context.lifecycle }
 	local track_uv_handle = context.track_uv_handle
 	local release_uv_handle = context.release_uv_handle
 	local add_cleanup = context.add_cleanup
@@ -26,6 +31,63 @@ function M.setup(context)
 
 	local active_pdf_preview_images = {}
 	local pending_pdf_conversions = {}
+	local pending_pdf_info = {}
+	local deferred_timers = {}
+	local function defer(callback, delay, bufnr)
+		local timer
+		timer = track_uv_handle(vim.defer_fn(function()
+			deferred_timers[timer] = nil
+			release_uv_handle(timer)
+			if not lifecycle.closed then
+				callback()
+			end
+		end, delay))
+		deferred_timers[timer] = bufnr or false
+		return timer
+	end
+	local function cancel_process(process)
+		if process then
+			pcall(process.kill, process, 15)
+		end
+	end
+	local function preview_capability()
+		if #vim.api.nvim_list_uis() == 0 then
+			return false, "Inline PDF preview needs an attached terminal UI."
+		end
+		local terminal = (vim.env.TERM_PROGRAM or ""):lower()
+		if
+			not (
+				vim.env.KITTY_WINDOW_ID
+				or (vim.env.TERM or ""):find("kitty", 1, true)
+				or terminal == "wezterm"
+				or terminal == "ghostty"
+			)
+		then
+			return false, "Inline PDF preview needs a Kitty-compatible graphics terminal."
+		end
+		if vim.fn.executable("pdftoppm") == 0 then
+			return false, "Missing pdftoppm for PDF preview; install Poppler."
+		end
+		if
+			vim.fn.executable("magick") == 0
+			and (vim.fn.executable("convert") == 0 or vim.fn.executable("identify") == 0)
+		then
+			return false, "Missing ImageMagick for inline PDF preview."
+		end
+		return true
+	end
+
+	local function pending_cache_file(path)
+		if pending_pdf_conversions[path] then
+			return true
+		end
+		for _, pending in pairs(pending_pdf_conversions) do
+			if pending.partial == path then
+				return true
+			end
+		end
+		return false
+	end
 
 	local function prune_pdf_cache()
 		if lifecycle.closed or not vim.uv.fs_stat(pdf_cache_dir) then
@@ -46,7 +108,7 @@ function M.setup(context)
 			if kind == "file" and name:match("%.png$") then
 				local path = vim.fs.joinpath(pdf_cache_dir, name)
 				local stat = vim.uv.fs_stat(path)
-				if stat and not pending_pdf_conversions[path] then
+				if stat and not pending_cache_file(path) then
 					local modified = stat.mtime and stat.mtime.sec or 0
 					if modified > 0 and now - modified > pdf_cache_max_age then
 						vim.uv.fs_unlink(path)
@@ -70,10 +132,16 @@ function M.setup(context)
 	end
 
 	local prune_generation = 0
+	local prune_timer
 	local function schedule_pdf_cache_prune(delay)
 		prune_generation = prune_generation + 1
 		local generation = prune_generation
-		vim.defer_fn(function()
+		if prune_timer then
+			deferred_timers[prune_timer] = nil
+			release_uv_handle(prune_timer)
+		end
+		prune_timer = defer(function()
+			prune_timer = nil
 			if not lifecycle.closed and generation == prune_generation then
 				prune_pdf_cache()
 			end
@@ -130,7 +198,7 @@ function M.setup(context)
 	end
 
 	local function load_pdf_image_plugin()
-		if package.loaded["image"] or pdf_image_loading then
+		if not preview_capability() or package.loaded["image"] or pdf_image_loading then
 			return
 		end
 
@@ -178,10 +246,44 @@ function M.setup(context)
 		return vim.fs.joinpath(pdf_cache_dir, vim.fn.sha256(fingerprint) .. ".png")
 	end
 
+	local function remove_partial(pending)
+		pcall(vim.uv.fs_unlink, pending.partial)
+	end
+
+	local function cancel_buffer_jobs(bufnr)
+		local info = pending_pdf_info[bufnr]
+		pending_pdf_info[bufnr] = nil
+		if info then
+			cancel_process(info.process)
+		end
+		for png, pending in pairs(pending_pdf_conversions) do
+			pending.owners[bufnr] = nil
+			for index = #pending.callbacks, 1, -1 do
+				if pending.callbacks[index].bufnr == bufnr then
+					table.remove(pending.callbacks, index)
+				end
+			end
+			if not next(pending.owners) then
+				pending_pdf_conversions[png] = nil
+				cancel_process(pending.process)
+				remove_partial(pending)
+			end
+		end
+		for timer, owner in pairs(deferred_timers) do
+			if owner == bufnr then
+				deferred_timers[timer] = nil
+				release_uv_handle(timer)
+			end
+		end
+	end
+
 	local function convert_pdf_preview(file, page, zoom, png, callback, opts)
 		opts = opts or {}
 		callback = callback or function() end
 		local notify_on_error = not opts.silent
+		if lifecycle.closed or not pdf_buffer_loaded(opts.bufnr) then
+			return
+		end
 
 		if vim.uv.fs_stat(png) then
 			local now = os.time()
@@ -190,10 +292,11 @@ function M.setup(context)
 			return
 		end
 
-		if pending_pdf_conversions[png] then
-			table.insert(pending_pdf_conversions[png].callbacks, callback)
-			pending_pdf_conversions[png].notify_on_error = pending_pdf_conversions[png].notify_on_error
-				or notify_on_error
+		local pending = pending_pdf_conversions[png]
+		if pending then
+			pending.owners[opts.bufnr] = true
+			table.insert(pending.callbacks, { callback = callback, bufnr = opts.bufnr })
+			pending.notify_on_error = pending.notify_on_error or notify_on_error
 			return
 		end
 
@@ -202,10 +305,18 @@ function M.setup(context)
 			return
 		end
 
-		pending_pdf_conversions[png] = { callbacks = { callback }, notify_on_error = notify_on_error }
+		-- A canceled process can still finish writing. Publish only this
+		-- generation's completed PNG, so it cannot overwrite a newer render.
+		local output_base = png:gsub("%.png$", "") .. "." .. tostring(vim.uv.hrtime()) .. ".part"
+		pending = {
+			callbacks = { { callback = callback, bufnr = opts.bufnr } },
+			owners = { [opts.bufnr] = true },
+			notify_on_error = notify_on_error,
+			partial = output_base .. ".png",
+		}
+		pending_pdf_conversions[png] = pending
 		local dpi = math.floor(pdf_base_dpi * zoom / 100 + 0.5)
-		local output_base = png:gsub("%.png$", "")
-		vim.system({
+		pending.process = vim.system({
 			"pdftoppm",
 			"-f",
 			tostring(page),
@@ -219,14 +330,16 @@ function M.setup(context)
 			output_base,
 		}, { text = true }, function(result)
 			vim.schedule(function()
-				if lifecycle.closed then
-					pending_pdf_conversions[png] = nil
+				if lifecycle.closed or pending_pdf_conversions[png] ~= pending then
+					remove_partial(pending)
 					return
 				end
-				local pending = pending_pdf_conversions[png] or { callbacks = {}, notify_on_error = notify_on_error }
 				pending_pdf_conversions[png] = nil
-
-				if result.code ~= 0 or not vim.uv.fs_stat(png) then
+				local published = result.code == 0
+					and vim.uv.fs_stat(pending.partial)
+					and vim.uv.fs_rename(pending.partial, png)
+				if not published then
+					remove_partial(pending)
 					if pending.notify_on_error then
 						local stderr = vim.trim(result.stderr or "")
 						local message = stderr ~= "" and stderr or ("Failed to render PDF page " .. page)
@@ -235,8 +348,10 @@ function M.setup(context)
 					return
 				end
 
-				for _, queued_callback in ipairs(pending.callbacks) do
-					queued_callback(png)
+				for _, queued in ipairs(pending.callbacks) do
+					if pdf_buffer_loaded(queued.bufnr) then
+						queued.callback(png)
+					end
 				end
 				schedule_pdf_cache_prune()
 			end)
@@ -277,6 +392,26 @@ function M.setup(context)
 	end
 
 	local function ensure_pdf_preview_scroll_space(bufnr)
+		local available, reason = preview_capability()
+		vim.b[bufnr].pdf_preview_unavailable_reason = reason
+		if not available then
+			local modifiable, readonly = vim.bo[bufnr].modifiable, vim.bo[bufnr].readonly
+			vim.bo[bufnr].modifiable = true
+			vim.bo[bufnr].readonly = false
+			vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {
+				"PDF: " .. (vim.b[bufnr].pdf_preview_file or ""),
+				"",
+				reason,
+				"",
+				"Press o or use :PdfOpen to open this PDF externally.",
+			})
+			vim.bo[bufnr].modifiable = modifiable
+			vim.bo[bufnr].readonly = readonly
+			vim.bo[bufnr].modified = false
+			vim.b[bufnr].pdf_preview_scroll_lines = nil
+			vim.b[bufnr].pdf_preview_scroll_columns = nil
+			return 0, 0
+		end
 		local lines, columns = pdf_preview_scroll_size()
 		if
 			vim.b[bufnr].pdf_preview_scroll_lines == lines
@@ -292,10 +427,12 @@ function M.setup(context)
 			content[i] = line
 		end
 
-		local modifiable = vim.bo[bufnr].modifiable
+		local modifiable, readonly = vim.bo[bufnr].modifiable, vim.bo[bufnr].readonly
 		vim.bo[bufnr].modifiable = true
+		vim.bo[bufnr].readonly = false
 		vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, content)
 		vim.bo[bufnr].modifiable = modifiable
+		vim.bo[bufnr].readonly = readonly
 		vim.bo[bufnr].modified = false
 		vim.b[bufnr].pdf_preview_scroll_lines = lines
 		vim.b[bufnr].pdf_preview_scroll_columns = columns
@@ -340,7 +477,7 @@ function M.setup(context)
 			if target >= 1 and (not pages or target <= pages) then
 				local png = pdf_cache_file(file, target, zoom)
 				if not vim.uv.fs_stat(png) and not pending_pdf_conversions[png] then
-					convert_pdf_preview(file, target, zoom, png, nil, { silent = true })
+					convert_pdf_preview(file, target, zoom, png, nil, { silent = true, bufnr = bufnr })
 				end
 			end
 		end
@@ -348,7 +485,12 @@ function M.setup(context)
 
 	local function render_pdf_preview(bufnr, opts)
 		opts = opts or {}
-		if lifecycle.closed or not pdf_buffer_loaded(bufnr) or #vim.api.nvim_list_uis() == 0 then
+		if lifecycle.closed or not pdf_buffer_loaded(bufnr) then
+			return
+		end
+		if not preview_capability() then
+			ensure_pdf_preview_scroll_space(bufnr)
+			clear_pdf_preview_images(bufnr)
 			return
 		end
 
@@ -444,7 +586,7 @@ function M.setup(context)
 			active_pdf_preview_images[bufnr] = images
 			clear_pdf_image_set(previous_images, previous_ids)
 			refresh_pdf_statusline()
-			vim.defer_fn(function()
+			defer(function()
 				if
 					not lifecycle.closed
 					and pdf_buffer_loaded(bufnr)
@@ -453,13 +595,18 @@ function M.setup(context)
 				then
 					prefetch_pdf_adjacent(bufnr, file, page, zoom)
 				end
-			end, 100)
-		end, { silent = not (pages and pages > 0) })
+			end, 100, bufnr)
+		end, { silent = not (pages and pages > 0), bufnr = bufnr })
 	end
 
 	local function request_pdf_page_count(bufnr, file)
 		if lifecycle.closed or not pdf_buffer_loaded(bufnr) then
 			return
+		end
+		local previous = pending_pdf_info[bufnr]
+		pending_pdf_info[bufnr] = nil
+		if previous then
+			cancel_process(previous.process)
 		end
 		vim.b[bufnr].pdf_preview_pages = nil
 		refresh_pdf_statusline()
@@ -470,16 +617,21 @@ function M.setup(context)
 
 		local token = (tonumber(vim.b[bufnr].pdf_preview_page_count_token) or 0) + 1
 		vim.b[bufnr].pdf_preview_page_count_token = token
-		vim.system({ "pdfinfo", file }, { text = true }, function(result)
+		local pending = {}
+		pending_pdf_info[bufnr] = pending
+		pending.process = vim.system({ "pdfinfo", file }, { text = true }, function(result)
 			vim.schedule(function()
 				if
 					lifecycle.closed
 					or not pdf_buffer_loaded(bufnr)
 					or vim.b[bufnr].pdf_preview_file ~= file
 					or vim.b[bufnr].pdf_preview_page_count_token ~= token
+					or pending_pdf_info[bufnr] ~= pending
 				then
 					return
 				end
+
+				pending_pdf_info[bufnr] = nil
 
 				if result.code ~= 0 then
 					refresh_pdf_statusline()
@@ -507,7 +659,7 @@ function M.setup(context)
 	end
 
 	local function set_pdf_page(bufnr, page)
-		if not pdf_buffer_loaded(bufnr) then
+		if lifecycle.closed or not pdf_buffer_loaded(bufnr) then
 			return
 		end
 
@@ -521,7 +673,7 @@ function M.setup(context)
 	end
 
 	local function prompt_pdf_page(bufnr)
-		if not pdf_buffer_loaded(bufnr) then
+		if lifecycle.closed or not pdf_buffer_loaded(bufnr) then
 			return
 		end
 
@@ -543,7 +695,7 @@ function M.setup(context)
 	end
 
 	local function set_pdf_zoom(bufnr, zoom)
-		if not pdf_buffer_loaded(bufnr) then
+		if lifecycle.closed or not pdf_buffer_loaded(bufnr) then
 			return
 		end
 
@@ -726,6 +878,9 @@ function M.setup(context)
 				file,
 				{},
 				vim.schedule_wrap(function(err)
+					if pdf_file_watchers[bufnr] ~= handle then
+						return
+					end
 					if lifecycle.closed or err then
 						stop_pdf_watcher(bufnr)
 						return
@@ -735,14 +890,14 @@ function M.setup(context)
 						return
 					end
 					pdf_watch_pending[bufnr] = true
-					vim.defer_fn(function()
+					defer(function()
 						pdf_watch_pending[bufnr] = nil
 						if lifecycle.closed or not pdf_buffer_loaded(bufnr) then
 							stop_pdf_watcher(bufnr)
 							return
 						end
 						on_change()
-					end, 200)
+					end, 200, bufnr)
 				end)
 			)
 		end)
@@ -752,44 +907,43 @@ function M.setup(context)
 		end
 	end
 
-	vim.api.nvim_create_autocmd("BufReadCmd", {
-		group = augroup("pdf_preview"),
-		pattern = { "*.pdf", "*.PDF" },
-		callback = function(event)
-			local bufnr = event.buf
-			local file = vim.fn.fnamemodify(event.match, ":p")
+	local function open_pdf_buffer(bufnr, path)
+		if lifecycle.closed then
+			return
+		end
+		cancel_buffer_jobs(bufnr)
+		local file = vim.fn.fnamemodify(path, ":p")
 
-			vim.b[bufnr].pdf_preview_file = file
-			vim.b[bufnr].pdf_preview_page = 1
-			vim.b[bufnr].pdf_preview_pages = nil
-			vim.b[bufnr].pdf_preview_zoom = 100
-			vim.b[bufnr].pdf_preview_render_token = 0
-			vim.bo[bufnr].bufhidden = "hide"
-			vim.bo[bufnr].buflisted = true
-			vim.bo[bufnr].buftype = "nofile"
-			vim.bo[bufnr].filetype = "pdf"
-			vim.bo[bufnr].modified = false
-			vim.bo[bufnr].modifiable = true
-			vim.bo[bufnr].readonly = true
-			vim.bo[bufnr].swapfile = false
-			ensure_pdf_preview_scroll_space(bufnr)
-			vim.bo[bufnr].modifiable = false
-			vim.bo[bufnr].modified = false
+		vim.b[bufnr].pdf_preview_file = file
+		vim.b[bufnr].pdf_preview_page = 1
+		vim.b[bufnr].pdf_preview_pages = nil
+		vim.b[bufnr].pdf_preview_zoom = 100
+		vim.b[bufnr].pdf_preview_render_token = 0
+		vim.bo[bufnr].bufhidden = "hide"
+		vim.bo[bufnr].buflisted = true
+		vim.bo[bufnr].buftype = "nofile"
+		vim.bo[bufnr].filetype = "pdf"
+		vim.bo[bufnr].modified = false
+		vim.bo[bufnr].modifiable = true
+		vim.bo[bufnr].readonly = true
+		vim.bo[bufnr].swapfile = false
+		ensure_pdf_preview_scroll_space(bufnr)
+		vim.bo[bufnr].modifiable = false
+		vim.bo[bufnr].modified = false
 
-			load_pdf_statusline()
-			load_pdf_image_plugin()
-			apply_pdf_preview_window_options(bufnr)
-			setup_pdf_preview_keymaps(bufnr, file)
-			request_pdf_page_count(bufnr, file)
-			watch_pdf_file(bufnr, file)
+		load_pdf_statusline()
+		load_pdf_image_plugin()
+		apply_pdf_preview_window_options(bufnr)
+		setup_pdf_preview_keymaps(bufnr, file)
+		request_pdf_page_count(bufnr, file)
+		watch_pdf_file(bufnr, file)
 
-			vim.schedule(function()
-				if pdf_buffer_loaded(bufnr) then
-					render_pdf_preview(bufnr)
-				end
-			end)
-		end,
-	})
+		vim.schedule(function()
+			if pdf_buffer_loaded(bufnr) then
+				render_pdf_preview(bufnr)
+			end
+		end)
+	end
 
 	vim.api.nvim_create_autocmd({ "BufWinEnter", "VimResized" }, {
 		group = augroup("pdf_preview_refresh"),
@@ -823,6 +977,7 @@ function M.setup(context)
 	})
 
 	local function cleanup_pdf_buffer(bufnr)
+		cancel_buffer_jobs(bufnr)
 		clear_pdf_preview_images(bufnr)
 		stop_pdf_watcher(bufnr)
 	end
@@ -834,15 +989,44 @@ function M.setup(context)
 		end,
 	})
 
-	add_cleanup(function()
+	local function cleanup()
+		if lifecycle.closed then
+			return
+		end
+		lifecycle.closed = true
 		for bufnr in pairs(active_pdf_preview_images) do
 			clear_pdf_preview_images(bufnr)
 		end
 		for bufnr in pairs(pdf_file_watchers) do
 			stop_pdf_watcher(bufnr)
 		end
+		for _, pending in pairs(pending_pdf_conversions) do
+			cancel_process(pending.process)
+			remove_partial(pending)
+		end
 		pending_pdf_conversions = {}
-	end)
+		for _, info in pairs(pending_pdf_info) do
+			cancel_process(info.process)
+		end
+		pending_pdf_info = {}
+		for timer in pairs(deferred_timers) do
+			release_uv_handle(timer)
+		end
+		deferred_timers = {}
+	end
+	lifecycle.cleanup = cleanup
+	rawset(vim, lifecycle_key, lifecycle)
+	-- Module-only reloads share the owner's one cleanup dispatcher. The
+	-- generation itself lives outside package.loaded, just like its UV handles.
+	if not context.lifecycle.pdf_cleanup_registered then
+		context.lifecycle.pdf_cleanup_registered = true
+		add_cleanup(function()
+			local current = rawget(vim, lifecycle_key)
+			if current and current.owner == context.lifecycle then
+				current.cleanup()
+			end
+		end)
+	end
 
 	-- Re-sourcing this module deliberately tears down the previous generation's
 	-- handles and image objects. Rehydrate any PDF buffers that survived that
@@ -865,6 +1049,13 @@ function M.setup(context)
 			end
 		end
 	end
+	return {
+		open = open_pdf_buffer,
+		cleanup = cleanup,
+		is_active = function()
+			return not lifecycle.closed
+		end,
+	}
 end
 
 return M

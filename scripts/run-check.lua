@@ -14,6 +14,9 @@ assert(
 		"workflow_python_js",
 		"workflow_native",
 		"workflow_java_docs",
+		"signature",
+		"lifecycle",
+		"pdf_lifecycle",
 	}, group),
 	"Unknown behavior check group: " .. group
 )

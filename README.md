@@ -71,12 +71,14 @@ Selene、Stylelint、golangci-lint 仅在项目存在对应配置时运行，避
 │       │   ├── ai_terminal.lua -- AI CLI 的 toggleterm 生命周期与通信
 │       │   ├── autocmds.lua   -- 通用自动命令与生命周期
 │       │   ├── backdrop.lua   -- 浮窗背景调暗
+│       │   ├── blink_signature.lua -- 签名提示稳定入口
+│       │   ├── signature/     -- 调用解析、参数选择、渲染与 Blink 适配
 │       │   ├── commands.lua   -- 自定义命令
 │       │   ├── conflicts.lua  -- Git conflict 高亮、跳转与选择
 │       │   ├── diagnostics.lua -- 诊断 UI
 │       │   ├── dict.lua       -- ECDICT 离线词典浮窗
 │       │   ├── float_style.lua -- 无边框 padding 浮窗共享样式
-│       │   ├── highlights.lua -- 主题切换后的高亮重放 helper
+│       │   ├── highlights.lua -- 具名高亮回调，重载时替换
 │       │   ├── java.lua       -- Java root / runtime / workspace 解析
 │       │   ├── keymaps.lua    -- 全局非插件键位
 │       │   ├── layout.lua     -- 窗口布局工具
@@ -85,6 +87,7 @@ Selene、Stylelint、golangci-lint 仅在项目存在对应配置时运行，避
 │       │   ├── palette.lua    -- 从当前主题推导语义色
 │       │   ├── panels.lua     -- 侧边面板尺寸常量
 │       │   ├── pdf.lua        -- PDF 状态栏数据
+│       │   ├── pdf_registration.lua -- PDF 轻量注册，首次使用再加载实现
 │       │   ├── pdf_preview.lua -- PDF 渲染、缓存、按键与文件监听
 │       │   ├── popups.lua     -- Esc 统一关闭临时弹窗
 │       │   ├── sensitive.lua  -- 密钥文件与剪贴板保护
@@ -361,6 +364,12 @@ Go 汇编仅在 `.s`、Go 项目和 Plan 9 指令特征同时匹配时使用 asm
   找不到时才使用 Mason 的绝对路径，因此普通终端不会继承 Mason 环境。
 - 写入不存在的父目录不会再静默创建目录；确认路径后使用 `:WriteCreateDirs`。
 - PDF PNG 缓存目录权限设为仅当前用户可访问，保留不超过 30 天且总量限制为 512 MiB。
+- PDF 渲染与缓存扫描按需启动；关闭文件和重载时取消该实例的进程与监听。
+  无图形协议或缺少可选工具时显示原因与外部打开入口。
+- 签名提示的解析与 Blink 适配分离，插件内部接口缺失时回退到普通签名提示。
+  AI 操作也按首次使用加载；主题回调使用具名替换，避免重载时重复注册。
 - 修改配置后运行 `./scripts/check.sh`，执行静态检查、原有集成回归及 performance、ai、languages
   行为回归。每个 Neovim 组使用独立进程与临时 cache / state / log，复用已安装的插件和工具。
   可用 `./scripts/check.sh performance` 或 `./scripts/check.sh --group static --group ai` 仅运行指定组。
+- `python3 scripts/benchmark.py` 保留启动输入、各次日志与结果 JSON；默认每场景四次、丢弃首轮。
+  启动报错会使测量失败。此工具只测无头启动，补全、语言服务就绪和终端绘制分别验收。

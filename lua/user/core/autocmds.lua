@@ -435,7 +435,7 @@ vim.api.nvim_create_autocmd({ "InsertLeave", "TextChanged" }, {
 	end,
 })
 
-require("user.core.pdf_preview").setup({
+require("user.core.pdf_registration").setup({
 	augroup = augroup,
 	lifecycle = lifecycle,
 	track_uv_handle = track_uv_handle,

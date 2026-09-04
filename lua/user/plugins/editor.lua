@@ -169,7 +169,7 @@ return {
 		},
 		config = function(_, opts)
 			require("illuminate").configure(opts)
-			require("user.core.highlights").on_colorscheme(function()
+			require("user.core.highlights").on_colorscheme("illuminate", function()
 				local p = require("user.core.palette").get()
 				vim.api.nvim_set_hl(0, "IlluminatedWordText", { bg = p.subtle })
 				vim.api.nvim_set_hl(0, "IlluminatedWordRead", { bg = p.subtle })
@@ -230,7 +230,7 @@ return {
 		},
 		config = function(_, opts)
 			require("treesitter-context").setup(opts)
-			require("user.core.highlights").on_colorscheme(function()
+			require("user.core.highlights").on_colorscheme("treesitter-context", function()
 				local p = require("user.core.palette").get()
 				vim.api.nvim_set_hl(0, "TreesitterContext", { bg = p.bg })
 				vim.api.nvim_set_hl(0, "TreesitterContextBottom", { underline = true, sp = p.strong })
