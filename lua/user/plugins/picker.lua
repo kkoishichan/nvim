@@ -43,17 +43,34 @@ return {
 				end
 				width = math.min(math.max(width + 8, 30), math.floor(vim.o.columns * 0.8))
 				return {
+					fzf_opts = {
+						-- The scrollbar owns fzf's last terminal cell even when all
+						-- choices fit, which makes the right padding look one cell wider.
+						["--no-scrollbar"] = true,
+					},
 					winopts = {
 						height = height,
 						width = width,
 						row = 0.4,
 						col = 0.5,
 						border = float_style.border(),
+						backdrop = 60,
 					},
 					hls = {
 						normal = "Pmenu",
 						border = "Pmenu",
 						title = "Pmenu",
+						cursorline = "PmenuSel",
+						-- fzf paints its terminal cells from this nested palette; setting
+						-- only `normal` leaves an editor-coloured rectangle inside the
+						-- Pmenu padding after recent fzf-lua updates.
+						fzf = {
+							normal = "Pmenu",
+							cursorline = "PmenuSel",
+							border = "Pmenu",
+							gutter = "Pmenu",
+							query = "Pmenu",
+						},
 					},
 				}
 			end)

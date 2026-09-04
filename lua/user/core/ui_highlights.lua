@@ -59,15 +59,15 @@ local function set_float_highlights()
 	vim.api.nvim_set_hl(0, "BlinkCmpSignatureVirtualIndicator", { fg = p.warn })
 	-- Virtual signatures keep Tree-sitter foregrounds but sit on the same raised
 	-- surface as Blink's popup, so they remain distinct from source text.
-	local signature_bg = vim.api.nvim_get_hl(0, { name = "Pmenu", link = false }).bg or p.panel
+	local popup_bg = vim.api.nvim_get_hl(0, { name = "Pmenu", link = false }).bg or p.panel
 	vim.api.nvim_set_hl(0, "BlinkCmpSignatureVirtual", {
-		bg = signature_bg,
+		bg = popup_bg,
 	})
 	-- Mark the active parameter with a quiet neutral lift instead of the default
 	-- blue/cyan LspSignatureActiveParameter background. With no foreground here,
 	-- the signature's Tree-sitter colours remain visible.
 	vim.api.nvim_set_hl(0, "BlinkCmpSignatureHelpActiveParameter", {
-		bg = palette.blend(p.fg, signature_bg, 0.16),
+		bg = palette.blend(p.fg, popup_bg, 0.16),
 	})
 	vim.api.nvim_set_hl(0, "BqfPreviewFloat", { link = "Pmenu" })
 	vim.api.nvim_set_hl(0, "BqfPreviewBorder", { link = "Pmenu" })
@@ -79,6 +79,12 @@ local function set_float_highlights()
 	vim.api.nvim_set_hl(0, "WhichKeyNormal", { link = "Pmenu" })
 	vim.api.nvim_set_hl(0, "WhichKeyBorder", { link = "Pmenu" })
 	vim.api.nvim_set_hl(0, "WhichKeyTitle", { link = "Pmenu" })
+	-- which-key classifies find/search/diagnostic/AI mappings as "green". The
+	-- VS Code palette maps MiniIconsGreen to its comment green, which is too
+	-- prominent in the leader popup; keep that one icon class theme-neutral.
+	vim.api.nvim_set_hl(0, "WhichKeyIconGreen", {
+		fg = palette.blend(p.fg, popup_bg, 0.72),
+	})
 	-- fzf-lua: override the theme's own FzfLua* border/title onto the shared accent.
 	vim.api.nvim_set_hl(0, "FzfLuaBorder", { link = "FloatBorder" })
 	vim.api.nvim_set_hl(0, "FzfLuaPreviewBorder", { link = "FloatBorder" })

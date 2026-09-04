@@ -40,6 +40,11 @@ opt.pumblend = 0
 opt.pumheight = 12
 opt.relativenumber = true
 opt.scrolloff = 8
+-- `blank` makes :mksession serialize visible plugin panels (neo-tree, outline,
+-- etc.) as `enew | file <panel name>`. On restore those names become ordinary
+-- file buffers because the plugin-specific buffer metadata is not persisted.
+-- Keep real listed buffers, but leave transient/panel windows out of sessions.
+opt.sessionoptions:remove("blank")
 opt.shiftround = true
 opt.shiftwidth = 2
 opt.shortmess:append({ W = true, I = true, c = true, C = true })

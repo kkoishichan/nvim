@@ -19,6 +19,11 @@ do
 	assert(active_snippet.link == "SnippetTabstop", "Active snippet placeholder does not inherit snippet grey")
 end
 assert(vim.o.shada:match("<0"), "ShaDa still persists register contents")
+assert(
+	not vim.tbl_contains(vim.opt.sessionoptions:get(), "blank"),
+	"Sessions still serialize plugin panels as ordinary file buffers"
+)
+assert(vim.tbl_contains(vim.opt.sessionoptions:get(), "buffers"), "Sessions no longer preserve hidden file buffers")
 assert(vim.g.user_lsp_preview_patched == nil, "LSP floating-preview API was monkeypatched")
 assert(
 	type(vim.fn.maparg("<Esc>", "n", false, true).callback) == "function",
@@ -190,6 +195,12 @@ do
 	local glance = plugins["glance.nvim"]
 	assert(glance and glance.cmd == "Glance", "Glance peek UI is missing or not lazy-loaded")
 	local neo_tree_opts = opts("neo-tree.nvim")
+	assert(neo_tree_opts.auto_clean_after_session_restore, "Neo-tree cannot clean legacy session buffers")
+	local neo_tree_session_cleanup = vim.api.nvim_get_autocmds({
+		group = "user_neotree_session_cleanup",
+		event = "SessionLoadPost",
+	})
+	assert(#neo_tree_session_cleanup == 1, "Legacy Neo-tree session cleanup is not registered")
 	assert(neo_tree_opts.enable_git_status, "neo-tree Git status is disabled")
 	assert(neo_tree_opts.enable_diagnostics, "neo-tree diagnostics are disabled")
 	assert(neo_tree_opts.filesystem.use_libuv_file_watcher, "neo-tree file watcher is disabled")
@@ -221,6 +232,14 @@ do
 	)
 	assert(snacks_opts.styles.notification.border == "rounded", "Snacks notification style was changed")
 	assert_shared_border(opts("which-key.nvim").win.border, "Which-key")
+	local which_key_green = vim.api.nvim_get_hl(0, { name = "WhichKeyIconGreen", link = false }).fg
+	local comment = vim.api.nvim_get_hl(0, { name = "Comment", link = false }).fg
+	local popup_bg = vim.api.nvim_get_hl(0, { name = "Pmenu", link = false }).bg
+	assert(which_key_green ~= comment, "Which-key green icons still inherit the VS Code comment green")
+	assert(
+		which_key_green == require("user.core.palette").blend(require("user.core.palette").get().fg, popup_bg, 0.72),
+		"Which-key green icons are not using the neutral popup colour"
+	)
 	local completion_opts = opts("blink.cmp")
 	assert(completion_opts.completion.menu.border == "padded", "Completion menu lost its borderless style")
 	assert(completion_opts.keymap.preset == "super-tab", "Completion no longer uses IDE-style Tab acceptance")
@@ -724,7 +743,35 @@ do
 	)
 
 	-- Other application-sized overlays deliberately keep their framed layouts.
-	assert(opts("fzf-lua").winopts.border == "rounded", "Fzf main window lost its panel border")
+	local fzf_plugin = plugins["fzf-lua"]
+	local fzf_opts = opts("fzf-lua")
+	assert(fzf_opts.winopts.border == "rounded", "Fzf main window lost its panel border")
+	do
+		-- The theme picker and other vim.ui.select callers use a compact popup,
+		-- while regular FzfLua commands retain the application-sized style above.
+		local registered_ui_select
+		local loaded_fzf = package.loaded["fzf-lua"]
+		package.loaded["fzf-lua"] = {
+			setup = function() end,
+			register_ui_select = function(callback)
+				registered_ui_select = callback
+			end,
+		}
+		fzf_plugin.config(nil, fzf_opts)
+		package.loaded["fzf-lua"] = loaded_fzf
+		assert(type(registered_ui_select) == "function", "vim.ui.select was not registered with FzfLua")
+		local select_opts = registered_ui_select({ prompt = "Colorscheme" }, { "one", "two", "three", "four" })
+		assert_shared_border(select_opts.winopts.border, "Theme picker")
+		assert(select_opts.winopts.backdrop == 60, "Theme picker backdrop is disabled")
+		assert(select_opts.fzf_opts["--no-scrollbar"], "Theme picker still reserves an extra right-hand cell")
+		assert(select_opts.hls.normal == "Pmenu", "Theme picker body does not use Pmenu")
+		assert(select_opts.hls.cursorline == "PmenuSel", "Theme picker selection does not use PmenuSel")
+		assert(
+			select_opts.hls.fzf.normal == "Pmenu" and select_opts.hls.fzf.gutter == "Pmenu",
+			"Theme picker terminal surface does not use Pmenu"
+		)
+		assert(select_opts.hls.fzf.cursorline == "PmenuSel", "Theme picker terminal selection does not use PmenuSel")
+	end
 	local oil_opts = opts("oil.nvim")
 	assert(oil_opts.float.border == "rounded", "Oil float lost its panel border")
 	assert(type(oil_opts.keymaps["<Esc>"].callback) == "function", "Floating Oil cannot be closed with Escape")

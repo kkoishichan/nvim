@@ -1,6 +1,17 @@
 local panels = require("user.core.panels")
 local float_style = require("user.core.float_style")
 
+local function has_invalid_restored_neotree_buffer()
+	for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+		local name = vim.fn.bufname(bufnr)
+		local has_source = pcall(vim.api.nvim_buf_get_var, bufnr, "neo_tree_source")
+		if name:match("neo%-tree [^ ]+ %[%d+]") and not has_source then
+			return true
+		end
+	end
+	return false
+end
+
 return {
 	{
 		"stevearc/oil.nvim",
@@ -66,6 +77,22 @@ return {
 	{
 		"nvim-neo-tree/neo-tree.nvim",
 		cmd = "Neotree",
+		init = function()
+			-- Sessions saved before `sessionoptions-=blank` may already contain a
+			-- plain buffer named `neo-tree filesystem [1]`. Load Neo-tree only when
+			-- such a legacy entry exists, then let its own cleaner remove it.
+			vim.api.nvim_create_autocmd("SessionLoadPost", {
+				group = vim.api.nvim_create_augroup("user_neotree_session_cleanup", { clear = true }),
+				desc = "Clean invalid Neo-tree buffers restored by old sessions",
+				callback = function()
+					if not has_invalid_restored_neotree_buffer() then
+						return
+					end
+					require("lazy").load({ plugins = { "neo-tree.nvim" } })
+					require("neo-tree.ui.renderer").clean_invalid_neotree_buffers(true)
+				end,
+			})
+		end,
 		keys = {
 			{
 				"<leader>e",
@@ -79,6 +106,7 @@ return {
 			"nvim-mini/mini.icons",
 		},
 		opts = {
+			auto_clean_after_session_restore = true,
 			close_if_last_window = true,
 			enable_diagnostics = true,
 			enable_git_status = true,
