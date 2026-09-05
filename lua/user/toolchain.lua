@@ -97,6 +97,78 @@ local packages = {
 
 M.packages = packages
 
+-- Profiles select explicit restores only. File opening and normal startup never
+-- install tools, and all profiles reuse the single catalog of pinned versions.
+M.profiles = {
+	minimal = { "lua-language-server", "stylua", "selene", "ruff", "shellcheck", "shfmt" },
+	python = { "basedpyright", "ruff", "debugpy" },
+	web = {
+		"js-debug-adapter",
+		"biome",
+		"css-lsp",
+		"dockerfile-language-server",
+		"emmet-language-server",
+		"html-lsp",
+		"json-lsp",
+		"sqlls",
+		"tailwindcss-language-server",
+		"vtsls",
+		"vue-language-server",
+		"yaml-language-server",
+		"prettier",
+		"stylelint",
+	},
+	java = { "jdtls", "java-debug-adapter", "java-test" },
+	native = {
+		"asm-lsp",
+		"autotools-language-server",
+		"clangd",
+		"gopls",
+		"neocmakelsp",
+		"rust-analyzer",
+		"taplo",
+		"verible",
+		"asmfmt",
+		"checkmake",
+		"clang-format",
+		"cmakelang",
+		"cmakelint",
+		"gofumpt",
+		"goimports",
+		"golangci-lint",
+		"codelldb",
+		"delve",
+	},
+	docs = { "marksman", "texlab", "tinymist", "typos-lsp", "latexindent", "markdownlint-cli2", "typstyle" },
+	full = {}, -- The complete catalog, including tools outside the named language profiles.
+}
+
+function M.ensure_installed(profiles)
+	profiles = profiles or { "minimal" }
+	if type(profiles) == "string" then
+		profiles = { profiles }
+	end
+	assert(type(profiles) == "table", "Tool profiles must be a name or list of names")
+	local selected, full = {}, false
+	for _, name in ipairs(M.profiles.minimal) do
+		selected[name] = true
+	end
+	for _, profile in ipairs(profiles) do
+		assert(M.profiles[profile], "Unknown tool profile: " .. tostring(profile))
+		full = full or profile == "full"
+		for _, name in ipairs(M.profiles[profile]) do
+			selected[name] = true
+		end
+	end
+	local result = {}
+	for _, package in ipairs(packages) do
+		if full or selected[package[1]] then
+			table.insert(result, vim.deepcopy(package))
+		end
+	end
+	return result
+end
+
 M.node_commands = {
 	["basedpyright-langserver"] = true,
 	["bash-language-server"] = true,

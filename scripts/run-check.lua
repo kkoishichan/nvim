@@ -1,6 +1,7 @@
 local root = assert(vim.env.NVIM_TEST_ROOT, "NVIM_TEST_ROOT is required")
 local tmp = assert(vim.env.NVIM_TEST_TMP, "NVIM_TEST_TMP is required")
 local group = assert(vim.env.NVIM_TEST_GROUP, "NVIM_TEST_GROUP is required")
+assert(vim.v.errmsg == "", "Configuration startup failed: " .. vim.v.errmsg)
 assert(
 	vim.tbl_contains({
 		"performance",
@@ -20,6 +21,7 @@ assert(
 		"windows",
 		"layout_session",
 		"ui_themes",
+		"offline_assets",
 	}, group),
 	"Unknown behavior check group: " .. group
 )

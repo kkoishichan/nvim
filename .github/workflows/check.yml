@@ -1,0 +1,46 @@
+name: Neovim checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Install host prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential curl fd-find fzf git gzip python3-venv ripgrep shellcheck tar unzip
+          mkdir -p "$RUNNER_TEMP/nvim-host/bin" "$RUNNER_TEMP/nvim-host/neovim"
+          curl --fail --location --retry 3 https://github.com/neovim/neovim/releases/download/v0.12.5/nvim-linux-x86_64.tar.gz -o "$RUNNER_TEMP/nvim-host/neovim.tar.gz"
+          echo "bce0f56eda1f1b1db6eee8f4133d7a38813ea07933837dd1777411ca384c6875  $RUNNER_TEMP/nvim-host/neovim.tar.gz" | sha256sum --check --status
+          tar -xzf "$RUNNER_TEMP/nvim-host/neovim.tar.gz" --strip-components=1 -C "$RUNNER_TEMP/nvim-host/neovim"
+          curl --fail --location --retry 3 https://github.com/tree-sitter/tree-sitter/releases/download/v0.26.9/tree-sitter-linux-x64.gz -o "$RUNNER_TEMP/nvim-host/tree-sitter.gz"
+          echo "9ce82137caa65864e7ca8b869fd391cef88c9bd2a01c4371b9c4dd26c2585efb  $RUNNER_TEMP/nvim-host/tree-sitter.gz" | sha256sum --check --status
+          gzip -dc "$RUNNER_TEMP/nvim-host/tree-sitter.gz" > "$RUNNER_TEMP/nvim-host/bin/tree-sitter"
+          chmod +x "$RUNNER_TEMP/nvim-host/bin/tree-sitter"
+          ln -s /usr/bin/fdfind "$RUNNER_TEMP/nvim-host/bin/fd"
+          echo "$RUNNER_TEMP/nvim-host/bin" >> "$GITHUB_PATH"
+          echo "$RUNNER_TEMP/nvim-host/neovim/bin" >> "$GITHUB_PATH"
+      - name: Restore dependency cache
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ${{ runner.temp }}/nvim-check/data
+          key: nvim-0.12.5-ts-0.26.9-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('lazy-lock.json', 'lua/user/core/treesitter.lua', 'lua/user/core/lazy_bootstrap.lua', 'lua/user/toolchain.lua', 'scripts/prepare-checks.*', 'scripts/check-support.lua', 'scripts/verify-lock.lua') }}
+      - name: Prepare locked dependencies
+        run: ./scripts/prepare-checks.sh "$RUNNER_TEMP/nvim-check"
+      - name: Verify exact dependency state
+        run: |
+          source "$RUNNER_TEMP/nvim-check/environment.sh"
+          nvim --headless -u NONE -i NONE -l scripts/verify-lock.lua
+      - name: Run static and core behavior checks
+        run: |
+          source "$RUNNER_TEMP/nvim-check/environment.sh"
+          ./scripts/check.sh

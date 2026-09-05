@@ -59,11 +59,14 @@ Selene、Stylelint、golangci-lint 仅在项目存在对应配置时运行，避
 ```text
 ~/.config/nvim
 ├── .gitignore                 -- 本地状态、日志与临时文件忽略规则
+├── .github/workflows/check.yml -- 固定依赖版本的 CI
+├── docs/                      -- 路线、实施记录与分层验收证据
 ├── after/
 │   └── ftplugin/
 │       └── markdown.lua       -- 内置 Markdown ftplugin 兼容补丁
 ├── lua/
 │   └── user/
+│       ├── health.lua         -- 项目、工具来源与缺项健康报告
 │       ├── lazy.lua           -- lazy.nvim bootstrap 与 setup
 │       ├── toolchain.lua      -- 带版本的 Mason 工具清单
 │       ├── core/
@@ -71,6 +74,7 @@ Selene、Stylelint、golangci-lint 仅在项目存在对应配置时运行，避
 │       │   ├── ai_terminal.lua -- AI CLI 的 toggleterm 生命周期与通信
 │       │   ├── autocmds.lua   -- 通用自动命令与生命周期
 │       │   ├── backdrop.lua   -- 浮窗背景调暗
+│       │   ├── buffer_policy.lua -- 有界成本判定与各功能准入
 │       │   ├── buffers.lua    -- 保留分屏的文件关闭与保存选择
 │       │   ├── blink_signature.lua -- 签名提示稳定入口
 │       │   ├── signature/     -- 调用解析、参数选择、渲染与 Blink 适配
@@ -79,21 +83,26 @@ Selene、Stylelint、golangci-lint 仅在项目存在对应配置时运行，避
 │       │   ├── diagnostics.lua -- 诊断 UI
 │       │   ├── dict.lua       -- ECDICT 离线词典浮窗
 │       │   ├── float_style.lua -- 无边框 padding 浮窗共享样式
+│       │   ├── format_policy.lua -- 保存预算、异步格式化与汇编边界
 │       │   ├── highlights.lua -- 具名高亮回调，重载时替换
 │       │   ├── java.lua       -- Java root / runtime / workspace 解析
 │       │   ├── keymaps.lua    -- 全局非插件键位
 │       │   ├── layout.lua     -- 窗口布局工具
+│       │   ├── lazy_bootstrap.lua -- 从同源锁文件启动 Lazy
 │       │   ├── lsp_progress.lua -- LSP 进度通知
 │       │   ├── options.lua    -- vim 选项
 │       │   ├── palette.lua    -- 从当前主题推导语义色
-│       │   ├── panels.lua     -- 侧边面板尺寸常量
+│       │   ├── panels.lua     -- 面板空间分配与正文保护
 │       │   ├── pdf.lua        -- PDF 状态栏数据
 │       │   ├── pdf_registration.lua -- PDF 轻量注册，首次使用再加载实现
 │       │   ├── pdf_preview.lua -- PDF 渲染、缓存、按键与文件监听
 │       │   ├── popups.lua     -- Esc 统一关闭临时弹窗
+│       │   ├── preferences.lua -- 类型检查后的机器偏好
+│       │   ├── project.lua    -- 工作区、语言项目与仓库上下文
 │       │   ├── sensitive.lua  -- 密钥文件与剪贴板保护
 │       │   ├── session.lua    -- 多标签工作区会话与项目元数据
 │       │   ├── window_roles.lua -- 正文、面板与临时窗口角色
+│       │   ├── workflows.lua  -- 项目 build/run/test 与失败位置
 │       │   ├── statuscolumn.lua -- IDE 风格 gutter 排布
 │       │   ├── testing.lua    -- 按项目/语言加载 neotest adapter
 │       │   ├── theme.lua      -- 主题切换与持久化
@@ -128,8 +137,13 @@ Selene、Stylelint、golangci-lint 仅在项目存在对应配置时运行，避
 ├── scripts/
 │   ├── check.lua              -- Neovim 集成回归
 │   ├── check.sh               -- 静态检查与分组回归入口
+│   ├── check-workflows.sh     -- 显式执行真实语言工作流
 │   ├── run-check.lua          -- 独立进程中的行为回归加载器
-│   ├── checks/                -- performance、ai、languages 行为回归
+│   ├── checks/                -- 按主题分组的行为与集成回归
+│   ├── prepare-checks.sh      -- 显式准备隔离的锁定依赖
+│   ├── verify-lock.lua        -- 依赖版本、修改状态与可加载性校验
+│   ├── benchmark.py           -- 可重复的启动测量
+│   ├── ui-smoke.py            -- 真实 PTY 按键与补全检查
 │   └── deploy.sh              -- 跨设备部署脚本
 ├── spell/
 │   ├── en.utf-8.add           -- 自定义英文词表
@@ -148,22 +162,24 @@ Selene、Stylelint、golangci-lint 仅在项目存在对应配置时运行，避
 
 ## 部署
 
-新机器上一条命令完成（安装依赖 + 克隆配置 + 无头安装插件）：
+新机器先预览安装计划，再按需要选择语言工具：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/kkoishichan/nvim/main/scripts/deploy.sh)
+./scripts/deploy.sh --dry-run --ref main --profile minimal
+./scripts/deploy.sh --ref main --nvim-version v0.12.5 --profile python --profile web
 ```
 
-或已克隆仓库时直接 `./scripts/deploy.sh`。支持 Arch / Debian·Ubuntu / Fedora /
-openSUSE / macOS(Homebrew)；发行版仓库里的 Neovim 过旧时会自动从官方
-Release 安装到 `~/.local`。已有的 `~/.config/nvim` 会先备份为
-`nvim.bak.<时间戳>`；如果它本身就是本仓库则改为 `git pull`。
+脚本包含 Arch / Debian·Ubuntu / Fedora / openSUSE / macOS(Homebrew) 的依赖分支，
+默认固定 Neovim 0.12.5，必要时从官方 Release 安装到 `~/.local`。
+`--ref` 接受分支、tag 或提交；要重复同一配置，请指定完整提交号。
+先在同目录的暂存区完成克隆和插件校验，再备份旧配置并切换符号链接。
+原目录中的未提交修改也保留在备份中；不会通过自动 `git pull` 合并它们。
 
-常用选项：`--ssh`（SSH 克隆）、`--with-extras`（lazygit / node / ImageMagick /
-poppler / typst / latexmk 等可选依赖）、`--mason`（安装固定版本的 Mason 工具链及其
-公共前置环境）、
-`--dict`（下载 ECDICT-ultimate 离线词典）、
-`--no-deps`、`--no-sync`。详见 `./scripts/deploy.sh --help`。
+`--profile` 可重复选择 `minimal`、`python`、`web`、`java`、`native`、`docs`，
+`full` 包含完整 Mason 清单，`--mason` 为其兼容别名。默认仅安装 minimal。
+其他选项包括 `--ssh`、`--with-extras`、`--dict`、`--no-deps`、`--no-sync` 和
+`--config-dir`。部分工具失败会返回非零状态并说明当前配置与备份的位置。
+完整流程、限制及恢复步骤见 [部署说明](docs/deployment.md)。
 
 ## 首次启动
 
@@ -380,10 +396,13 @@ Go 汇编仅在 `.s`、Go 项目和 Plan 9 指令特征同时匹配时使用 asm
   无图形协议或缺少可选工具时显示原因与外部打开入口。
 - 签名提示的解析与 Blink 适配分离，插件内部接口缺失时回退到普通签名提示。
   AI 操作也按首次使用加载；主题回调使用具名替换，避免重载时重复注册。
-- 修改配置后运行 `./scripts/check.sh`，执行静态检查、原有集成回归及 performance、ai、languages
-  行为回归。每个 Neovim 组使用独立进程与临时 cache / state / log，复用已安装的插件和工具。
+- 修改配置后运行 `./scripts/check.sh`，执行静态、部署故障检查及核心行为回归。
+  每个 Neovim 组使用独立进程与临时 config / cache / state / log，复用已安装的插件和工具；
+  先核对版本锁与补全二进制，缺少依赖时失败并提示准备，不在检查中安装。
   可用 `./scripts/check.sh performance` 或 `./scripts/check.sh --group static --group ai` 仅运行指定组。
 - `python3 scripts/benchmark.py` 保留启动输入、各次日志与结果 JSON；默认每场景四次、丢弃首轮。
   启动报错会使测量失败。此工具只测无头启动，补全、语言服务就绪和终端绘制分别验收。
 - `python3 scripts/ui-smoke.py` 在三个尺寸的真实 PTY 中检查按键、终端模式和补全菜单，
   保存终端日志与窗口数据。它模拟无图片协议与 SSH 环境变量，不连接远程主机。
+- 依赖准备与 CI 复跑见 [CI 验证](docs/ci-validation.md)，语言端到端检查见
+  [工作流矩阵](docs/workflow-matrix.md)，升级和恢复见 [维护指南](docs/maintenance.md)。
