@@ -217,6 +217,10 @@ vim.g.user_checktime_batch_size = 16 -- 每批检查的隐藏 buffer 数
 Git 行 blame 默认启用，可用 `<leader>ghB` 切换；scrollview 搜索结果标记保持启用，
 不设置单独开关。Neo-tree 保持目录 watcher、Git 状态和诊断功能。
 
+滚轮和触控板使用原生滚动；颜色预览按 50 ms 时间窗合并视口刷新，让正文先响应输入，
+并清理重复的字面量高亮。分屏分别绘制可见区域，键盘分页动画保持原有行为。
+验证方法、测量结果及适用范围见 [滚动性能验证](docs/scrolling.md)。
+
 右侧滚动条采用单轨概览设计：滑块、诊断、搜索、mark、TODO、冲突和 Git 改动始终
 共用一列，同一高度只显示优先级最高的标记。诊断沿用左列的 `E/W/I/H`，FIX、TODO、
 HACK、WARN/XXX 也沿用对应图标；Git 使用粗实线 `┃`，搜索 `━`、冲突 `×`，mark 保留字母。
@@ -413,5 +417,7 @@ Go 汇编仅在 `.s`、Go 项目和 Plan 9 指令特征同时匹配时使用 asm
   这是核心回调微基准，不代表完整按键到屏幕的延迟；方法和结果见 [性能验证](docs/performance.md)。
 - `python3 scripts/ui-smoke.py` 在三个尺寸的真实 PTY 中检查按键、终端模式和补全菜单，
   保存终端日志与窗口数据。它模拟无图片协议与 SSH 环境变量，不连接远程主机。
+- `python3 scripts/benchmark-scroll.py --baseline /path/to/old-checkout` 对比完整配置中的原生
+  滚轮输入到屏幕刷新；`python3 scripts/scroll-smoke.py` 验证终端鼠标协议、分屏和颜色更新。
 - 依赖准备与 CI 复跑见 [CI 验证](docs/ci-validation.md)，语言端到端检查见
   [工作流矩阵](docs/workflow-matrix.md)，升级和恢复见 [维护指南](docs/maintenance.md)。

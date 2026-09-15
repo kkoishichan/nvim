@@ -8,6 +8,7 @@ assert(
 		"editing_cost",
 		"startup_loading",
 		"ui_runtime",
+		"scrolling_colors",
 		"ai",
 		"languages",
 		"projects",

@@ -85,6 +85,9 @@ return {
 				return expensive_buffer(bufnr) or not color_filetype_set[vim.bo[bufnr].filetype]
 			end,
 		},
+		config = function(_, opts)
+			require("user.core.color_preview").setup(opts)
+		end,
 	},
 	{
 		"mbbill/undotree",
