@@ -126,7 +126,16 @@ function M.enforce()
 	applying = true
 	local ok, err = pcall(function()
 		local panels = windows()
-		local sizes = M.budget()
+		-- Completion menus and overview rails create windows too. There is no
+		-- layout to constrain when the tab only contains editors and floats.
+		if #panels == 0 then
+			return
+		end
+		local present = {}
+		for _, panel in ipairs(panels) do
+			present[panel.side] = true
+		end
+		local sizes = M.budget(nil, nil, present)
 		for _, panel in ipairs(panels) do
 			if sizes[panel.side] == 0 then
 				hide(panel.win)
@@ -136,7 +145,9 @@ function M.enforce()
 				if type(custom) == "number" and custom > sizes[panel.side] then
 					vim.w[panel.win]["edgy_" .. dimension] = sizes[panel.side]
 				end
-				pcall(vim.api["nvim_win_set_" .. dimension], panel.win, sizes[panel.side])
+				if vim.api["nvim_win_get_" .. dimension](panel.win) ~= sizes[panel.side] then
+					pcall(vim.api["nvim_win_set_" .. dimension], panel.win, sizes[panel.side])
+				end
 			end
 		end
 		if M.editor_fits() then

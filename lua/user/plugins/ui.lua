@@ -426,6 +426,11 @@ return {
 		config = function(_, opts)
 			local scrollview = require("scrollview")
 			scrollview.setup(opts)
+			local cleanup_key = "_user_scrollview_git_cleanup"
+			local previous_cleanup = rawget(vim, cleanup_key)
+			if type(previous_cleanup) == "function" then
+				previous_cleanup()
+			end
 
 			-- Git change bars. scrollview ships no gitsigns integration, so register
 			-- a custom sign group that mirrors gitsigns' hunks as the coloured
@@ -446,56 +451,106 @@ return {
 				}).name
 			end
 
+			local rendered = {}
 			scrollview.set_sign_group_callback(group, function()
 				local ok, gitsigns = pcall(require, "gitsigns")
 				if not ok then
 					return
 				end
+				local seen = {}
 				for _, winid in ipairs(scrollview.get_sign_eligible_windows()) do
 					local bufnr = vim.api.nvim_win_get_buf(winid)
-					local add, change, delete = {}, {}, {}
-					local hunks = gitsigns.get_hunks(bufnr)
-					local changed_lines = 0
-					for _, hunk in ipairs(hunks or {}) do
-						changed_lines = changed_lines + math.max(hunk.added.count, 1)
-					end
-					local expand_hunks = changed_lines <= 1000
-					for _, hunk in ipairs(hunks or {}) do
-						local start = hunk.added.start
-						if hunk.type == "delete" then
-							delete[#delete + 1] = start
-						else
-							local bucket = hunk.type == "add" and add or change
-							local count = math.max(hunk.added.count, 1)
-							bucket[#bucket + 1] = start
-							if expand_hunks then
-								for line = start + 1, start + count - 1 do
-									bucket[#bucket + 1] = line
+					-- Sign locations belong to the buffer, even when several splits
+					-- show it. get_hunks also constructs patch text, so call it once.
+					if not seen[bufnr] then
+						seen[bufnr] = true
+						local add, change, delete = {}, {}, {}
+						local hunks = gitsigns.get_hunks(bufnr)
+						local changed_lines = 0
+						for _, hunk in ipairs(hunks or {}) do
+							changed_lines = changed_lines + math.max(hunk.added.count, 1)
+						end
+						local expand_hunks = changed_lines <= 1000
+						for _, hunk in ipairs(hunks or {}) do
+							local start = hunk.added.start
+							if hunk.type == "delete" then
+								delete[#delete + 1] = start
+							else
+								local bucket = hunk.type == "add" and add or change
+								local count = math.max(hunk.added.count, 1)
+								bucket[#bucket + 1] = start
+								if expand_hunks then
+									for line = start + 1, start + count - 1 do
+										bucket[#bucket + 1] = line
+									end
+								elseif count > 1 then
+									bucket[#bucket + 1] = start + count - 1
 								end
-							elseif count > 1 then
-								bucket[#bucket + 1] = start + count - 1
 							end
 						end
+						local lines = { add = add, change = change, delete = delete }
+						-- Scrolling still reads the latest hunks, but unchanged signs do
+						-- not need another Lua-to-Vim copy of all changed line numbers.
+						if not vim.deep_equal(rendered[bufnr], lines) then
+							for kind, values in pairs(lines) do
+								vim.b[bufnr][names[kind]] = values
+							end
+							rendered[bufnr] = lines
+						end
 					end
-					vim.b[bufnr][names.add] = add
-					vim.b[bufnr][names.change] = change
-					vim.b[bufnr][names.delete] = delete
 				end
 			end)
 			scrollview.set_sign_group_state(group, true)
 
 			local refresh_generation = 0
+			local refresh_timer
+			local closed = false
+			local function cleanup()
+				closed = true
+				if refresh_timer then
+					refresh_timer:stop()
+					if not refresh_timer:is_closing() then
+						refresh_timer:close()
+					end
+					refresh_timer = nil
+				end
+				if rawget(vim, cleanup_key) == cleanup then
+					rawset(vim, cleanup_key, nil)
+				end
+			end
+			rawset(vim, cleanup_key, cleanup)
+			local refresh_group = vim.api.nvim_create_augroup("user_scrollview_git", { clear = true })
+			vim.api.nvim_create_autocmd("VimLeavePre", { group = refresh_group, once = true, callback = cleanup })
+			vim.api.nvim_create_autocmd("BufWipeout", {
+				group = refresh_group,
+				callback = function(event)
+					rendered[event.buf] = nil
+				end,
+			})
 			vim.api.nvim_create_autocmd("User", {
 				pattern = "GitSignsUpdate",
-				group = vim.api.nvim_create_augroup("user_scrollview_git", { clear = true }),
+				group = refresh_group,
 				callback = function()
+					if closed then
+						return
+					end
 					refresh_generation = refresh_generation + 1
 					local generation = refresh_generation
-					vim.defer_fn(function()
-						if generation == refresh_generation and scrollview.is_sign_group_active(group) then
-							scrollview.refresh()
-						end
-					end, 120)
+					-- Restart one timer instead of allocating one timer per update.
+					refresh_timer = refresh_timer or vim.uv.new_timer()
+					refresh_timer:start(
+						120,
+						0,
+						vim.schedule_wrap(function()
+							if
+								not closed
+								and generation == refresh_generation
+								and scrollview.is_sign_group_active(group)
+							then
+								scrollview.refresh()
+							end
+						end)
+					)
 				end,
 			})
 		end,

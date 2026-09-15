@@ -12,6 +12,17 @@ local M = {
 
 local manager_filetypes = { lazy = true, mason = true }
 local manager_backdrop_filetypes = { lazy_backdrop = true, mason_backdrop = true }
+local generation = 0
+local scheduled = false
+
+local function same_geometry(current, target)
+	for _, key in ipairs({ "relative", "row", "col", "width", "height", "border" }) do
+		if current[key] ~= target[key] then
+			return false
+		end
+	end
+	return true
+end
 
 ---Normalize Lazy and Mason after their different upstream viewport calculations.
 ---Lazy includes cmdheight in its height while Mason excludes it, otherwise
@@ -30,14 +41,17 @@ function M.apply_manager_float(winid)
 	local border_offset = M.manager_border == "none" and 0 or 1
 	local row = math.max(0, math.floor((usable_lines - height) / 2) - border_offset)
 	local col = math.max(0, math.floor((vim.o.columns - width) / 2) - border_offset)
-	vim.api.nvim_win_set_config(winid, {
+	local target = {
 		relative = "editor",
 		row = row,
 		col = col,
 		width = width,
 		height = height,
 		border = M.manager_border,
-	})
+	}
+	if not same_geometry(config, target) then
+		vim.api.nvim_win_set_config(winid, target)
+	end
 	return true
 end
 
@@ -52,14 +66,17 @@ function M.apply_manager_backdrop(winid)
 	if config.relative == "" then
 		return false
 	end
-	vim.api.nvim_win_set_config(winid, {
+	local target = {
 		relative = "editor",
 		row = 0,
 		col = 0,
 		width = vim.o.columns,
 		height = vim.o.lines,
 		border = "none",
-	})
+	}
+	if not same_geometry(config, target) then
+		vim.api.nvim_win_set_config(winid, target)
+	end
 	return true
 end
 
@@ -77,6 +94,21 @@ end
 
 function M.setup()
 	require("user.core.panels").setup()
+	generation = generation + 1
+	scheduled = false
+	local current = generation
+	local function schedule_normalize()
+		if scheduled then
+			return
+		end
+		scheduled = true
+		vim.schedule(function()
+			if current == generation then
+				scheduled = false
+				normalize_open_managers()
+			end
+		end)
+	end
 	local group = vim.api.nvim_create_augroup("user_manager_float_layout", { clear = true })
 	vim.api.nvim_create_autocmd("FileType", {
 		group = group,
@@ -90,7 +122,7 @@ function M.setup()
 				return
 			end
 			vim.schedule(function()
-				if not vim.api.nvim_buf_is_valid(event.buf) then
+				if current ~= generation or not vim.api.nvim_buf_is_valid(event.buf) then
 					return
 				end
 				for _, winid in ipairs(vim.fn.win_findbuf(event.buf)) do
@@ -101,23 +133,17 @@ function M.setup()
 	})
 	vim.api.nvim_create_autocmd({ "VimResized" }, {
 		group = group,
-		callback = function()
-			vim.schedule(normalize_open_managers)
-		end,
+		callback = schedule_normalize,
 	})
 	vim.api.nvim_create_autocmd("OptionSet", {
 		group = group,
 		pattern = "cmdheight",
-		callback = function()
-			vim.schedule(normalize_open_managers)
-		end,
+		callback = schedule_normalize,
 	})
 	vim.api.nvim_create_autocmd("User", {
 		group = group,
 		pattern = "LazyFloatResized",
-		callback = function()
-			vim.schedule(normalize_open_managers)
-		end,
+		callback = schedule_normalize,
 	})
 end
 
