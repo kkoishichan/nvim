@@ -109,6 +109,16 @@ local function dimensions(bytes, lines)
 	end
 end
 
+local function find_long_line(bufnr, first, last)
+	-- A single bounded read avoids two memline offset lookups per line. This
+	-- runs only below the document byte/line ceilings, or for the changed range.
+	for index, text in ipairs(vim.api.nvim_buf_get_lines(bufnr, first, last, false)) do
+		if #text > M.limits.line_bytes then
+			return first + index - 1
+		end
+	end
+end
+
 function M.inspect(bufnr, changed)
 	bufnr = (bufnr == nil or bufnr == 0) and vim.api.nvim_get_current_buf() or bufnr
 	if not vim.api.nvim_buf_is_valid(bufnr) or vim.bo[bufnr].buftype ~= "" then
@@ -117,25 +127,44 @@ function M.inspect(bufnr, changed)
 	local entry = state(bufnr)
 	local tick = vim.api.nvim_buf_get_changedtick(bufnr)
 	if not changed and entry.tick == tick then
-		return { heavy = entry.heavy, reason = entry.reason, override = entry.override or "auto" }
+		return {
+			heavy = entry.heavy,
+			reason = entry.override == "off" and "disabled manually" or entry.reason,
+			override = entry.override or "auto",
+		}
 	end
 	local lines = vim.api.nvim_buf_line_count(bufnr)
 	local bytes = math.max(0, vim.api.nvim_buf_get_offset(bufnr, lines))
 	local reason = dimensions(bytes, lines)
 	if not reason then
-		-- Previously ordinary buffers need only their changed range checked.
-		-- Full scans are bounded by both byte and line ceilings above.
-		local first, last = 0, lines
-		if changed and entry.heavy == false then
-			first, last = changed.first, math.min(changed.last, lines)
-		end
-		for line = first, last - 1 do
-			local width = vim.api.nvim_buf_get_offset(bufnr, line + 1) - vim.api.nvim_buf_get_offset(bufnr, line)
-			if width > M.limits.line_bytes + 1 then
-				reason = "line exceeds 2000 bytes"
-				break
+		if changed and entry.scanned then
+			-- An unchanged offending line remains proof that the document is
+			-- costly. Shift its row across insert/delete/undo without rescanning.
+			local previous = entry.long_line
+			local first, last = changed.first, math.min(changed.last, lines)
+			local old_last = changed.old_last or changed.last
+			if previous and previous >= old_last then
+				entry.long_line = previous + changed.last - old_last
+			elseif previous and previous >= first then
+				entry.long_line = nil
 			end
+			if not entry.long_line then
+				entry.long_line = find_long_line(bufnr, first, last)
+				if previous and not entry.long_line then
+					-- Removing the known long line may reveal another elsewhere.
+					-- Confirm recovery once; ordinary edits remain incremental.
+					entry.long_line = find_long_line(bufnr, 0, lines)
+				end
+			end
+		else
+			entry.long_line = find_long_line(bufnr, 0, lines)
 		end
+		entry.scanned = true
+		reason = entry.long_line and "line exceeds 2000 bytes" or nil
+	else
+		-- These ceilings already decide the outcome. Inspect line widths once
+		-- the document falls below them again, not on each oversized edit.
+		entry.scanned, entry.long_line = false, nil
 	end
 	return publish(bufnr, reason, tick)
 end
@@ -233,8 +262,8 @@ function M.setup()
 			local entry = state(event.buf)
 			if not entry.attached then
 				entry.attached = vim.api.nvim_buf_attach(event.buf, false, {
-					on_lines = function(_, buf, _, first, _, last)
-						M.inspect(buf, { first = first, last = last })
+					on_lines = function(_, buf, _, first, old_last, last)
+						M.inspect(buf, { first = first, old_last = old_last, last = last })
 					end,
 					on_detach = function(_, buf)
 						states[buf] = nil

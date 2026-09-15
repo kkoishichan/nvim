@@ -1,6 +1,7 @@
 local M = {}
 local namespace = vim.api.nvim_create_namespace("user_git_conflicts")
 local refresh
+local rendered = {}
 
 local function apply_highlights()
 	vim.api.nvim_set_hl(0, "UserConflictCurrent", { default = true, link = "DiffText" })
@@ -16,15 +17,33 @@ local function set_line_highlight(bufnr, row, group)
 	})
 end
 
+local function sync_diagnostics(bufnr, has_conflict)
+	vim.b[bufnr].user_has_conflicts = has_conflict
+	if has_conflict and vim.diagnostic.is_enabled({ bufnr = bufnr }) then
+		vim.diagnostic.enable(false, { bufnr = bufnr })
+		vim.b[bufnr].user_conflict_disabled_diagnostics = true
+	elseif not has_conflict and vim.b[bufnr].user_conflict_disabled_diagnostics then
+		vim.b[bufnr].user_conflict_disabled_diagnostics = nil
+		vim.diagnostic.enable(true, { bufnr = bufnr })
+	end
+end
+
 local function render_conflicts(bufnr)
 	if not vim.api.nvim_buf_is_valid(bufnr) or not vim.api.nvim_buf_is_loaded(bufnr) then
+		return
+	end
+	local tick = vim.api.nvim_buf_get_changedtick(bufnr)
+	local ordinary = vim.bo[bufnr].buftype == "" and not vim.b[bufnr].bigfile
+	local previous = rendered[bufnr]
+	if previous and previous.tick == tick and previous.ordinary == ordinary then
+		sync_diagnostics(bufnr, previous.has_conflict)
 		return
 	end
 	vim.api.nvim_buf_clear_namespace(bufnr, namespace, 0, -1)
 
 	local has_conflict = false
 	local section
-	if vim.bo[bufnr].buftype == "" and not vim.b[bufnr].bigfile then
+	if ordinary then
 		for index, line in ipairs(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)) do
 			local row = index - 1
 			if line:match("^<<<<<<<") then
@@ -46,26 +65,36 @@ local function render_conflicts(bufnr)
 		end
 	end
 
-	vim.b[bufnr].user_has_conflicts = has_conflict
-	if has_conflict and vim.diagnostic.is_enabled({ bufnr = bufnr }) then
-		vim.diagnostic.enable(false, { bufnr = bufnr })
-		vim.b[bufnr].user_conflict_disabled_diagnostics = true
-	elseif not has_conflict and vim.b[bufnr].user_conflict_disabled_diagnostics then
-		vim.b[bufnr].user_conflict_disabled_diagnostics = nil
-		vim.diagnostic.enable(true, { bufnr = bufnr })
-	end
+	rendered[bufnr] = { tick = tick, ordinary = ordinary, has_conflict = has_conflict }
+	sync_diagnostics(bufnr, has_conflict)
 end
 
 local pending_refresh = {}
 refresh = function(bufnr, delay)
-	pending_refresh[bufnr] = (pending_refresh[bufnr] or 0) + 1
-	local generation = pending_refresh[bufnr]
-	vim.defer_fn(function()
-		if pending_refresh[bufnr] == generation then
-			pending_refresh[bufnr] = nil
-			render_conflicts(bufnr)
+	delay = delay or 0
+	local deadline = vim.uv.hrtime() / 1e6 + delay
+	local pending = pending_refresh[bufnr]
+	if pending and delay > 0 then
+		-- Keep one pending callback while typing instead of allocating a new
+		-- timer for every TextChanged event. Its deadline follows the last edit.
+		pending.deadline = deadline
+		return
+	end
+	pending = { deadline = deadline }
+	pending_refresh[bufnr] = pending
+	local function flush()
+		if pending_refresh[bufnr] ~= pending then
+			return
 		end
-	end, delay or 0)
+		local remaining = pending.deadline - vim.uv.hrtime() / 1e6
+		if remaining > 0 then
+			vim.defer_fn(flush, math.ceil(remaining))
+			return
+		end
+		pending_refresh[bufnr] = nil
+		render_conflicts(bufnr)
+	end
+	vim.defer_fn(flush, delay)
 end
 
 local function conflict_at_cursor()
@@ -197,6 +226,7 @@ function M.setup()
 		group = group,
 		callback = function(event)
 			pending_refresh[event.buf] = nil
+			rendered[event.buf] = nil
 		end,
 	})
 
