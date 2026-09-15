@@ -426,6 +426,7 @@ return {
 		config = function(_, opts)
 			local scrollview = require("scrollview")
 			scrollview.setup(opts)
+			require("user.core.scrollview_refresh").setup()
 			local cleanup_key = "_user_scrollview_git_cleanup"
 			local previous_cleanup = rawget(vim, cleanup_key)
 			if type(previous_cleanup) == "function" then
@@ -779,14 +780,7 @@ return {
 		config = function(_, opts)
 			local lualine = require("lualine")
 			lualine.setup(opts)
-			-- theme = "auto" only resolves at setup time, so re-run setup on a
-			-- colorscheme switch to refresh the statusline colours live.
-			vim.api.nvim_create_autocmd("ColorScheme", {
-				group = vim.api.nvim_create_augroup("user_lualine_theme", { clear = true }),
-				callback = function()
-					lualine.setup(opts)
-				end,
-			})
+			require("user.core.statusline_refresh").setup()
 		end,
 	},
 	{

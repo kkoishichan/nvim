@@ -192,6 +192,12 @@ def main():
     parser.add_argument("--nvim", default="nvim")
     parser.add_argument("--runs", type=int, default=2)
     parser.add_argument("--events", type=int, default=80)
+    parser.add_argument(
+        "--scene",
+        action="append",
+        choices=("code", "colors", "css_vars"),
+        help="repeat to select scenes; defaults to code and colors",
+    )
     args = parser.parse_args()
     if args.runs < 1 or args.events < 20 or args.events > 500:
         parser.error("Use at least one run and 20–500 events")
@@ -212,8 +218,9 @@ def main():
         "targets": {name: metadata(path) for name, path in targets.items()},
         "scenes": {},
     }
-    for scene in ("code", "colors"):
-        sample = output / (scene + ".lua")
+    for scene in args.scene or ("code", "colors"):
+        filetype = "css" if scene == "css_vars" else "lua"
+        sample = output / (scene + "." + filetype)
         blocks = []
         for index in range(500):
             line = (
@@ -226,7 +233,16 @@ def main():
                 + line
                 + "\n  local function square(value)\n    return value * value\n  end\nend\n"
             )
-        sample.write_text("".join(blocks))
+        if scene == "css_vars":
+            sample.write_text(
+                ":root { --accent: #44aaff; }\n"
+                + "".join(
+                    f".item-{index} {{ color: var(--accent); }}\n"
+                    for index in range(999)
+                )
+            )
+        else:
+            sample.write_text("".join(blocks))
         rows = {name: [] for name in targets}
         for run_index in range(args.runs):
             order = list(targets)
@@ -244,14 +260,14 @@ def main():
                         "nvim_exec_lua",
                         """
                       assert(require('user.core.buffer_policy').allow(0), 'Fixture unexpectedly disabled document features')
-                      assert(vim.bo.filetype == 'lua', 'Lua fixture was not recognized')
+                      assert(vim.bo.filetype == ..., 'Fixture filetype was not recognized')
                       assert(package.loaded['nvim-highlight-colors'] and require('nvim-highlight-colors').is_active(), 'Color plugin is inactive')
                       assert(package.loaded.scrollview and vim.g.scrollview_enabled, 'Scrollview is inactive')
                       assert(not package.loaded.neoscroll, 'Wheel unexpectedly loaded Neoscroll')
                       return {filetype=vim.bo.filetype, clients=vim.tbl_map(function(c) return c.name end, vim.lsp.get_clients({bufnr=0})),
                         neoscroll_loaded=package.loaded.neoscroll ~= nil}
                     """,
-                        [],
+                        [filetype],
                     )
                     samples = []
                     for _ in range(args.events):

@@ -13,7 +13,8 @@ usage() {
 	cat <<'EOF'
 Usage: ./scripts/check.sh [--group NAME | NAME] ...
 
-Groups: static, integration, performance, editing_cost, startup_loading, ui_runtime, scrolling_colors, ai, languages, projects,
+Groups: static, integration, performance, editing_cost, startup_loading, ui_runtime, scrolling_colors,
+        statusline_refresh, scrollview_refresh, ai, languages, projects,
         project_actions, toolchain, terminals, workflow_actions, signature, lifecycle, pdf_lifecycle,
         windows, layout_session, ui_themes, offline_assets, deployment
 Optional real-tool groups: workflow_python_js, workflow_native, workflow_java_docs
@@ -27,7 +28,7 @@ groups=()
 add_group() {
 	local existing
 	case "$1" in
-	static | integration | performance | editing_cost | startup_loading | ui_runtime | scrolling_colors | ai | languages | projects | project_actions | toolchain | terminals | workflow_actions | signature | lifecycle | pdf_lifecycle | windows | layout_session | ui_themes | offline_assets | deployment | workflow_python_js | workflow_native | workflow_java_docs) ;;
+	static | integration | performance | editing_cost | startup_loading | ui_runtime | scrolling_colors | statusline_refresh | scrollview_refresh | ai | languages | projects | project_actions | toolchain | terminals | workflow_actions | signature | lifecycle | pdf_lifecycle | windows | layout_session | ui_themes | offline_assets | deployment | workflow_python_js | workflow_native | workflow_java_docs) ;;
 	*)
 		printf 'Unknown check group: %s\n' "$1" >&2
 		usage >&2
@@ -59,7 +60,7 @@ while [ $# -gt 0 ]; do
 	shift
 done
 if [ "${#groups[@]}" -eq 0 ]; then
-	groups=(static integration performance editing_cost startup_loading ui_runtime scrolling_colors ai languages projects project_actions toolchain terminals workflow_actions signature lifecycle pdf_lifecycle windows layout_session ui_themes offline_assets deployment)
+	groups=(static integration performance editing_cost startup_loading ui_runtime scrolling_colors statusline_refresh scrollview_refresh ai languages projects project_actions toolchain terminals workflow_actions signature lifecycle pdf_lifecycle windows layout_session ui_themes offline_assets deployment)
 fi
 
 tool() {

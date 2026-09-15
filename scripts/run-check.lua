@@ -9,6 +9,8 @@ assert(
 		"startup_loading",
 		"ui_runtime",
 		"scrolling_colors",
+		"statusline_refresh",
+		"scrollview_refresh",
 		"ai",
 		"languages",
 		"projects",

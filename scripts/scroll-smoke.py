@@ -18,8 +18,20 @@ import time
 SNAPSHOT = r'''
 function _G.NvimScrollSnapshot(name)
   local windows = {}
+  local bars = {}
+  local tab_windows = vim.api.nvim_tabpage_list_wins(0)
+  for _, win in ipairs(tab_windows) do
+    local ok, props = pcall(vim.api.nvim_win_get_var, win, "scrollview_props")
+    if ok and props.type == 0 and props.parent_winid then
+      bars[props.parent_winid] = {
+        id = win, row = props.row, height = props.height,
+        count = (bars[props.parent_winid] or {}).count or 0,
+      }
+      bars[props.parent_winid].count = bars[props.parent_winid].count + 1
+    end
+  end
   local namespace = vim.api.nvim_get_namespaces()["nvim-highlight-colors"]
-  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+  for _, win in ipairs(tab_windows) do
     if vim.api.nvim_win_get_config(win).relative == "" then
       local buf = vim.api.nvim_win_get_buf(win)
       local info = vim.fn.getwininfo(win)[1]
@@ -41,6 +53,7 @@ function _G.NvimScrollSnapshot(name)
         width = info.width, height = info.height,
         topline = info.topline, botline = info.botline,
         cursor = vim.api.nvim_win_get_cursor(win), color_rows = vim.tbl_keys(rows),
+        scrollbar = bars[win],
       }
     end
   end
@@ -177,6 +190,24 @@ def main():
         assert len(colored) >= 5, f"Colors are absent from the scrolled viewport: {win}"
         assert win["botline"] - 2 in colored, f"Newly visible bottom rows were not colored: {win}"
 
+    def scrollbar(win):
+        bar = win.get("scrollbar")
+        assert bar and bar["count"] == 1, f"Expected one scrollbar for the text window: {win}"
+        assert 1 <= bar["height"] <= win["height"], f"Invalid scrollbar height: {win}"
+        assert 1 <= bar["row"] <= win["height"], f"Invalid scrollbar row: {win}"
+        return bar
+
+    def scrollbar_moved(before, after, direction):
+        old, new = scrollbar(before), scrollbar(after)
+        assert before["id"] == after["id"], "Compared scrollbars from different text windows"
+        moved = new["row"] > old["row"] if direction == "down" else new["row"] < old["row"]
+        assert moved, f"Scrollbar did not follow the {direction} viewport: before={before}, after={after}"
+
+    def scrollbar_unchanged(before, after):
+        old, new = scrollbar(before), scrollbar(after)
+        assert (old["row"], old["height"]) == (new["row"], new["height"]), \
+            f"Scrolling an inactive split moved the focused window's bar: before={before}, after={after}"
+
     def finish_process(graceful):
         # A failed assertion must not leave Nvim or its language servers alive.
         # Bound shutdown even when a plugin prevents a normal :qa! or SIGTERM.
@@ -204,13 +235,18 @@ def main():
         ready = snapshot("ready", ready=True)
         assert ready["colors_loaded"], "The Lua color fixture did not load color highlighting"
         colors_visible(window(ready))
-        wheel(window(ready), "down", 24)
+        scrollbar(window(ready))
+        # The rail has only about 30 rows for a 2,000-line fixture. Move far
+        # enough in each direction to cross its quantization boundaries.
+        wheel(window(ready), "down", 80)
         down = snapshot("down")
         assert window(down)["topline"] > window(ready)["botline"], "SGR wheel-down did not reveal new rows"
+        scrollbar_moved(window(ready), window(down), "down")
         colors_visible(window(down))
-        wheel(window(down), "up", 8)
+        wheel(window(down), "up", 40)
         up = snapshot("up")
         assert window(up)["topline"] < window(down)["topline"], "SGR wheel-up did not scroll upward"
+        scrollbar_moved(window(down), window(up), "up")
         colors_visible(window(up))
 
         command("vsplit")
@@ -218,17 +254,21 @@ def main():
         split = snapshot("split")
         active = window(split)
         hovered = next(win for win in split["windows"] if win["id"] != split["current"])
-        wheel(hovered, "down", 24)
+        wheel(hovered, "down", 80)
         inactive_down = snapshot("inactive_down")
         assert inactive_down["current"] == split["current"], "Wheel input stole focus from the current split"
         assert window(inactive_down)["topline"] == active["topline"], "The wrong split scrolled"
         assert window(inactive_down, hovered["id"])["topline"] > hovered["botline"], "Hovered split did not scroll"
+        scrollbar_moved(hovered, window(inactive_down, hovered["id"]), "down")
+        scrollbar_unchanged(active, window(inactive_down))
         colors_visible(window(inactive_down, hovered["id"]))
-        wheel(window(inactive_down, hovered["id"]), "up", 8)
+        wheel(window(inactive_down, hovered["id"]), "up", 40)
         inactive_up = snapshot("inactive_up")
         assert inactive_up["current"] == split["current"], "Wheel-up stole focus from the current split"
         assert window(inactive_up)["topline"] == active["topline"], "Wheel-up changed the wrong split"
         assert window(inactive_up, hovered["id"])["topline"] < window(inactive_down, hovered["id"])["topline"]
+        scrollbar_moved(window(inactive_down, hovered["id"]), window(inactive_up, hovered["id"]), "up")
+        scrollbar_unchanged(active, window(inactive_up))
         colors_visible(window(inactive_up, hovered["id"]))
         command("qa!")
         pump(0.2)
@@ -241,10 +281,13 @@ def main():
             os.close(master)
     assert exit_code == 0, f"Neovim did not exit cleanly: {exit_code}"
     report = {
-        "scope": "Actual xterm-256color PTY and SGR wheel bytes; verifies decoding, viewport, split routing and color extmarks. "
+        "scope": "Actual xterm-256color PTY and SGR wheel bytes; verifies decoding, viewport, scrollview bar position/height, "
+                 "split routing and color extmarks. "
                  "Does not measure physical mouse/trackpad latency, terminal frame rate or pixels.",
         "root": str(root), "columns": columns, "rows": rows, "events": events, "exit_code": exit_code,
         "checks": ["SGR wheel down", "SGR wheel up", "hovered inactive split without focus change",
+                   "scrollview bar follows both wheel directions in focused and inactive windows",
+                   "inactive-window scrolling preserves the focused window's bar",
                    "new visible color backgrounds", "wheel does not load Neoscroll", "no Neovim errors"],
         "snapshots": snapshots,
     }
