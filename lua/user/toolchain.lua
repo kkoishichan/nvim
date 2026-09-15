@@ -226,10 +226,11 @@ local function cache_key(kind, name, ctx, prefer_mason)
 	return table.concat({
 		kind,
 		name,
-		ctx.root or "",
-		ctx.language_root or "",
-		ctx.directory or "",
+		ctx and ctx.root or "",
+		ctx and ctx.language_root or "",
+		ctx and ctx.directory or "",
 		vim.fn.getcwd(),
+		vim.fn.stdpath("data"),
 		vim.env.PATH or "",
 		vim.env.JAVA_HOME or "",
 		vim.env.VIRTUAL_ENV or "",
@@ -288,9 +289,10 @@ end
 
 function M.resolve(name, opts)
 	opts = opts or {}
-	local ctx = context(opts)
 	local prefer_mason = preference(opts)
-	local key = cache_key("executable", name, ctx, prefer_mason)
+	-- PATH/Mason selection does not depend on project markers. Keep cwd in the
+	-- key for relative PATH entries, without walking the workspace on every hit.
+	local key = cache_key("executable", name, nil, prefer_mason)
 	local previous = cached(key)
 	if previous then
 		return previous
@@ -385,8 +387,7 @@ function M.python_executable(source)
 end
 
 function M.debugpy_host()
-	local ctx = context({})
-	local key = cache_key("debugpy-host", "debugpy", ctx, false)
+	local key = cache_key("debugpy-host", "debugpy", nil, false)
 	local previous = cached(key)
 	if previous then
 		return previous

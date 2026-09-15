@@ -79,6 +79,17 @@ return function(tmp)
 	vim.env.PATH = bin_a .. ":" .. old_path
 	tools.reset()
 	assert(tools.resolve("audit-tool").path == system, "Default lookup did not prefer PATH")
+	do
+		local project = require("user.core.project")
+		local original = project.context
+		project.context = function()
+			error("Global tool lookup must not scan project markers")
+		end
+		assert(tools.executable("audit-tool") == system, "Cached PATH tool changed")
+		assert(tools.executable(system) == system, "Explicit tool path changed")
+		assert(tools.executable("audit-tool", { prefer_mason = true }) == mason, "Mason tool changed")
+		project.context = original
+	end
 	assert(tools.resolve("audit-tool", { prefer_mason = true }).path == mason, "Explicit Mason preference was ignored")
 	prefer_mason = true
 	assert(tools.resolve("audit-tool").source == "mason", "Changed preferences reused the PATH cache")

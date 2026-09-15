@@ -53,15 +53,18 @@ function M.canonical(path)
 	return vim.fs.normalize(path, { expand_env = false })
 end
 
-function M.contains(root, path)
-	root, path = M.canonical(root), M.canonical(path)
+local function contains_canonical(root, path)
 	return root ~= nil
 		and path ~= nil
 		and (path == root or path:sub(1, #(root:gsub("/$", "") .. "/")) == root:gsub("/$", "") .. "/")
 end
 
-local function directory(path)
-	path = M.canonical(path)
+function M.contains(root, path)
+	return contains_canonical(M.canonical(root), M.canonical(path))
+end
+
+local function directory(path, canonical)
+	path = canonical and path or M.canonical(path)
 	if not path then
 		return M.canonical(vim.fn.getcwd())
 	end
@@ -75,7 +78,16 @@ end
 
 local function bounded_root(dir, markers, repository)
 	local root = M.canonical(vim.fs.root(dir, markers))
-	return root and (not repository or M.contains(repository, root)) and root or nil
+	return root and (not repository or contains_canonical(repository, root)) and root or nil
+end
+
+-- Reuse discoveries within one lookup. No persistent filesystem cache: a new
+-- package marker or nested repository must affect the very next tool request.
+local function roots(dir)
+	local repository = repository_root(dir)
+	local marker = bounded_root(dir, M.markers[1], repository)
+	local language = bounded_root(dir, { M.markers[2] }, repository) or marker or repository
+	return repository, marker, language
 end
 
 function M.find_root(path)
@@ -99,15 +111,19 @@ function M.context(source)
 			file = M.canonical(vim.api.nvim_buf_get_name(bufnr))
 		end
 	end
-	local dir = bound or directory(file or cwd)
-	local repository = repository_root(dir)
-	local language_root = M.find_root(file or dir)
+	local dir = bound or directory(file or cwd, true)
+	local repository, marker, language_root = roots(dir)
+	if bound and file then
+		local file_dir = directory(file, true)
+		if file_dir ~= dir then
+			language_root = M.find_root(file)
+		end
+	end
 	local scope = vim.fn.haslocaldir()
 	local explicit = not by_path and M.canonical(vim.t.user_project_root) or nil
 	if not by_path and scope == 1 then
 		explicit = cwd
 	end
-	local marker = bounded_root(dir, M.markers[1], repository)
 	return {
 		root = explicit or bound or marker or repository or language_root or dir,
 		language_root = language_root or dir,

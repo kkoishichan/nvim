@@ -18,6 +18,13 @@ return function(tmp)
 	assert(project.contains(a, a .. "/packages/app"), "Workspace containment failed")
 	assert(not project.contains(a, a .. "-other/main.ts"), "Workspace prefix matched another project")
 	assert(project.contains("/", a), "Filesystem root containment failed")
+	write(a .. "/packages/app/src/.root", {})
+	assert(
+		project.context(a .. "/packages/app/src/main.ts").root == a .. "/packages/app/src",
+		"New workspace marker was hidden by a stale context cache"
+	)
+	vim.fn.delete(a .. "/packages/app/src/.root")
+	assert(project.context(a .. "/packages/app/src/main.ts").root == a, "Deleted workspace marker stayed active")
 
 	-- Language tools and workspace markers must stop at a nested repository.
 	write(a .. "/pyproject.toml", { "[project]" })
@@ -99,6 +106,12 @@ return function(tmp)
 	)
 	vim.cmd.cd({ args = { base } })
 	assert(project.root() == b, "Special buffer lost its bound project without a tab override")
+	vim.bo[buffer].buftype = ""
+	vim.api.nvim_buf_set_name(buffer, a .. "/packages/app/src/new.ts")
+	assert(
+		project.context(buffer).root == b and project.context(buffer).language_root == a .. "/packages/app",
+		"Bound workspace replaced the file's language project"
+	)
 	vim.api.nvim_set_current_tabpage(tab_b)
 	vim.cmd.tabclose()
 	vim.api.nvim_set_current_tabpage(tab_a)
