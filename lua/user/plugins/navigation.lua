@@ -15,7 +15,11 @@ end
 return {
 	{
 		"stevearc/oil.nvim",
-		lazy = false,
+		cmd = "Oil",
+		event = { "BufReadCmd oil://*", "BufReadCmd oil-ssh://*", "BufReadCmd oil-trash://*", "BufReadCmd oil-s3://*" },
+		init = function()
+			require("user.core.oil_registration").setup()
+		end,
 		keys = {
 			{
 				"<leader>E",
