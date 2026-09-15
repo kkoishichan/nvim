@@ -131,4 +131,5 @@ for _, count in ipairs({ 100, 2500, 7500 }) do
 	end
 end
 scene("paste_restore_7500", 7500, "paste")
-vim.fn.writefile({ vim.json.encode(report) }, assert(vim.env.NVIM_BENCH_OUTPUT, "NVIM_BENCH_OUTPUT is required"))
+local output = assert(vim.env.NVIM_BENCH_OUTPUT, "NVIM_BENCH_OUTPUT is required")
+vim.fn.writefile({ vim.json.encode(report) }, output)

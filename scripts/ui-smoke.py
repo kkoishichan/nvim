@@ -17,8 +17,10 @@ import time
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--root", type=Path, help="configuration checkout to validate")
+    parser.add_argument("--nvim", default="nvim")
     args = parser.parse_args()
-    root = Path(__file__).resolve().parent.parent
+    root = (args.root or Path(__file__).resolve().parent.parent).resolve()
     output = args.output or Path(tempfile.mkdtemp(prefix="nvim-ui-smoke-"))
     if args.output:
         output.mkdir(parents=True, exist_ok=False)
@@ -29,6 +31,8 @@ def main():
         run = output / f"{columns}x{rows}"
         workspace = run / "workspace"
         workspace.mkdir(parents=True)
+        (run / "config").mkdir()
+        (run / "config" / "nvim").symlink_to(root, target_is_directory=True)
         (workspace / ".root").write_text("")
         sample = workspace / "sample.txt"
         sample.write_text("sample\n")
@@ -54,6 +58,8 @@ vim.defer_fn(function() NvimSmokeSnapshot("ready") end, 150)
 ''')
         env = os.environ | {
             "TERM": "xterm-256color", "SHELL": "/bin/sh",
+            "XDG_CONFIG_HOME": str(run / "config"), "NVIM_APPNAME": "nvim",
+            "NVIM_CHECK_ONLY": "1",
             "XDG_CACHE_HOME": str(run / "cache"), "XDG_STATE_HOME": str(run / "state"),
             "NVIM_LOG_FILE": str(run / "nvim.log"), "NVIM_UI_SMOKE_OUTPUT": str(run),
         }
@@ -66,7 +72,7 @@ vim.defer_fn(function() NvimSmokeSnapshot("ready") end, 150)
         pid, master = pty.fork()
         if pid == 0:
             os.chdir(root)
-            command = ["nvim", "-u", str(root / "init.lua"), "-i", "NONE", str(sample),
+            command = [args.nvim, "-u", str(root / "init.lua"), "-i", "NONE", str(sample),
                        "--cmd", "autocmd VimEnter * lua dofile(" + json.dumps(str(script)) + ")"]
             os.execvpe(command[0], command, env)
         fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack("HHHH", rows, columns, 0, 0))

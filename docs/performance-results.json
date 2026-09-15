@@ -1,0 +1,1843 @@
+{
+  "date": "2026-09-15",
+  "note": "Initial startup sweeps are sequential by checkout and show time-of-run variation. Use the paired follow-up for startup comparisons. Runtime fixtures are isolated core microbenchmarks, not full input latency.",
+  "evidence_directory": "/tmp/nvim-speed-results-x6ew4yrw",
+  "startup_initial": {
+    "cold": {
+      "baseline": {
+        "method": "headless NVIM STARTED; cold cache, fresh state per run, installed data reused; discard first run",
+        "scope": "Startup only. Does not measure screen drawing, completion, LSP readiness or external CLI startup.",
+        "nvim": "NVIM v0.12.5",
+        "revision": "a3827c140ca15b81f3a9e07aecabe5cdc9b5478e",
+        "working_tree_dirty": false,
+        "lock_sha256": "97c502f6f4bf71413fe43024ad257d1219eb7470360cb702965a79dfd6083a28",
+        "scenes": {
+          "empty": {
+            "runs_ms": [
+              77.313,
+              93.478,
+              70.694,
+              74.846,
+              71.971,
+              80.245
+            ],
+            "median_ms": 74.846
+          },
+          "small_lua": {
+            "runs_ms": [
+              223.96,
+              234.375,
+              244.201,
+              265.04,
+              254.723,
+              246.689
+            ],
+            "median_ms": 246.689
+          },
+          "medium_lua": {
+            "runs_ms": [
+              261.946,
+              273.119,
+              278.344,
+              260.354,
+              315.476,
+              266.259
+            ],
+            "median_ms": 273.119
+          },
+          "long_json": {
+            "runs_ms": [
+              294.957,
+              279.677,
+              296.956,
+              316.403,
+              240.668,
+              275.868
+            ],
+            "median_ms": 279.677
+          },
+          "large_json": {
+            "runs_ms": [
+              285.913,
+              291.285,
+              299.307,
+              344.576,
+              293.764,
+              272.503
+            ],
+            "median_ms": 293.764
+          }
+        }
+      },
+      "current": {
+        "method": "headless NVIM STARTED; cold cache, fresh state per run, installed data reused; discard first run",
+        "scope": "Startup only. Does not measure screen drawing, completion, LSP readiness or external CLI startup.",
+        "nvim": "NVIM v0.12.5",
+        "revision": "d829d26bda7cb07abf51299fe607d68782c5d66b",
+        "working_tree_dirty": true,
+        "lock_sha256": "97c502f6f4bf71413fe43024ad257d1219eb7470360cb702965a79dfd6083a28",
+        "scenes": {
+          "empty": {
+            "runs_ms": [
+              85.978,
+              86.78,
+              87.582,
+              84.576,
+              92.553,
+              89.228
+            ],
+            "median_ms": 87.582
+          },
+          "small_lua": {
+            "runs_ms": [
+              284.198,
+              260.585,
+              257.025,
+              260.957,
+              252.91,
+              274.271
+            ],
+            "median_ms": 260.585
+          },
+          "medium_lua": {
+            "runs_ms": [
+              256.606,
+              279.302,
+              269.694,
+              295.497,
+              245.495,
+              257.846
+            ],
+            "median_ms": 269.694
+          },
+          "long_json": {
+            "runs_ms": [
+              264.545,
+              265.112,
+              263.008,
+              260.392,
+              242.777,
+              259.517
+            ],
+            "median_ms": 260.392
+          },
+          "large_json": {
+            "runs_ms": [
+              236.146,
+              237.405,
+              226.611,
+              237.024,
+              273.676,
+              239.833
+            ],
+            "median_ms": 237.405
+          }
+        }
+      }
+    },
+    "warm": {
+      "baseline": {
+        "method": "headless NVIM STARTED; warm cache, fresh state per run, installed data reused; discard first run",
+        "scope": "Startup only. Does not measure screen drawing, completion, LSP readiness or external CLI startup.",
+        "nvim": "NVIM v0.12.5",
+        "revision": "a3827c140ca15b81f3a9e07aecabe5cdc9b5478e",
+        "working_tree_dirty": false,
+        "lock_sha256": "97c502f6f4bf71413fe43024ad257d1219eb7470360cb702965a79dfd6083a28",
+        "scenes": {
+          "empty": {
+            "runs_ms": [
+              69.406,
+              53.316,
+              63.339,
+              53.706,
+              58.841,
+              85.335
+            ],
+            "median_ms": 58.841
+          },
+          "small_lua": {
+            "runs_ms": [
+              262.789,
+              169.588,
+              213.334,
+              167.899,
+              161.739,
+              175.428
+            ],
+            "median_ms": 169.588
+          },
+          "medium_lua": {
+            "runs_ms": [
+              297.05,
+              216.619,
+              234.831,
+              200.326,
+              174.832,
+              174.113
+            ],
+            "median_ms": 200.326
+          },
+          "long_json": {
+            "runs_ms": [
+              266.393,
+              242.519,
+              224.641,
+              247.041,
+              244.039,
+              250.985
+            ],
+            "median_ms": 244.039
+          },
+          "large_json": {
+            "runs_ms": [
+              216.841,
+              174.613,
+              180.154,
+              225.332,
+              242.054,
+              241.558
+            ],
+            "median_ms": 225.332
+          }
+        }
+      },
+      "current": {
+        "method": "headless NVIM STARTED; warm cache, fresh state per run, installed data reused; discard first run",
+        "scope": "Startup only. Does not measure screen drawing, completion, LSP readiness or external CLI startup.",
+        "nvim": "NVIM v0.12.5",
+        "revision": "d829d26bda7cb07abf51299fe607d68782c5d66b",
+        "working_tree_dirty": true,
+        "lock_sha256": "97c502f6f4bf71413fe43024ad257d1219eb7470360cb702965a79dfd6083a28",
+        "scenes": {
+          "empty": {
+            "runs_ms": [
+              86.568,
+              67.266,
+              72.993,
+              66.386,
+              70.743,
+              62.557
+            ],
+            "median_ms": 67.266
+          },
+          "small_lua": {
+            "runs_ms": [
+              193.053,
+              185.282,
+              201.088,
+              167.901,
+              134.66,
+              140.827
+            ],
+            "median_ms": 167.901
+          },
+          "medium_lua": {
+            "runs_ms": [
+              215.437,
+              168.493,
+              167.473,
+              145.518,
+              149.301,
+              132.122
+            ],
+            "median_ms": 149.301
+          },
+          "long_json": {
+            "runs_ms": [
+              243.257,
+              146.542,
+              152.158,
+              162.367,
+              166.589,
+              209.475
+            ],
+            "median_ms": 162.367
+          },
+          "large_json": {
+            "runs_ms": [
+              215.476,
+              179.53,
+              157.423,
+              146.367,
+              152.791,
+              148.406
+            ],
+            "median_ms": 152.791
+          }
+        }
+      }
+    }
+  },
+  "runtime": {
+    "scope": "Isolated synchronous core callbacks; excludes full rendering, plugins, language servers and external tools. See each scene's scope.",
+    "nvim": "NVIM v0.12.5",
+    "targets": {
+      "baseline": {
+        "path": "/tmp/nvim-speed-baseline.G5yN2O/config",
+        "commit": "a3827c140ca15b81f3a9e07aecabe5cdc9b5478e",
+        "dirty": false,
+        "lock_sha256": "97c502f6f4bf71413fe43024ad257d1219eb7470360cb702965a79dfd6083a28"
+      },
+      "current": {
+        "path": "/home/koishi/.config/nvim",
+        "commit": "d829d26bda7cb07abf51299fe607d68782c5d66b",
+        "dirty": true,
+        "lock_sha256": "97c502f6f4bf71413fe43024ad257d1219eb7470360cb702965a79dfd6083a28"
+      }
+    },
+    "results": {
+      "baseline": {
+        "context": {
+          "project_context": {
+            "runs_us": [
+              631.526165,
+              644.8374,
+              678.2498499999999,
+              544.490495,
+              664.73954,
+              728.85708
+            ],
+            "root_searches_per_call": 4,
+            "median_us": 664.73954
+          },
+          "global_tool_hit": {
+            "runs_us": [
+              596.34933,
+              724.9935300000001,
+              617.6215550000001,
+              548.5619300000001,
+              575.196235,
+              657.7088100000001
+            ],
+            "root_searches_per_call": 4,
+            "median_us": 617.6215550000001
+          },
+          "project_tool_hit": {
+            "runs_us": [
+              746.668965,
+              685.5345649999999,
+              691.254565,
+              663.47435,
+              623.8406,
+              599.60097
+            ],
+            "root_searches_per_call": 4,
+            "median_us": 663.47435
+          }
+        },
+        "editing": {
+          "scenes": [
+            {
+              "has_conflict": false,
+              "heavy": false,
+              "policy_calls": 600,
+              "edit_ms": 6.836601,
+              "policy_ms": 4.09403,
+              "p95_pair_ms": 0.052178,
+              "lines_read": 0,
+              "line_reads": 0,
+              "offset_reads": 1800,
+              "extmark_writes": 0,
+              "p50_pair_ms": 0.013365,
+              "name": "ordinary_100",
+              "timer_requests": 0,
+              "deferred_ms": 0,
+              "timer_callbacks": 0
+            },
+            {
+              "has_conflict": false,
+              "heavy": true,
+              "policy_calls": 600,
+              "edit_ms": 23.236453,
+              "policy_ms": 19.174582,
+              "p95_pair_ms": 0.13224,
+              "lines_read": 0,
+              "line_reads": 0,
+              "offset_reads": 96600,
+              "extmark_writes": 0,
+              "p50_pair_ms": 0.064411,
+              "name": "long_100",
+              "timer_requests": 0,
+              "deferred_ms": 0,
+              "timer_callbacks": 0
+            },
+            {
+              "has_conflict": false,
+              "heavy": true,
+              "policy_calls": 600,
+              "edit_ms": 28.093385,
+              "policy_ms": 24.73896,
+              "p95_pair_ms": 0.162186,
+              "lines_read": 0,
+              "line_reads": 0,
+              "offset_reads": 120600,
+              "extmark_writes": 0,
+              "p50_pair_ms": 0.07953,
+              "name": "manual_100",
+              "timer_requests": 0,
+              "deferred_ms": 0,
+              "timer_callbacks": 0
+            },
+            {
+              "has_conflict": true,
+              "heavy": false,
+              "policy_calls": 600,
+              "edit_ms": 8.915617,
+              "policy_ms": 4.652941,
+              "p95_pair_ms": 0.055615,
+              "lines_read": 100,
+              "line_reads": 1,
+              "offset_reads": 1800,
+              "extmark_writes": 5,
+              "p50_pair_ms": 0.02113,
+              "name": "conflict_100",
+              "timer_requests": 301,
+              "deferred_ms": 0.376307,
+              "timer_callbacks": 301
+            },
+            {
+              "has_conflict": false,
+              "heavy": false,
+              "policy_calls": 600,
+              "edit_ms": 9.299312,
+              "policy_ms": 5.808536,
+              "p95_pair_ms": 0.089859,
+              "lines_read": 0,
+              "line_reads": 0,
+              "offset_reads": 1800,
+              "extmark_writes": 0,
+              "p50_pair_ms": 0.015659,
+              "name": "ordinary_2500",
+              "timer_requests": 0,
+              "deferred_ms": 0,
+              "timer_callbacks": 0
+            },
+            {
+              "has_conflict": false,
+              "heavy": true,
+              "policy_calls": 600,
+              "edit_ms": 1401.814404,
+              "policy_ms": 1397.40308,
+              "p95_pair_ms": 4.851692,
+              "lines_read": 0,
+              "line_reads": 0,
+              "offset_reads": 2976600,
+              "extmark_writes": 0,
+              "p50_pair_ms": 4.615066,
+              "name": "long_2500",
+              "timer_requests": 0,
+              "deferred_ms": 0,
+              "timer_callbacks": 0
+            },
+            {
+              "has_conflict": false,
+              "heavy": true,
+              "policy_calls": 600,
+              "edit_ms": 1414.140781,
+              "policy_ms": 1409.312833,
+              "p95_pair_ms": 4.879314,
+              "lines_read": 0,
+              "line_reads": 0,
+              "offset_reads": 3000600,
+              "extmark_writes": 0,
+              "p50_pair_ms": 4.644582,
+              "name": "manual_2500",
+              "timer_requests": 0,
+              "deferred_ms": 0,
+              "timer_callbacks": 0
+            },
+            {
+              "has_conflict": true,
+              "heavy": false,
+              "policy_calls": 600,
+              "edit_ms": 9.754542,
+              "policy_ms": 5.537973,
+              "p95_pair_ms": 0.112563,
+              "lines_read": 2500,
+              "line_reads": 1,
+              "offset_reads": 1800,
+              "extmark_writes": 5,
+              "p50_pair_ms": 0.022824,
+              "name": "conflict_2500",
+              "timer_requests": 301,
+              "deferred_ms": 1.14216,
+              "timer_callbacks": 301
+            },
+            {
+              "has_conflict": false,
+              "heavy": false,
+              "policy_calls": 600,
+              "edit_ms": 13.906072,
+              "policy_ms": 8.723066,
+              "p95_pair_ms": 0.151957,
+              "lines_read": 0,
+              "line_reads": 0,
+              "offset_reads": 1800,
+              "extmark_writes": 0,
+              "p50_pair_ms": 0.032641,
+              "name": "ordinary_7500",
+              "timer_requests": 0,
+              "deferred_ms": 0,
+              "timer_callbacks": 0
+            },
+            {
+              "has_conflict": false,
+              "heavy": true,
+              "policy_calls": 600,
+              "edit_ms": 5863.397326,
+              "policy_ms": 5852.317793,
+              "p95_pair_ms": 20.833575,
+              "lines_read": 0,
+              "line_reads": 0,
+              "offset_reads": 8976600,
+              "extmark_writes": 0,
+              "p50_pair_ms": 19.398344,
+              "name": "long_7500",
+              "timer_requests": 0,
+              "deferred_ms": 0,
+              "timer_callbacks": 0
+            },
+            {
+              "has_conflict": false,
+              "heavy": true,
+              "policy_calls": 600,
+              "edit_ms": 6019.674112,
+              "policy_ms": 5994.604897,
+              "p95_pair_ms": 21.166834,
+              "lines_read": 0,
+              "line_reads": 0,
+              "offset_reads": 9000600,
+              "extmark_writes": 0,
+              "p50_pair_ms": 19.915331,
+              "name": "manual_7500",
+              "timer_requests": 0,
+              "deferred_ms": 0,
+              "timer_callbacks": 0
+            },
+            {
+              "has_conflict": true,
+              "heavy": false,
+              "policy_calls": 600,
+              "edit_ms": 8.807924,
+              "policy_ms": 4.802893,
+              "p95_pair_ms": 0.071835,
+              "lines_read": 7500,
+              "line_reads": 1,
+              "offset_reads": 1800,
+              "extmark_writes": 5,
+              "p50_pair_ms": 0.021831,
+              "name": "conflict_7500",
+              "timer_requests": 301,
+              "deferred_ms": 1.75577,
+              "timer_callbacks": 301
+            },
+            {
+              "has_conflict": false,
+              "heavy": false,
+              "policy_calls": 600,
+              "edit_ms": 3002.572639,
+              "policy_ms": 2994.690197,
+              "p95_pair_ms": 10.763707,
+              "lines_read": 0,
+              "line_reads": 0,
+              "offset_reads": 4501200,
+              "extmark_writes": 0,
+              "p50_pair_ms": 9.887643,
+              "name": "paste_restore_7500",
+              "timer_requests": 0,
+              "deferred_ms": 0,
+              "timer_callbacks": 0
+            }
+          ],
+          "iterations": 300,
+          "scope": "core modules only; no plugins, parsing or redraw; actual buffer callbacks + TextChanged events"
+        },
+        "ui": {
+          "panel_enforce_four_editors_six_floats": {
+            "per_call_us": 118.1244764,
+            "samples_ms": [
+              586.961697,
+              587.24869,
+              590.622382,
+              627.39617,
+              629.903825
+            ],
+            "iterations": 5000,
+            "median_ms": 590.622382
+          },
+          "panel_empty_tab_scans": 3,
+          "git_rail_first_refresh": {
+            "buffer_var_writes": 6,
+            "get_hunks": 2
+          },
+          "git_rail_same_buffer_two_views_1000_lines": {
+            "per_call_us": 182.850304,
+            "samples_ms": [
+              352.448772,
+              356.483912,
+              365.700608,
+              366.560752,
+              383.195838
+            ],
+            "iterations": 2000,
+            "median_ms": 365.700608
+          },
+          "git_rail_unchanged_refresh": {
+            "buffer_var_writes": 6,
+            "get_hunks": 2
+          },
+          "note": "Headless isolated Lua hot-path microbenchmark; no screen rendering, LSP, or Git subprocess work",
+          "manager_stable_geometry": {
+            "per_call_us": 2.7274228,
+            "samples_ms": [
+              12.618961,
+              13.081705,
+              13.637114,
+              15.021178,
+              15.233028
+            ],
+            "iterations": 5000,
+            "median_ms": 13.637114
+          },
+          "git_statuscolumn_wrapper_attached": {
+            "per_call_us": 2.1236568,
+            "samples_ms": [
+              202.387416,
+              212.304113,
+              212.36568,
+              222.644212,
+              240.612425
+            ],
+            "iterations": 100000,
+            "median_ms": 212.36568
+          },
+          "manager_stable_geometry_writes_per_20_calls": 20,
+          "panel_enforce_one_editor": {
+            "per_call_us": 21.182482,
+            "samples_ms": [
+              93.488597,
+              98.614888,
+              105.91241,
+              108.723498,
+              109.012184
+            ],
+            "iterations": 5000,
+            "median_ms": 105.91241
+          }
+        }
+      },
+      "current": {
+        "context": {
+          "project_tool_hit": {
+            "median_us": 418.38985,
+            "runs_us": [
+              512.54361,
+              390.083785,
+              418.38985,
+              410.615215,
+              588.093435,
+              466.17885
+            ],
+            "root_searches_per_call": 3
+          },
+          "project_context": {
+            "median_us": 412.076775,
+            "runs_us": [
+              440.940385,
+              412.076775,
+              385.30361,
+              375.276975,
+              415.00826,
+              458.902855
+            ],
+            "root_searches_per_call": 3
+          },
+          "global_tool_hit": {
+            "median_us": 11.53313,
+            "runs_us": [
+              11.332205,
+              17.19282,
+              11.12476,
+              8.894095,
+              11.53313,
+              12.44806
+            ],
+            "root_searches_per_call": 0
+          }
+        },
+        "editing": {
+          "iterations": 300,
+          "scope": "core modules only; no plugins, parsing or redraw; actual buffer callbacks + TextChanged events",
+          "scenes": [
+            {
+              "heavy": false,
+              "policy_ms": 3.486709,
+              "lines_read": 600,
+              "line_reads": 600,
+              "name": "ordinary_100",
+              "extmark_writes": 0,
+              "p50_pair_ms": 0.013345,
+              "p95_pair_ms": 0.043362,
+              "timer_requests": 0,
+              "deferred_ms": 0,
+              "timer_callbacks": 0,
+              "has_conflict": false,
+              "edit_ms": 5.862511,
+              "policy_calls": 600,
+              "offset_reads": 600
+            },
+            {
+              "heavy": true,
+              "policy_ms": 5.723328,
+              "lines_read": 0,
+              "line_reads": 0,
+              "name": "long_100",
+              "extmark_writes": 0,
+              "p50_pair_ms": 0.029566,
+              "p95_pair_ms": 0.06392,
+              "timer_requests": 0,
+              "deferred_ms": 0,
+              "timer_callbacks": 0,
+              "has_conflict": false,
+              "edit_ms": 10.308057,
+              "policy_calls": 600,
+              "offset_reads": 600
+            },
+            {
+              "heavy": true,
+              "policy_ms": 5.562783,
+              "lines_read": 600,
+              "line_reads": 600,
+              "name": "manual_100",
+              "extmark_writes": 0,
+              "p50_pair_ms": 0.021361,
+              "p95_pair_ms": 0.057148,
+              "timer_requests": 0,
+              "deferred_ms": 0,
+              "timer_callbacks": 0,
+              "has_conflict": false,
+              "edit_ms": 8.748292,
+              "policy_calls": 600,
+              "offset_reads": 600
+            },
+            {
+              "heavy": false,
+              "policy_ms": 8.792334,
+              "lines_read": 700,
+              "line_reads": 601,
+              "name": "conflict_100",
+              "extmark_writes": 5,
+              "p50_pair_ms": 0.022292,
+              "p95_pair_ms": 0.165783,
+              "timer_requests": 2,
+              "deferred_ms": 0.41807,
+              "timer_callbacks": 2,
+              "has_conflict": true,
+              "edit_ms": 14.106992,
+              "policy_calls": 600,
+              "offset_reads": 600
+            },
+            {
+              "heavy": false,
+              "policy_ms": 4.320266,
+              "lines_read": 600,
+              "line_reads": 600,
+              "name": "ordinary_2500",
+              "extmark_writes": 0,
+              "p50_pair_ms": 0.015159,
+              "p95_pair_ms": 0.08441,
+              "timer_requests": 0,
+              "deferred_ms": 0,
+              "timer_callbacks": 0,
+              "has_conflict": false,
+              "edit_ms": 7.758212,
+              "policy_calls": 600,
+              "offset_reads": 600
+            },
+            {
+              "heavy": true,
+              "policy_ms": 4.631029,
+              "lines_read": 0,
+              "line_reads": 0,
+              "name": "long_2500",
+              "extmark_writes": 0,
+              "p50_pair_ms": 0.017182,
+              "p95_pair_ms": 0.049704,
+              "timer_requests": 0,
+              "deferred_ms": 0,
+              "timer_callbacks": 0,
+              "has_conflict": false,
+              "edit_ms": 7.346203,
+              "policy_calls": 600,
+              "offset_reads": 600
+            },
+            {
+              "heavy": true,
+              "policy_ms": 5.270136,
+              "lines_read": 600,
+              "line_reads": 600,
+              "name": "manual_2500",
+              "extmark_writes": 0,
+              "p50_pair_ms": 0.018755,
+              "p95_pair_ms": 0.062378,
+              "timer_requests": 0,
+              "deferred_ms": 0,
+              "timer_callbacks": 0,
+              "has_conflict": false,
+              "edit_ms": 7.989929,
+              "policy_calls": 600,
+              "offset_reads": 600
+            },
+            {
+              "heavy": false,
+              "policy_ms": 6.390534,
+              "lines_read": 3100,
+              "line_reads": 601,
+              "name": "conflict_2500",
+              "extmark_writes": 5,
+              "p50_pair_ms": 0.025488,
+              "p95_pair_ms": 0.066466,
+              "timer_requests": 2,
+              "deferred_ms": 1.751558,
+              "timer_callbacks": 2,
+              "has_conflict": true,
+              "edit_ms": 10.074747,
+              "policy_calls": 600,
+              "offset_reads": 600
+            },
+            {
+              "heavy": false,
+              "policy_ms": 7.410743,
+              "lines_read": 600,
+              "line_reads": 600,
+              "name": "ordinary_7500",
+              "extmark_writes": 0,
+              "p50_pair_ms": 0.03179,
+              "p95_pair_ms": 0.11676,
+              "timer_requests": 0,
+              "deferred_ms": 0,
+              "timer_callbacks": 0,
+              "has_conflict": false,
+              "edit_ms": 12.085975,
+              "policy_calls": 600,
+              "offset_reads": 600
+            },
+            {
+              "heavy": true,
+              "policy_ms": 6.447219,
+              "lines_read": 0,
+              "line_reads": 0,
+              "name": "long_7500",
+              "extmark_writes": 0,
+              "p50_pair_ms": 0.031911,
+              "p95_pair_ms": 0.081604,
+              "timer_requests": 0,
+              "deferred_ms": 0,
+              "timer_callbacks": 0,
+              "has_conflict": false,
+              "edit_ms": 11.682664,
+              "policy_calls": 600,
+              "offset_reads": 600
+            },
+            {
+              "heavy": true,
+              "policy_ms": 7.451503,
+              "lines_read": 600,
+              "line_reads": 600,
+              "name": "manual_7500",
+              "extmark_writes": 0,
+              "p50_pair_ms": 0.019387,
+              "p95_pair_ms": 0.167366,
+              "timer_requests": 0,
+              "deferred_ms": 0,
+              "timer_callbacks": 0,
+              "has_conflict": false,
+              "edit_ms": 10.95583,
+              "policy_calls": 600,
+              "offset_reads": 600
+            },
+            {
+              "heavy": false,
+              "policy_ms": 5.203448,
+              "lines_read": 8100,
+              "line_reads": 601,
+              "name": "conflict_7500",
+              "extmark_writes": 5,
+              "p50_pair_ms": 0.018816,
+              "p95_pair_ms": 0.087946,
+              "timer_requests": 2,
+              "deferred_ms": 3.437592,
+              "timer_callbacks": 2,
+              "has_conflict": true,
+              "edit_ms": 9.707944,
+              "policy_calls": 600,
+              "offset_reads": 600
+            },
+            {
+              "heavy": false,
+              "policy_ms": 105.314911,
+              "lines_read": 2250600,
+              "line_reads": 900,
+              "name": "paste_restore_7500",
+              "extmark_writes": 0,
+              "p50_pair_ms": 0.307231,
+              "p95_pair_ms": 0.660868,
+              "timer_requests": 0,
+              "deferred_ms": 0,
+              "timer_callbacks": 0,
+              "has_conflict": false,
+              "edit_ms": 110.428999,
+              "policy_calls": 600,
+              "offset_reads": 600
+            }
+          ]
+        },
+        "ui": {
+          "panel_empty_tab_scans": 1,
+          "manager_stable_geometry": {
+            "median_ms": 10.278612,
+            "per_call_us": 2.0557224,
+            "samples_ms": [
+              9.855052,
+              10.038438,
+              10.278612,
+              10.3834,
+              13.459128
+            ],
+            "iterations": 5000
+          },
+          "git_statuscolumn_wrapper_attached": {
+            "median_ms": 191.101311,
+            "per_call_us": 1.91101311,
+            "samples_ms": [
+              166.5052,
+              169.115891,
+              191.101311,
+              226.889118,
+              237.358199
+            ],
+            "iterations": 100000
+          },
+          "git_rail_first_refresh": {
+            "get_hunks": 1,
+            "buffer_var_writes": 3
+          },
+          "git_rail_same_buffer_two_views_1000_lines": {
+            "median_ms": 32.971939,
+            "per_call_us": 16.4859695,
+            "samples_ms": [
+              32.789524,
+              32.829279,
+              32.971939,
+              33.24841,
+              33.515696
+            ],
+            "iterations": 2000
+          },
+          "git_rail_unchanged_refresh": {
+            "get_hunks": 1,
+            "buffer_var_writes": 0
+          },
+          "note": "Headless isolated Lua hot-path microbenchmark; no screen rendering, LSP, or Git subprocess work",
+          "panel_enforce_one_editor": {
+            "median_ms": 16.916407,
+            "per_call_us": 3.3832814,
+            "samples_ms": [
+              16.481947,
+              16.791241,
+              16.916407,
+              17.882482,
+              19.515315
+            ],
+            "iterations": 5000
+          },
+          "panel_enforce_four_editors_six_floats": {
+            "median_ms": 91.785099,
+            "per_call_us": 18.3570198,
+            "samples_ms": [
+              89.51909,
+              89.828675,
+              91.785099,
+              94.420056,
+              101.507129
+            ],
+            "iterations": 5000
+          },
+          "manager_stable_geometry_writes_per_20_calls": 0
+        }
+      }
+    }
+  },
+  "pty": {
+    "baseline": {
+      "scope": "Actual PTY with xterm-256color input; simulated SSH/no-image environment, not a live SSH host or graphical image protocol",
+      "runs": [
+        {
+          "columns": 80,
+          "rows": 24,
+          "checks": [
+            "insert and leader write",
+            "Ctrl-Left resize",
+            "Ctrl-/ terminal",
+            "Alt-Space completion dispatch",
+            "real buffer completion menu"
+          ],
+          "completion_ms": 27.147418,
+          "state": {
+            "windows": [
+              {
+                "buffer": 1,
+                "filetype": "text",
+                "height": 22,
+                "id": 1002,
+                "role": "editor",
+                "buftype": "",
+                "width": 80,
+                "floating": false
+              }
+            ],
+            "mode": "n",
+            "completion_ms": 27.147418,
+            "current": 1002,
+            "theme": "vscode",
+            "errmsg": ""
+          }
+        },
+        {
+          "columns": 120,
+          "rows": 36,
+          "checks": [
+            "insert and leader write",
+            "Ctrl-Left resize",
+            "Ctrl-/ terminal",
+            "Alt-Space completion dispatch",
+            "real buffer completion menu"
+          ],
+          "completion_ms": 14.427246,
+          "state": {
+            "current": 1002,
+            "windows": [
+              {
+                "role": "editor",
+                "floating": false,
+                "buftype": "",
+                "height": 34,
+                "filetype": "text",
+                "buffer": 1,
+                "id": 1002,
+                "width": 120
+              }
+            ],
+            "completion_ms": 14.427246,
+            "theme": "vscode",
+            "errmsg": "",
+            "mode": "n"
+          }
+        },
+        {
+          "columns": 180,
+          "rows": 50,
+          "checks": [
+            "insert and leader write",
+            "Ctrl-Left resize",
+            "Ctrl-/ terminal",
+            "Alt-Space completion dispatch",
+            "real buffer completion menu"
+          ],
+          "completion_ms": 11.598504,
+          "state": {
+            "errmsg": "",
+            "theme": "vscode",
+            "completion_ms": 11.598504,
+            "windows": [
+              {
+                "filetype": "text",
+                "role": "editor",
+                "buftype": "",
+                "id": 1002,
+                "width": 180,
+                "height": 48,
+                "floating": false,
+                "buffer": 1
+              }
+            ],
+            "mode": "n",
+            "current": 1002
+          }
+        }
+      ]
+    },
+    "current": {
+      "scope": "Actual PTY with xterm-256color input; simulated SSH/no-image environment, not a live SSH host or graphical image protocol",
+      "runs": [
+        {
+          "columns": 80,
+          "rows": 24,
+          "checks": [
+            "insert and leader write",
+            "Ctrl-Left resize",
+            "Ctrl-/ terminal",
+            "Alt-Space completion dispatch",
+            "real buffer completion menu"
+          ],
+          "completion_ms": 10.936614,
+          "state": {
+            "windows": [
+              {
+                "floating": false,
+                "id": 1002,
+                "width": 80,
+                "filetype": "text",
+                "buffer": 1,
+                "height": 22,
+                "buftype": "",
+                "role": "editor"
+              }
+            ],
+            "errmsg": "",
+            "current": 1002,
+            "mode": "n",
+            "theme": "vscode",
+            "completion_ms": 10.936614
+          }
+        },
+        {
+          "columns": 120,
+          "rows": 36,
+          "checks": [
+            "insert and leader write",
+            "Ctrl-Left resize",
+            "Ctrl-/ terminal",
+            "Alt-Space completion dispatch",
+            "real buffer completion menu"
+          ],
+          "completion_ms": 12.63921,
+          "state": {
+            "windows": [
+              {
+                "filetype": "text",
+                "id": 1002,
+                "buftype": "",
+                "width": 120,
+                "height": 34,
+                "buffer": 1,
+                "role": "editor",
+                "floating": false
+              }
+            ],
+            "completion_ms": 12.63921,
+            "theme": "vscode",
+            "mode": "n",
+            "errmsg": "",
+            "current": 1002
+          }
+        },
+        {
+          "columns": 180,
+          "rows": 50,
+          "checks": [
+            "insert and leader write",
+            "Ctrl-Left resize",
+            "Ctrl-/ terminal",
+            "Alt-Space completion dispatch",
+            "real buffer completion menu"
+          ],
+          "completion_ms": 12.478636,
+          "state": {
+            "current": 1002,
+            "windows": [
+              {
+                "filetype": "text",
+                "buffer": 1,
+                "floating": false,
+                "width": 180,
+                "height": 48,
+                "role": "editor",
+                "buftype": "",
+                "id": 1002
+              }
+            ],
+            "theme": "vscode",
+            "errmsg": "",
+            "completion_ms": 12.478636,
+            "mode": "n"
+          }
+        }
+      ]
+    }
+  },
+  "startup_paired": {
+    "cold": {
+      "method": "headless NVIM STARTED; cold cache, fresh state per run, installed data reused; discard first run; paired targets, alternating baseline/current and current/baseline each round",
+      "scope": "Startup only. Does not measure screen drawing, completion, LSP readiness or external CLI startup.",
+      "nvim": "NVIM v0.12.5",
+      "scenes": {
+        "empty": {
+          "targets": {
+            "baseline": {
+              "runs_ms": [
+                73.321,
+                86.717,
+                70.502,
+                70.159,
+                61.453,
+                80.084
+              ],
+              "median_ms": 70.502
+            },
+            "current": {
+              "runs_ms": [
+                63.635,
+                67.317,
+                56.923,
+                62.709,
+                81.628,
+                98.328
+              ],
+              "median_ms": 67.317
+            }
+          },
+          "order": [
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ],
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ],
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ]
+          ],
+          "paired_delta_ms": {
+            "runs_ms": [
+              -9.686,
+              -19.400000000000006,
+              -13.578999999999994,
+              -7.450000000000003,
+              20.174999999999997,
+              18.244
+            ],
+            "median_ms": -7.450000000000003
+          }
+        },
+        "small_lua": {
+          "targets": {
+            "baseline": {
+              "runs_ms": [
+                220.996,
+                255.061,
+                292.387,
+                281.326,
+                258.664,
+                254.695
+              ],
+              "median_ms": 258.664
+            },
+            "current": {
+              "runs_ms": [
+                188.842,
+                244.192,
+                272.336,
+                218.123,
+                235.039,
+                250.498
+              ],
+              "median_ms": 244.192
+            }
+          },
+          "order": [
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ],
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ],
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ]
+          ],
+          "paired_delta_ms": {
+            "runs_ms": [
+              -32.153999999999996,
+              -10.869,
+              -20.050999999999988,
+              -63.20300000000003,
+              -23.625,
+              -4.197000000000003
+            ],
+            "median_ms": -20.050999999999988
+          }
+        },
+        "medium_lua": {
+          "targets": {
+            "baseline": {
+              "runs_ms": [
+                221.082,
+                267.451,
+                262.874,
+                262.038,
+                253.117,
+                264.772
+              ],
+              "median_ms": 262.874
+            },
+            "current": {
+              "runs_ms": [
+                238.756,
+                255.151,
+                208.129,
+                267.355,
+                244.774,
+                244.427
+              ],
+              "median_ms": 244.774
+            }
+          },
+          "order": [
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ],
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ],
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ]
+          ],
+          "paired_delta_ms": {
+            "runs_ms": [
+              17.674000000000007,
+              -12.300000000000011,
+              -54.74500000000003,
+              5.317000000000007,
+              -8.34299999999999,
+              -20.345
+            ],
+            "median_ms": -12.300000000000011
+          }
+        },
+        "long_json": {
+          "targets": {
+            "baseline": {
+              "runs_ms": [
+                296.413,
+                284.226,
+                266.047,
+                282.039,
+                255.676,
+                259.759
+              ],
+              "median_ms": 266.047
+            },
+            "current": {
+              "runs_ms": [
+                256.353,
+                232.015,
+                264.205,
+                265.793,
+                211.818,
+                210.492
+              ],
+              "median_ms": 232.015
+            }
+          },
+          "order": [
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ],
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ],
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ]
+          ],
+          "paired_delta_ms": {
+            "runs_ms": [
+              -40.06,
+              -52.21100000000001,
+              -1.8420000000000414,
+              -16.24599999999998,
+              -43.857999999999976,
+              -49.267000000000024
+            ],
+            "median_ms": -43.857999999999976
+          }
+        },
+        "large_json": {
+          "targets": {
+            "baseline": {
+              "runs_ms": [
+                357.992,
+                262.123,
+                265.317,
+                260.15,
+                270.358,
+                265.673
+              ],
+              "median_ms": 265.317
+            },
+            "current": {
+              "runs_ms": [
+                248.859,
+                262.558,
+                245.751,
+                237.127,
+                240.529,
+                241.87
+              ],
+              "median_ms": 241.87
+            }
+          },
+          "order": [
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ],
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ],
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ]
+          ],
+          "paired_delta_ms": {
+            "runs_ms": [
+              -109.13300000000001,
+              0.4350000000000023,
+              -19.566000000000003,
+              -23.022999999999968,
+              -29.829000000000008,
+              -23.802999999999997
+            ],
+            "median_ms": -23.022999999999968
+          }
+        }
+      },
+      "targets": {
+        "baseline": {
+          "root": "/tmp/nvim-speed-baseline.G5yN2O/config",
+          "revision": "a3827c140ca15b81f3a9e07aecabe5cdc9b5478e",
+          "working_tree_dirty": false,
+          "lock_sha256": "97c502f6f4bf71413fe43024ad257d1219eb7470360cb702965a79dfd6083a28"
+        },
+        "current": {
+          "root": "/home/koishi/.config/nvim",
+          "revision": "d829d26bda7cb07abf51299fe607d68782c5d66b",
+          "working_tree_dirty": true,
+          "lock_sha256": "97c502f6f4bf71413fe43024ad257d1219eb7470360cb702965a79dfd6083a28"
+        }
+      }
+    },
+    "warm": {
+      "method": "headless NVIM STARTED; warm cache, fresh state per run, installed data reused; discard first run; paired targets, alternating baseline/current and current/baseline each round",
+      "scope": "Startup only. Does not measure screen drawing, completion, LSP readiness or external CLI startup.",
+      "nvim": "NVIM v0.12.5",
+      "scenes": {
+        "empty": {
+          "targets": {
+            "baseline": {
+              "runs_ms": [
+                90.565,
+                90.148,
+                71.439,
+                70.153,
+                66.651,
+                65.841
+              ],
+              "median_ms": 70.153
+            },
+            "current": {
+              "runs_ms": [
+                72.209,
+                70.645,
+                70.871,
+                75.932,
+                58.227,
+                67.476
+              ],
+              "median_ms": 70.645
+            }
+          },
+          "order": [
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ],
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ],
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ]
+          ],
+          "paired_delta_ms": {
+            "runs_ms": [
+              -18.355999999999995,
+              -19.503,
+              -0.5679999999999978,
+              5.778999999999996,
+              -8.424,
+              1.6350000000000051
+            ],
+            "median_ms": -0.5679999999999978
+          }
+        },
+        "small_lua": {
+          "targets": {
+            "baseline": {
+              "runs_ms": [
+                243.101,
+                182.725,
+                216.452,
+                223.929,
+                159.527,
+                222.971
+              ],
+              "median_ms": 216.452
+            },
+            "current": {
+              "runs_ms": [
+                193.545,
+                137.928,
+                179.854,
+                165.442,
+                143.677,
+                170.096
+              ],
+              "median_ms": 165.442
+            }
+          },
+          "order": [
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ],
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ],
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ]
+          ],
+          "paired_delta_ms": {
+            "runs_ms": [
+              -49.55600000000001,
+              -44.797,
+              -36.597999999999985,
+              -58.486999999999995,
+              -15.849999999999994,
+              -52.875
+            ],
+            "median_ms": -44.797
+          }
+        },
+        "medium_lua": {
+          "targets": {
+            "baseline": {
+              "runs_ms": [
+                220.832,
+                181.374,
+                228.659,
+                202.941,
+                216.963,
+                211.821
+              ],
+              "median_ms": 211.821
+            },
+            "current": {
+              "runs_ms": [
+                234.551,
+                183.743,
+                173.874,
+                183.464,
+                156.896,
+                184.218
+              ],
+              "median_ms": 183.464
+            }
+          },
+          "order": [
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ],
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ],
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ]
+          ],
+          "paired_delta_ms": {
+            "runs_ms": [
+              13.718999999999994,
+              2.3689999999999998,
+              -54.785,
+              -19.477000000000004,
+              -60.06700000000001,
+              -27.60300000000001
+            ],
+            "median_ms": -27.60300000000001
+          }
+        },
+        "long_json": {
+          "targets": {
+            "baseline": {
+              "runs_ms": [
+                301.76,
+                200.979,
+                181.983,
+                176.195,
+                183.887,
+                221.055
+              ],
+              "median_ms": 183.887
+            },
+            "current": {
+              "runs_ms": [
+                261.658,
+                198.509,
+                148.773,
+                159.794,
+                196.69,
+                182.436
+              ],
+              "median_ms": 182.436
+            }
+          },
+          "order": [
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ],
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ],
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ]
+          ],
+          "paired_delta_ms": {
+            "runs_ms": [
+              -40.101999999999975,
+              -2.4700000000000273,
+              -33.21000000000001,
+              -16.400999999999982,
+              12.802999999999997,
+              -38.619
+            ],
+            "median_ms": -16.400999999999982
+          }
+        },
+        "large_json": {
+          "targets": {
+            "baseline": {
+              "runs_ms": [
+                269.291,
+                163.429,
+                181.579,
+                186.242,
+                214.229,
+                211.925
+              ],
+              "median_ms": 186.242
+            },
+            "current": {
+              "runs_ms": [
+                235.077,
+                173.665,
+                190.236,
+                163.412,
+                188.986,
+                142.289
+              ],
+              "median_ms": 173.665
+            }
+          },
+          "order": [
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ],
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ],
+            [
+              "baseline",
+              "current"
+            ],
+            [
+              "current",
+              "baseline"
+            ]
+          ],
+          "paired_delta_ms": {
+            "runs_ms": [
+              -34.214,
+              10.23599999999999,
+              8.656999999999982,
+              -22.829999999999984,
+              -25.243000000000023,
+              -69.63600000000002
+            ],
+            "median_ms": -22.829999999999984
+          }
+        }
+      },
+      "targets": {
+        "baseline": {
+          "root": "/tmp/nvim-speed-baseline.G5yN2O/config",
+          "revision": "a3827c140ca15b81f3a9e07aecabe5cdc9b5478e",
+          "working_tree_dirty": false,
+          "lock_sha256": "97c502f6f4bf71413fe43024ad257d1219eb7470360cb702965a79dfd6083a28"
+        },
+        "current": {
+          "root": "/home/koishi/.config/nvim",
+          "revision": "d829d26bda7cb07abf51299fe607d68782c5d66b",
+          "working_tree_dirty": true,
+          "lock_sha256": "97c502f6f4bf71413fe43024ad257d1219eb7470360cb702965a79dfd6083a28"
+        }
+      }
+    }
+  }
+}

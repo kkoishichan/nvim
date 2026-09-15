@@ -388,6 +388,10 @@ Go 汇编仅在 `.s`、Go 项目和 Plan 9 指令特征同时匹配时使用 asm
   寄存器和系统剪贴板清除，可将 `vim.g.user_sensitive_clipboard_timeout_ms = 0` 关闭。
 - 外部文件变化默认在聚焦、切换 buffer 或离开终端时检查。需要空闲轮询时设置
   `vim.g.user_external_change_poll_ms`（毫秒）；默认不开启全 buffer 定时扫描。
+- 连续编辑按变化行判断文件开销；已发现的超长行保持位置记录，删除后再确认是否恢复。
+  手动关闭增强功能也不会触发逐键全文扫描。Git 概览在同文件多分屏时只计算一次，
+  未变化的窗口尺寸和标记不重复写入，连续更新合并刷新。
+- Oil 在第一次浏览目录时加载；目录参数、`:edit`、`:Oil`、快捷键和旧目录会话仍可直接使用。
 - Mason 不修改全局 `PATH`；LSP、formatter、linter 与 debugger 会逐项解析系统工具，
   找不到时才使用 Mason 的绝对路径，因此普通终端不会继承 Mason 环境。
 - 写入不存在的父目录不会再静默创建目录；确认路径后使用 `:WriteCreateDirs`。
@@ -401,7 +405,12 @@ Go 汇编仅在 `.s`、Go 项目和 Plan 9 指令特征同时匹配时使用 asm
   先核对版本锁与补全二进制，缺少依赖时失败并提示准备，不在检查中安装。
   可用 `./scripts/check.sh performance` 或 `./scripts/check.sh --group static --group ai` 仅运行指定组。
 - `python3 scripts/benchmark.py` 保留启动输入、各次日志与结果 JSON；默认每场景四次、丢弃首轮。
-  启动报错会使测量失败。此工具只测无头启动，补全、语言服务就绪和终端绘制分别验收。
+  `--baseline /path/to/old-checkout` 可交错对比新旧配置，`--cache warm` 复用各场景的编译缓存。
+  `--scene empty` 可缩小测量范围；启动报错会使测量失败。
+  此工具只测无头启动，补全、语言服务就绪和终端绘制分别验收。
+- `python3 scripts/benchmark-runtime.py --baseline /path/to/old-checkout` 使用同一组场景对比
+  项目查找、连续编辑和界面回调，隔离个人缓存与状态，记录耗时及 API 次数。
+  这是核心回调微基准，不代表完整按键到屏幕的延迟；方法和结果见 [性能验证](docs/performance.md)。
 - `python3 scripts/ui-smoke.py` 在三个尺寸的真实 PTY 中检查按键、终端模式和补全菜单，
   保存终端日志与窗口数据。它模拟无图片协议与 SSH 环境变量，不连接远程主机。
 - 依赖准备与 CI 复跑见 [CI 验证](docs/ci-validation.md)，语言端到端检查见

@@ -44,4 +44,5 @@ for name, action in pairs({
 	table.sort(samples)
 	results[name] = { median_us = samples[3], runs_us = runs, root_searches_per_call = calls }
 end
-vim.fn.writefile({ vim.json.encode(results) }, assert(vim.env.NVIM_BENCH_OUTPUT, "NVIM_BENCH_OUTPUT is required"))
+local output = assert(vim.env.NVIM_BENCH_OUTPUT, "NVIM_BENCH_OUTPUT is required")
+vim.fn.writefile({ vim.json.encode(results) }, output)

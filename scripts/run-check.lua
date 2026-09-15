@@ -5,6 +5,9 @@ assert(vim.v.errmsg == "", "Configuration startup failed: " .. vim.v.errmsg)
 assert(
 	vim.tbl_contains({
 		"performance",
+		"editing_cost",
+		"startup_loading",
+		"ui_runtime",
 		"ai",
 		"languages",
 		"projects",
