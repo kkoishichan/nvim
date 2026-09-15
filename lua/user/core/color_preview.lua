@@ -2,6 +2,7 @@ local M = {}
 local api = vim.api
 local plugin, callbacks
 local pending, timer, token = {}, nil, nil
+local css_cache = {}
 local active = false
 local delay_ms = 50
 
@@ -77,8 +78,11 @@ local function redraw(bufnr)
 		return
 	end
 	local utils = require("nvim-highlight-colors.utils")
+	local colors = require("nvim-highlight-colors.color.utils")
 	local original = utils.get_visible_rows_by_buffer_id
 	local original_lsp = utils.highlight_with_lsp
+	local original_css = colors.get_css_var_color
+	local tick = api.nvim_buf_get_changedtick(bufnr)
 	local lsp_request
 	local selected
 	-- The pinned helper uses bufwinid(), which always selects the first split.
@@ -99,6 +103,26 @@ local function redraw(bufnr)
 		lsp_request = lsp_request or { namespace = namespace, positions = {}, options = options }
 		vim.list_extend(lsp_request.positions, positions)
 	end
+	-- The upstream variable resolver searches the whole current buffer per use.
+	-- Reuse its exact result for this text version, including missing variables.
+	-- Keep the override inside the synchronous target-window render only.
+	colors.get_css_var_color = function(color, row_offset)
+		if api.nvim_get_current_buf() ~= bufnr then
+			return original_css(color, row_offset)
+		end
+		local entry = css_cache[bufnr]
+		if not entry or entry.tick ~= tick then
+			entry = { tick = tick, values = {} }
+			css_cache[bufnr] = entry
+		end
+		local offset = row_offset or false
+		entry.values[offset] = entry.values[offset] or {}
+		local values = entry.values[offset]
+		if values[color] == nil then
+			values[color] = original_css(color, row_offset) or false
+		end
+		return values[color] or nil
+	end
 	local ok, err = xpcall(function()
 		local covered, clear = 0, true
 		for _, range in ipairs(ranges) do
@@ -114,9 +138,15 @@ local function redraw(bufnr)
 	end, debug.traceback)
 	utils.get_visible_rows_by_buffer_id = original
 	utils.highlight_with_lsp = original_lsp
+	colors.get_css_var_color = original_css
 	if ok and lsp_request then
 		ok, err = xpcall(function()
-			original_lsp(bufnr, lsp_request.namespace, lsp_request.positions, lsp_request.options)
+			-- Query capabilities afresh: dynamic registration can change without
+			-- LspAttach. Avoid the upstream vim.version()/API metadata work when
+			-- attached clients (for example typos_lsp) cannot provide colors.
+			if #vim.lsp.get_clients({ bufnr = bufnr, method = "textDocument/documentColor" }) > 0 then
+				original_lsp(bufnr, lsp_request.namespace, lsp_request.positions, lsp_request.options)
+			end
 		end, debug.traceback)
 	end
 	if not ok then
@@ -168,6 +198,7 @@ function M.shutdown()
 	active = false
 	cancel()
 	pending = {}
+	css_cache = {}
 	if vim._user_color_preview == M then
 		vim._user_color_preview = nil
 	end
@@ -209,6 +240,7 @@ function M.setup(opts)
 		group = group,
 		callback = function(event)
 			pending[event.buf] = nil
+			css_cache[event.buf] = nil
 			if not next(pending) then
 				cancel()
 			end
