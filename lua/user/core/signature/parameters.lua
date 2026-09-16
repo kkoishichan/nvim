@@ -43,6 +43,26 @@ local function trim(text)
 	return (text:gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
+local function offset_range(label, offsets)
+	if
+		type(label) ~= "string"
+		or type(offsets) ~= "table"
+		or type(offsets[1]) ~= "number"
+		or type(offsets[2]) ~= "number"
+		or offsets[1] < 0
+		or offsets[2] <= offsets[1]
+	then
+		return nil
+	end
+	-- ParameterInformation.label offsets are UTF-16 code units, independent of
+	-- the client's negotiated document position encoding. Keep newlines intact.
+	local ok, first, last = pcall(function()
+		return vim.str_byteindex(label, "utf-16", offsets[1], true),
+			vim.str_byteindex(label, "utf-16", offsets[2], true)
+	end)
+	return ok and { first, last } or nil
+end
+
 local function parameter_label(signature, parameter)
 	if type(parameter) ~= "table" then
 		return ""
@@ -50,13 +70,9 @@ local function parameter_label(signature, parameter)
 	if type(parameter.label) == "string" then
 		return parameter.label
 	end
-	if
-		type(parameter.label) == "table"
-		and type(parameter.label[1]) == "number"
-		and type(parameter.label[2]) == "number"
-		and type(signature.label) == "string"
-	then
-		return signature.label:sub(parameter.label[1] + 1, parameter.label[2])
+	local range = offset_range(signature.label, parameter.label)
+	if range then
+		return signature.label:sub(range[1] + 1, range[2])
 	end
 	return ""
 end
@@ -101,7 +117,7 @@ local function signature_descriptor(signature)
 	end
 	local variadic_at
 	for index, label in ipairs(parameters) do
-		if label:find("...", 1, true) or label:match("^%s*%*%*?[%a_]") then
+		if label:find("...", 1, true) or label:match("^%s*%*%*?[%a_\128-\255]") then
 			variadic_at = index - 1
 			break
 		end
@@ -141,7 +157,15 @@ local function choose_signature(signature_help, argument_count)
 	for index, signature in ipairs(signature_help.signatures) do
 		local descriptor = signature_descriptor(signature)
 		local tier, rank = signature_fit(descriptor, argument_count)
-		if tier and (not best_tier or tier < best_tier or (tier == best_tier and rank < best_rank)) then
+		if
+			tier
+			and (
+				not best_tier
+				or tier < best_tier
+				or (tier == best_tier and rank < best_rank)
+				or (tier == best_tier and rank == best_rank and index - 1 == server_index)
+			)
+		then
 			best_index = index - 1
 			best_tier = tier
 			best_rank = rank
@@ -150,10 +174,45 @@ local function choose_signature(signature_help, argument_count)
 	return best_index or server_index
 end
 
----Correct stale parameter indices and select the shortest server-ordered
+local function active_parameter(signature_help, signature, call_state, filetype, server_index)
+	local active = call_state.active_parameter
+	local descriptor = signature_descriptor(signature)
+	local argument = call_state.arguments[active + 1] or ""
+	-- Python keyword order is independent of declaration order. Do not apply
+	-- this to languages where `name = value` is an assignment expression.
+	local name, remainder
+	if filetype == "python" then
+		name, remainder = argument:match("^%s*([%w_\128-\255]+)%s*=(.*)")
+	end
+	if name and remainder:sub(1, 1) ~= "=" then
+		for index, label in ipairs(descriptor.parameters) do
+			if label:match("^%s*%*?%*?([%w_\128-\255]+)") == name then
+				return index - 1
+			end
+		end
+		-- Preserve a useful server decision if its label format is unfamiliar.
+		local server_parameter = signature.activeParameter
+		if server_parameter == nil and (signature_help.activeSignature or 0) == server_index then
+			server_parameter = signature_help.activeParameter
+		end
+		if
+			type(server_parameter) == "number"
+			and server_parameter >= 0
+			and server_parameter < #descriptor.parameters
+		then
+			return server_parameter
+		end
+	end
+	if descriptor.variadic_at and active >= descriptor.variadic_at then
+		return descriptor.variadic_at
+	end
+	return active
+end
+
+---Correct stale parameter indices and select the shortest suitable
 ---signature that can hold the complete call. If none can, select the largest
----fixed arity as the closest useful hint. No client-side type guessing is
----performed.
+---fixed arity as the closest useful hint. Equal candidates retain the server's
+---selection, without client-side type guessing.
 ---@param context? blink.cmp.SignatureHelpContext
 ---@param signature_help? lsp.SignatureHelp
 ---@return lsp.SignatureHelp?
@@ -176,28 +235,63 @@ function M.normalize_signature_help(context, signature_help)
 	end
 
 	local normalized = vim.deepcopy(signature_help)
-	normalized.activeParameter = call_state.active_parameter
 	normalized.activeSignature = choose_signature(normalized, call_state.argument_count)
 	local active_signature = normalized.signatures[normalized.activeSignature + 1]
+	normalized.activeParameter = active_signature
+			and active_parameter(
+				signature_help,
+				active_signature,
+				call_state,
+				vim.bo[bufnr].filetype,
+				normalized.activeSignature
+			)
+		or call_state.active_parameter
 	if active_signature then
 		-- Neovim intentionally gives this signature-local field precedence over
 		-- SignatureHelp.activeParameter, so both must describe the live cursor.
-		active_signature.activeParameter = call_state.active_parameter
+		active_signature.activeParameter = normalized.activeParameter
 	end
 	return normalized
 end
 
-function M.active_parameter_range(signature_help, filetype)
-	local ok, _, range = pcall(vim.lsp.util.convert_signature_help_to_markdown_lines, signature_help, filetype, {})
-	if
-		ok
-		and type(range) == "table"
-		and range[1] == 1
-		and range[3] == 1
-		and type(range[2]) == "number"
-		and type(range[4]) == "number"
-	then
-		return { range[2], range[4] }
+---Return zero-based, end-exclusive byte offsets in the original label.
+---The range can include newlines; display flattening belongs to the renderer.
+function M.active_parameter_range(signature_help)
+	if type(signature_help) ~= "table" or type(signature_help.signatures) ~= "table" then
+		return nil
+	end
+	local index = type(signature_help.activeSignature) == "number" and signature_help.activeSignature or 0
+	local signature = signature_help.signatures[index + 1] or signature_help.signatures[1]
+	if not signature or type(signature.label) ~= "string" or type(signature.parameters) ~= "table" then
+		return nil
+	end
+	local active = signature.activeParameter or signature_help.activeParameter
+	if type(active) ~= "number" or active < 0 or active >= #signature.parameters then
+		return nil
+	end
+	local parameter = signature.parameters[active + 1]
+	if type(parameter) ~= "table" then
+		return nil
+	end
+	if type(parameter.label) == "table" then
+		return offset_range(signature.label, parameter.label)
+	end
+	-- Search in declaration order so repeated labels select the right instance.
+	local open = signature.label:find("(", 1, true)
+	local offset = open and open + 1 or 1
+	for parameter_index = 1, active + 1 do
+		local label = parameter_label(signature, signature.parameters[parameter_index])
+		if label == "" then
+			return nil
+		end
+		local first, last = signature.label:find(label, offset, true)
+		if not first then
+			return nil
+		end
+		if parameter_index == active + 1 then
+			return { first - 1, last }
+		end
+		offset = last + 1
 	end
 end
 

@@ -9,7 +9,8 @@ Neovim 打磨成接近 IDE 的日常工作流。
 - `glance.nvim` 提供定义、声明、实现、类型与引用的双栏 Peek 界面。
 - `oil.nvim` 像编辑 buffer 一样管理文件系统；`neo-tree.nvim` 提供侧边文件树。
 - `blink.cmp` 负责补全、snippet 与签名帮助；`Tab` / `Enter` 确认候选，方向键选择，
-	`Alt-Space` 主动唤起（`Ctrl-Space` 留给输入法）；当前重载默认以带函数标记的虚拟文本显示，并在空间允许时借用相邻行，
+	`Alt-Space` 主动唤起（`Ctrl-Space` 留给输入法）；当前重载默认以带函数标记的虚拟文本显示，并在空间允许时借用可见的相邻行，
+	长签名按窗口宽度省略，优先显示正在填写的参数；缩放、滚动和补全菜单出现时重新布局。
 	`Ctrl-K` 切换完整签名浮窗，`Ctrl-B` / `Ctrl-F` 滚动超出屏幕的签名。
 - `nvim-lspconfig` + Mason 负责语言服务与外部工具安装。
 - `conform.nvim` 格式化，`nvim-lint` 静态检查。

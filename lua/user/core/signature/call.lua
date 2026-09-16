@@ -15,6 +15,12 @@ local function position_before(left, right)
 	return left[1] < right[1] or (left[1] == right[1] and left[2] < right[2])
 end
 
+local function line_comment(character, following, filetype)
+	return (character == "/" and following == "/" and filetype ~= "python" and filetype ~= "lua")
+		or (character == "-" and following == "-" and (not filetype or filetype == "lua"))
+		or (character == "#" and (not filetype or filetype == "python"))
+end
+
 ---Find the syntax node immediately before an opening parenthesis. This also
 ---covers a just-typed, temporarily incomplete call such as `torch.arange(`.
 local function callee_before_parenthesis(root, bufnr, row, open_col)
@@ -59,6 +65,7 @@ local function lexical_call_site(bufnr, cursor)
 	local cursor_row = cursor[1] - 1
 	local first_row = math.max(0, cursor_row - 199)
 	local lines = api.nvim_buf_get_lines(bufnr, first_row, cursor_row + 1, false)
+	local filetype = vim.bo[bufnr].filetype
 	local stack = {}
 	local state = "code"
 	local quote
@@ -85,11 +92,7 @@ local function lexical_call_site(bufnr, cursor)
 					state = "code"
 					quote = nil
 				end
-			elseif
-				(character == "/" and following == "/")
-				or (character == "-" and following == "-")
-				or character == "#"
-			then
+			elseif line_comment(character, following, filetype) then
 				break
 			elseif character == "/" and following == "*" then
 				state = "block_comment"
@@ -212,7 +215,7 @@ local function looks_like_template_open(text, column)
 	return following ~= nil and following:match("[%w_:]") ~= nil and text:find(">", column + 1, true) ~= nil
 end
 
-local function split_arguments(text)
+local function split_arguments(text, filetype)
 	local arguments = {}
 	local start_col = 1
 	local stack = {}
@@ -242,11 +245,11 @@ local function split_arguments(text)
 				state = "code"
 				quote = nil
 			end
-		elseif (character == "/" and following == "/") or (character == "-" and following == "-") then
+		elseif line_comment(character, following, filetype) then
 			state = "line_comment"
-			column = column + 1
-		elseif character == "#" then
-			state = "line_comment"
+			if character ~= "#" then
+				column = column + 1
+			end
 		elseif character == "/" and following == "*" then
 			state = "block_comment"
 			column = column + 1
@@ -279,6 +282,29 @@ local function split_arguments(text)
 	return arguments
 end
 
+local function node_arguments(bufnr, node, argument_start, cursor)
+	local _, _, end_row, end_col = node:range()
+	local last = node:child(node:child_count() - 1)
+	local argument_end = last and last:type() == ")" and node_start(last) or { end_row + 1, end_col }
+	local arguments, active = {}, 0
+	local start = argument_start
+	-- Direct comma tokens delimit arguments; commas inside strings, regexes,
+	-- templates and nested expressions belong to child nodes instead.
+	for child in node:iter_children() do
+		if child:type() == "," then
+			local separator = node_start(child)
+			arguments[#arguments + 1] = text_between(bufnr, start, separator)
+			local _, _, row, col = child:range()
+			start = { row + 1, col }
+			if position_before(separator, cursor) then
+				active = active + 1
+			end
+		end
+	end
+	arguments[#arguments + 1] = text_between(bufnr, start, argument_end)
+	return arguments, active
+end
+
 ---Read both the cursor's parameter index and the complete argument list.
 ---They must remain independent: moving inside an existing call changes the
 ---highlighted parameter, but must not make later arguments disappear when an
@@ -296,17 +322,12 @@ function M.call_arguments(bufnr, cursor)
 		return nil
 	end
 
-	local cursor_arguments = split_arguments(text_between(bufnr, argument_start, cursor))
-	local arguments = cursor_arguments
+	local arguments, active
 	if site.argument_node then
-		local node_text = vim.treesitter.get_node_text(site.argument_node, bufnr)
-		if type(node_text) == "string" and node_text:sub(1, 1) == "(" then
-			node_text = node_text:sub(2)
-			if node_text:sub(-1) == ")" then
-				node_text = node_text:sub(1, -2)
-			end
-			arguments = split_arguments(node_text)
-		end
+		arguments, active = node_arguments(bufnr, site.argument_node, argument_start, cursor)
+	else
+		arguments = split_arguments(text_between(bufnr, argument_start, cursor), vim.bo[bufnr].filetype)
+		active = #arguments - 1
 	end
 	local argument_count = #arguments
 	if argument_count == 1 and arguments[1]:match("^%s*$") then
@@ -314,7 +335,7 @@ function M.call_arguments(bufnr, cursor)
 	end
 
 	return {
-		active_parameter = #cursor_arguments - 1,
+		active_parameter = active,
 		argument_count = argument_count,
 		arguments = arguments,
 		anchor = site.anchor,

@@ -1,4 +1,8 @@
-return function(_)
+return function(tmp)
+	for _, topic in ipairs({ "signature_parameters", "signature_layout", "signature_compact", "signature_render" }) do
+		local path = vim.fs.joinpath(vim.env.NVIM_TEST_ROOT, "scripts", "checks", topic .. ".lua")
+		assert(loadfile(path))()(tmp)
+	end
 	require("lazy").load({ plugins = { "blink.cmp" } })
 	local signature = require("user.core.blink_signature")
 	local window = require("blink.cmp.signature.window")

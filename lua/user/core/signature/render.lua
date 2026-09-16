@@ -7,15 +7,19 @@ local M = {
 local api = vim.api
 local adapter = require("user.core.signature.adapter")
 local call = require("user.core.signature.call")
+local compact = require("user.core.signature.compact")
+local layout = require("user.core.signature.layout")
 local parameters = require("user.core.signature.parameters")
 M.signature_help_view = parameters.signature_help_view
 M.normalize_signature_help = parameters.normalize_signature_help
 M.find_call_anchor = call.find_call_anchor
 M.display_cursor = call.display_cursor
+M.virtual_position = layout.virtual_position
 local active_parameter_range = parameters.active_parameter_range
 local virtual_namespace = api.nvim_create_namespace("user_blink_signature")
 local anchor_namespace = api.nvim_create_namespace("user_blink_signature_anchor")
 local full_indicator_namespace = api.nvim_create_namespace("user_blink_signature_full_indicator")
+local full_parameter_namespace = api.nvim_create_namespace("user_blink_signature_full_parameter")
 local expanded = false
 local last_context
 local last_signature_help
@@ -120,8 +124,9 @@ end
 ---@param label string
 ---@param filetype string
 ---@param active_range? integer[] Zero-based, end-exclusive byte range.
+---@param max_width? integer Available display cells, including card padding.
 ---@return table[]
-function M.virtual_chunks(label, filetype, active_range)
+function M.virtual_chunks(label, filetype, active_range, max_width)
 	local spans = syntax_spans(label, filetype)
 	local boundary_set = { [0] = true, [#label] = true }
 	for _, span in ipairs(spans) do
@@ -147,13 +152,7 @@ function M.virtual_chunks(label, filetype, active_range)
 
 	local boundaries = vim.tbl_keys(boundary_set)
 	table.sort(boundaries)
-	local chunks = {
-		{ " ", "BlinkCmpSignatureVirtual" },
-		{
-			M.virtual_indicator .. " ",
-			{ "BlinkCmpSignatureVirtualIndicator", "BlinkCmpSignatureVirtual" },
-		},
-	}
+	local body = {}
 	for index = 1, #boundaries - 1 do
 		local start_col = boundaries[index]
 		local end_col = boundaries[index + 1]
@@ -177,73 +176,25 @@ function M.virtual_chunks(label, filetype, active_range)
 		if active_start and start_col >= active_start and end_col <= active_end then
 			highlights[#highlights + 1] = "BlinkCmpSignatureHelpActiveParameter"
 		end
-		append_chunk(chunks, label:sub(start_col + 1, end_col), highlights)
+		append_chunk(body, label:sub(start_col + 1, end_col), highlights)
 	end
+	local chrome_width = vim.fn.strdisplaywidth(M.virtual_indicator) + 3
+	if max_width then
+		if max_width <= chrome_width then
+			return compact.fit_chunks(body, max_width)
+		end
+		body = compact.fit_chunks(body, max_width - chrome_width)
+	end
+	local chunks = {
+		{ " ", "BlinkCmpSignatureVirtual" },
+		{
+			M.virtual_indicator .. " ",
+			{ "BlinkCmpSignatureVirtualIndicator", "BlinkCmpSignatureVirtual" },
+		},
+	}
+	vim.list_extend(chunks, body)
 	append_chunk(chunks, " ", "BlinkCmpSignatureVirtual")
 	return chunks
-end
-
-local function completion_visible()
-	local blink = package.loaded["blink.cmp"]
-	if not blink or type(blink.is_menu_visible) ~= "function" then
-		return false
-	end
-	local ok, visible = pcall(blink.is_menu_visible)
-	return ok and visible or false
-end
-
----Choose a nearby physical line and pad its EOL to align the card with the
----stable call anchor. A neighbouring line is available when the anchor
----cell itself is empty; the remaining width of the window is deliberately not
----part of this decision.
----@param bufnr integer
----@param anchor integer[]
----@param preferred_side? integer -1 above, 0 current line, 1 below.
----@param fallback_row? integer Zero-based live cursor row for the inline case.
----@return integer row
----@return string padding
----@return integer side
-function M.virtual_position(bufnr, anchor, preferred_side, fallback_row)
-	local anchor_row = anchor[1] - 1
-	local line_count = api.nvim_buf_line_count(bufnr)
-	local anchor_line = api.nvim_buf_get_lines(bufnr, anchor_row, anchor_row + 1, false)[1] or ""
-	local anchor_width = vim.fn.strdisplaywidth(anchor_line:sub(1, anchor[2]))
-	fallback_row = fallback_row or anchor_row
-
-	local function candidate(side)
-		local row = anchor_row + side
-		if row < 0 or row >= line_count then
-			return nil
-		end
-		local line = api.nvim_buf_get_lines(bufnr, row, row + 1, false)[1] or ""
-		local line_width = vim.fn.strdisplaywidth(line)
-		if line_width > anchor_width then
-			return nil
-		end
-		return string.rep(" ", anchor_width - line_width)
-	end
-
-	if preferred_side == 0 then
-		return fallback_row, "", 0
-	end
-	if preferred_side == -1 or preferred_side == 1 then
-		local padding = candidate(preferred_side)
-		if padding then
-			return anchor_row + preferred_side, padding, preferred_side
-		end
-	end
-
-	local padding = candidate(-1)
-	if padding then
-		return anchor_row - 1, padding, -1
-	end
-	if not completion_visible() then
-		padding = candidate(1)
-		if padding then
-			return anchor_row + 1, padding, 1
-		end
-	end
-	return fallback_row, "", 0
 end
 
 local function clear_virtual()
@@ -256,6 +207,7 @@ end
 local function clear_full_indicators()
 	if full_indicator_buffer and api.nvim_buf_is_valid(full_indicator_buffer) then
 		api.nvim_buf_clear_namespace(full_indicator_buffer, full_indicator_namespace, 0, -1)
+		api.nvim_buf_clear_namespace(full_indicator_buffer, full_parameter_namespace, 0, -1)
 	end
 	full_indicator_buffer = nil
 end
@@ -293,6 +245,39 @@ local function render_full_indicators(signature_window, signature_help)
 		end
 	end
 	full_indicator_buffer = bufnr
+	local range = active_parameter_range(signature_help)
+	local selected = signature_help.signatures[1]
+	if not range or not selected then
+		return
+	end
+	-- Blink drops empty lines and CR/LF separators from labels. Map the raw
+	-- byte range into those displayed lines, including multiline parameters.
+	row = 0
+	for offset, line in selected.label:gmatch("()([^\r\n]+)") do
+		local start_col = math.max(0, range[1] - offset + 1)
+		local end_col = math.min(#line, range[2] - offset + 1)
+		if end_col > start_col then
+			api.nvim_buf_set_extmark(bufnr, full_parameter_namespace, row, start_col, {
+				end_col = end_col,
+				hl_group = "BlinkCmpSignatureHelpActiveParameter",
+				priority = vim.hl.priorities.user,
+			})
+		end
+		row = row + 1
+	end
+end
+
+local function full_render_view(view)
+	if not view or not view.signatures or not view.signatures[1] then
+		return view
+	end
+	-- Native signature rendering currently interprets LSP's UTF-16 label
+	-- offsets as bytes. Suppress only its active mark and draw our shared byte
+	-- range above; this view never becomes the next LSP request's context.
+	local rendered = vim.tbl_extend("force", {}, view)
+	rendered.signatures = vim.list_extend({}, view.signatures)
+	rendered.signatures[1] = vim.tbl_extend("force", {}, view.signatures[1], { activeParameter = vim.NIL })
+	return rendered
 end
 
 local function clear_anchor()
@@ -487,11 +472,11 @@ local function position_full_window(signature_window, original_update)
 		update_full_window_size(win)
 		if opposite_direction then
 			local direction = opposite_direction == -1 and "n" or "s"
-			local layout = win:get_vertical_direction_and_height({ direction }, win.config.max_height)
-			if layout then
+			local placement = win:get_vertical_direction_and_height({ direction }, win.config.max_height)
+			if placement then
 				signature_anchor.full_direction = opposite_direction
-				signature_anchor.full_height = layout.height
-				win:set_height(layout.height)
+				signature_anchor.full_height = placement.height
+				win:set_height(placement.height)
 			end
 		else
 			win:set_height(math.min(signature_anchor.full_height, api.nvim_win_get_height(winid)))
@@ -539,14 +524,17 @@ local function render_virtual(context, signature_help, already_normalized)
 
 	local label = active_signature.label
 	local filetype = vim.bo[bufnr].filetype
-	local range = not label:find("[\r\n]") and active_parameter_range(view, filetype) or nil
-	label = label:gsub("\r\n", " "):gsub("[\r\n]", " ")
+	local range = active_parameter_range(view, filetype)
+	label, range = compact.flatten(label, range)
 	local preferred_side = signature_anchor and signature_anchor.virtual_side or nil
-	local show_row, padding, side = M.virtual_position(bufnr, anchor, preferred_side, live_row)
+	local show_row, padding, side, width = M.virtual_position(bufnr, anchor, preferred_side, live_row)
 	if signature_anchor then
 		signature_anchor.virtual_side = side
 	end
-	local chunks = M.virtual_chunks(label, filetype, range)
+	local chunks = M.virtual_chunks(label, filetype, range, width)
+	if #chunks == 0 then
+		return false
+	end
 	if side ~= 0 and padding ~= "" then
 		table.insert(chunks, 1, { padding, "Normal" })
 	end
@@ -722,7 +710,7 @@ function M.setup()
 			clear_virtual()
 			clear_full_indicators()
 			local view = M.signature_help_view(normalized, true)
-			local result = original_open(context, view)
+			local result = original_open(context, full_render_view(view))
 			render_full_indicators(signature_window, view)
 			signature_window.update_position()
 			return result
@@ -790,10 +778,14 @@ function M.setup()
 		desc = "Keep virtual signature clear of the completion menu",
 		callback = schedule_signature_refresh,
 	})
-	api.nvim_create_autocmd("WinResized", {
+	api.nvim_create_autocmd({ "WinResized", "WinScrolled" }, {
 		group = refresh_group,
-		desc = "Reflow virtual signature after resizing",
-		callback = schedule_signature_refresh,
+		desc = "Reflow virtual signature in the visible window",
+		callback = function()
+			if not expanded and last_context and api.nvim_get_current_buf() == last_context.bufnr then
+				schedule_signature_refresh()
+			end
+		end,
 	})
 	return true
 end
