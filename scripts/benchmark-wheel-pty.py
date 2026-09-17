@@ -4,6 +4,7 @@
 Uses kitty terminfo; does not launch kitty or measure its GPU/compositor display.
 The observer records viewport changes at the end of decoration processing,
 before terminal output reaches the display. Requires a POSIX PTY and Neovim.
+Python msgpack controls the probe over RPC without opening the command line.
 """
 
 import argparse
@@ -16,6 +17,7 @@ import pty
 import re
 import select
 import signal
+import socket
 import statistics
 import struct
 import subprocess
@@ -23,6 +25,11 @@ import tempfile
 import termios
 import time
 from pathlib import Path
+
+try:
+    import msgpack
+except ImportError:
+    raise SystemExit("This optional benchmark requires Python msgpack.") from None
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--file", type=Path, required=True)
@@ -32,6 +39,18 @@ parser.add_argument("--runs", type=int, default=4)
 parser.add_argument("--bursts", type=int, default=6)
 parser.add_argument("--interval-ms", type=float, default=8)
 parser.add_argument("--settle-ms", type=int, default=1800)
+parser.add_argument(
+    "--require-lsp",
+    action="append",
+    default=[],
+    metavar="NAME",
+    help="Fail unless this language server is attached and initialized before preparation (repeatable)",
+)
+parser.add_argument(
+    "--prepare-lua",
+    type=Path,
+    help="Run a Lua fixture after initial settling, then allow another 700 ms before measuring",
+)
 args = parser.parse_args()
 if args.runs < 1 or args.bursts < 2 or args.interval_ms <= 0 or args.settle_ms < 0:
     parser.error(
@@ -48,6 +67,9 @@ if len(source.read_bytes().splitlines()) < 140:
         "Use at least 140 lines to keep the wheel bursts away from buffer edges"
     )
 digest = hashlib.sha256(source.read_bytes()).hexdigest()
+preparation = args.prepare_lua.expanduser().resolve() if args.prepare_lua else None
+if preparation and not preparation.is_file():
+    parser.error("Preparation Lua file does not exist")
 targets = {"baseline": args.baseline.resolve()} if args.baseline else {}
 targets["current"] = root
 
@@ -71,6 +93,7 @@ def revision(path):
 
 report = {
     "scope": __doc__,
+    "benchmark_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
     "file": str(source),
     "source_sha256": digest,
     "targets": {name: revision(path) for name, path in targets.items()},
@@ -80,8 +103,19 @@ report = {
     "events_per_burst": 20,
     "anchor_lines": {"down": 10, "up": 90},
     "observer": "Decoded wheel count paired with viewport changes including virtual rows and wrapped columns",
+    "control": "Local RPC; only measured SGR wheel events enter the terminal input",
     "interval_ms": args.interval_ms,
     "settle_ms": args.settle_ms,
+    "required_lsp": args.require_lsp,
+    "preparation": (
+        {
+            "path": str(preparation),
+            "sha256": hashlib.sha256(preparation.read_bytes()).hexdigest(),
+            "settle_ms": 700,
+        }
+        if preparation
+        else None
+    ),
     "runs": args.runs,
     "bursts": args.bursts,
 }
@@ -114,10 +148,43 @@ for run_index in range(args.runs):
             if (installed / asset).exists():
                 (data / asset).symlink_to(installed / asset, target_is_directory=True)
         script = run / "probe.lua"
+        # Unix socket names have a short platform-dependent limit. Keep this
+        # independent of the user's potentially long --output directory.
+        socket_dir = tempfile.TemporaryDirectory(prefix="nvim-wheel-rpc-")
+        socket_path = Path(socket_dir.name) / "socket"
         script.write_text("""
 local api=vim.api
 local win=api.nvim_get_current_win()
 local active
+local diagnostic_changes=0
+local lsp_requests={}
+api.nvim_create_autocmd('DiagnosticChanged',{buffer=api.nvim_get_current_buf(),callback=function()
+ diagnostic_changes=diagnostic_changes+1
+end})
+api.nvim_create_autocmd('LspRequest',{callback=function(event)
+ local request=event.data and event.data.request
+ if request and request.type=='pending' then
+  local method=request.method or 'unknown'
+  lsp_requests[method]=(lsp_requests[method] or 0)+1
+ end
+end})
+local function state()
+ local result={diagnostic_changes=diagnostic_changes,lsp_requests=vim.deepcopy(lsp_requests),lsp_clients={}}
+ local diagnostics={total=0,severity={},source={}}
+ for _,d in ipairs(vim.diagnostic.get(0)) do
+  diagnostics.total=diagnostics.total+1
+  local severity=vim.diagnostic.severity[d.severity]
+  diagnostics.severity[severity]=(diagnostics.severity[severity] or 0)+1
+  local source=d.source or 'unknown'
+  diagnostics.source[source]=(diagnostics.source[source] or 0)+1
+ end
+ result.diagnostics=diagnostics
+ result.diagnostics_enabled=vim.diagnostic.is_enabled({bufnr=api.nvim_get_current_buf()})
+ for _,client in ipairs(vim.lsp.get_clients({bufnr=api.nvim_get_current_buf()})) do
+  result.lsp_clients[#result.lsp_clients+1]={name=client.name,initialized=client.initialized,pending_requests=vim.tbl_count(client.requests or {})}
+ end
+ return result
+end
 assert(vim.o.mousescroll:match('ver:(%d+)')=='3','Benchmark expects the default three lines per wheel event')
 local function view()
  assert(api.nvim_get_current_win()==win,'Benchmark sample lost focus')
@@ -127,7 +194,10 @@ end
 local ns=api.nvim_create_namespace('pty_wheel_measurement')
 local up,down=vim.keycode('<ScrollWheelUp>'),vim.keycode('<ScrollWheelDown>')
 vim.on_key(function(key)
- if active and (key==up or key==down) then active.received=active.received+1 end
+ if active and (key==up or key==down) then
+  active.received=active.received+1
+  active.decoded_ns[#active.decoded_ns+1]=vim.uv.hrtime()
+ end
 end,ns)
 api.nvim_set_decoration_provider(ns,{on_end=function()
  if active then
@@ -140,7 +210,7 @@ api.nvim_set_decoration_provider(ns,{on_end=function()
 end})
 function _G.PtyWheelStart(index)
  local now=view()
- active={start_top=now.top,start_view=now,last=now,received=0,frames={}}
+ active={start_top=now.top,start_view=now,last=now,received=0,decoded_ns={},frames={},state_before=state()}
  vim.fn.writefile({'ready'},vim.env.PTY_WHEEL_RUN..'/start-'..index)
 end
 function _G.PtyWheelStop(index)
@@ -157,13 +227,32 @@ function _G.PtyWheelStop(index)
  local lang=vim.treesitter.language.get_lang(vim.bo.filetype)
  result.query_cache_ready=cache and (cache.is_enabled and cache.is_enabled(lang) or (lang=='python' and cache.setup())) or false
  result.memory_kb=collectgarbage('count')
- result.lsp_clients={}
- for _,client in ipairs(vim.lsp.get_clients({bufnr=api.nvim_get_current_buf()})) do
-  result.lsp_clients[#result.lsp_clients+1]={name=client.name,initialized=client.initialized,pending_requests=vim.tbl_count(client.requests or {})}
- end
+ result.state_after=state()
+ result.lsp_clients=result.state_after.lsp_clients
  vim.fn.writefile({vim.json.encode(result)},vim.env.PTY_WHEEL_RUN..'/result-'..index..'.json')
 end
-vim.defer_fn(function() vim.fn.writefile({'ready'},vim.env.PTY_WHEEL_RUN..'/ready') end,tonumber(vim.env.PTY_WHEEL_SETTLE_MS))
+vim.defer_fn(function()
+ local preparation=vim.env.PTY_WHEEL_PREPARE or ''
+ local ok,result=xpcall(function()
+  local before=state()
+  local attached={}
+  for _,client in ipairs(before.lsp_clients) do attached[client.name]=client.initialized end
+  for _,name in ipairs(vim.json.decode(vim.env.PTY_WHEEL_REQUIRED_LSP)) do
+   assert(attached[name],'Required LSP is missing or uninitialized: '..name)
+  end
+  local ready={before_preparation=before}
+  if preparation~='' then ready.preparation=dofile(preparation) end
+  return ready
+ end,debug.traceback)
+ if not ok then
+  vim.fn.writefile(vim.split(result,string.char(10)),vim.env.PTY_WHEEL_RUN..'/error')
+  return
+ end
+ vim.defer_fn(function()
+  result.after_preparation=state()
+  vim.fn.writefile({vim.json.encode(result)},vim.env.PTY_WHEEL_RUN..'/ready')
+ end,preparation~='' and 700 or 0)
+end,tonumber(vim.env.PTY_WHEEL_SETTLE_MS))
 """)
         env = os.environ | {
             "TERM": "xterm-kitty",
@@ -176,6 +265,8 @@ vim.defer_fn(function() vim.fn.writefile({'ready'},vim.env.PTY_WHEEL_RUN..'/read
             "NVIM_LOG_FILE": str(run / "nvim.log"),
             "PTY_WHEEL_RUN": str(run),
             "PTY_WHEEL_SETTLE_MS": str(args.settle_ms),
+            "PTY_WHEEL_REQUIRED_LSP": json.dumps(args.require_lsp),
+            "PTY_WHEEL_PREPARE": str(preparation) if preparation else "",
             "SHELL": "/bin/sh",
         }
         for key in ["KITTY_WINDOW_ID", "WEZTERM_PANE", "TERM_PROGRAM"]:
@@ -192,6 +283,8 @@ vim.defer_fn(function() vim.fn.writefile({'ready'},vim.env.PTY_WHEEL_RUN..'/read
                     "-i",
                     "NONE",
                     "-n",
+                    "--listen",
+                    str(socket_path),
                     str(source),
                     "--cmd",
                     "autocmd VimEnter * lua dofile(" + json.dumps(str(script)) + ")",
@@ -226,16 +319,45 @@ vim.defer_fn(function() vim.fn.writefile({'ready'},vim.env.PTY_WHEEL_RUN..'/read
         def await_file(path):
             deadline = time.monotonic() + max(15, args.settle_ms / 1000 + 10)
             while not path.exists() and time.monotonic() < deadline:
+                if (run / "error").exists():
+                    raise RuntimeError((run / "error").read_text())
                 pump(0.02)
             if not path.exists():
                 raise TimeoutError(str(path))
 
+        rpc = None
+        identifier = 0
+        unpack = msgpack.Unpacker(raw=False)
+
         def command(text):
-            os.write(master, (":" + text + "\r").encode())
+            global identifier
+            identifier += 1
+            rpc.sendall(
+                msgpack.packb(
+                    [0, identifier, "nvim_command", [text]], use_bin_type=True
+                )
+            )
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline:
+                if select.select([rpc], [], [], 0)[0]:
+                    data = rpc.recv(65536)
+                    if not data:
+                        raise RuntimeError("Neovim closed the control channel")
+                    unpack.feed(data)
+                    for message in unpack:
+                        if message[0] == 1 and message[1] == identifier:
+                            if message[2]:
+                                raise RuntimeError(str(message[2]))
+                            return message[3]
+                pump(0.005)
+            raise TimeoutError("Neovim control request timed out: " + text)
 
         waves = []
         try:
             await_file(run / "ready")
+            readiness = json.loads((run / "ready").read_text())
+            rpc = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            rpc.connect(str(socket_path))
             pump(0.2)
             for index in range(args.bursts):
                 down = index % 2 == 0
@@ -291,6 +413,7 @@ vim.defer_fn(function() vim.fn.writefile({'ready'},vim.env.PTY_WHEEL_RUN..'/read
             row = {
                 "target": name,
                 "run": run_index,
+                "readiness": readiness,
                 "waves": waves,
                 "p50_ms": statistics.median(values),
                 "p95_ms": values[math.ceil(len(values) * 0.95) - 1],
@@ -311,6 +434,8 @@ vim.defer_fn(function() vim.fn.writefile({'ready'},vim.env.PTY_WHEEL_RUN..'/read
                 flush=True,
             )
         finally:
+            if rpc:
+                rpc.close()
             os.killpg(pid, signal.SIGTERM)
             deadline = time.monotonic() + 3
             while time.monotonic() < deadline:
@@ -322,6 +447,7 @@ vim.defer_fn(function() vim.fn.writefile({'ready'},vim.env.PTY_WHEEL_RUN..'/read
                 os.killpg(pid, signal.SIGKILL)
                 os.waitpid(pid, 0)
             os.close(master)
+            socket_dir.cleanup()
             (run / "terminal.log").write_bytes(log)
 assert hashlib.sha256(source.read_bytes()).hexdigest() == digest
 report["results"] = rows
