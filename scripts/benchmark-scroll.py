@@ -292,8 +292,7 @@ def main():
                       assert(not package.loaded.neoscroll, 'Wheel unexpectedly loaded Neoscroll')
                       local highlighter = vim.treesitter.highlighter.active[vim.api.nvim_get_current_buf()]
                       return {filetype=vim.bo.filetype, clients=vim.tbl_map(function(c) return c.name end, vim.lsp.get_clients({bufnr=0})),
-                        treesitter_active=highlighter ~= nil, syntax=vim.bo.syntax,
-                        redraws=highlighter and highlighter.redraw_count or 0,
+                        treesitter_active=highlighter ~= nil, redraws=highlighter and highlighter.redraw_count or 0,
                         diagnostics=#vim.diagnostic.get(0), colors_active=colors_active,
                         neoscroll_loaded=package.loaded.neoscroll ~= nil}
                     """,

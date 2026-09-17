@@ -326,6 +326,40 @@ return {
 		},
 	},
 	{
+		"karb94/neoscroll.nvim",
+		keys = {
+			{ "<C-u>", mode = { "n", "x" } },
+			{ "<C-d>", mode = { "n", "x" } },
+			{ "<C-b>", mode = { "n", "x" } },
+			{ "<C-f>", mode = { "n", "x" } },
+			{ "<C-y>", mode = { "n", "x" } },
+			{ "<C-e>", mode = { "n", "x" } },
+			{ "zt", mode = { "n", "x" } },
+			{ "zz", mode = { "n", "x" } },
+			{ "zb", mode = { "n", "x" } },
+		},
+		opts = {
+			mappings = {
+				"<C-u>",
+				"<C-d>",
+				"<C-b>",
+				"<C-f>",
+				"<C-y>",
+				"<C-e>",
+				"zt",
+				"zz",
+				"zb",
+			},
+			hide_cursor = true,
+			stop_eof = true,
+			respect_scrolloff = true,
+			cursor_scrolls_alone = true,
+			easing = "quadratic",
+			duration_multiplier = 0.65,
+			performance_mode = false,
+		},
+	},
+	{
 		-- A single overview rail: diagnostics, search hits, marks, TODO/FIXME,
 		-- conflicts, and Git changes all occupy the same stable rightmost column.
 		-- Every source occupies one cell but has its own shape, so colour conveys
