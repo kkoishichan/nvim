@@ -120,6 +120,9 @@ return {
 			vim.g.matchup_matchparen_stopline = 300
 			vim.g.matchup_treesitter_stopline = 300
 		end,
+		config = function()
+			require("user.core.matchup_cache").setup()
+		end,
 	},
 	{
 		"lukas-reineke/indent-blankline.nvim",

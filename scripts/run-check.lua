@@ -7,6 +7,7 @@ assert(
 		"performance",
 		"editing_cost",
 		"treesitter_predicates",
+		"matchup_cache",
 		"startup_loading",
 		"ui_runtime",
 		"scrolling_colors",

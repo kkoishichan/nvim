@@ -227,6 +227,8 @@ Python 高亮在文本未变时复用文本判断结果，保持原查询的颜�
 容量上限、首次打开的代价及连续滚轮对照见[高亮缓存验证](docs/wheel-predicate-cache.md)。
 此缓存仍只默认用于 Python。其他九种语言的试验与未启用原因见[多语言滚动对照](docs/multilanguage-scrolling.md)。
 修复 warning 后的真实 LSP、诊断绘制和配对提示成本见[Python 诊断与滚动复测](docs/python-lsp-scrolling.md)。
+配对提示复用未变化的查询结果和跳过区域，保留原有提示及跳转；效果与适用范围见
+[vim-matchup 缓存验证](docs/matchup-scrolling.md)。
 
 右侧滚动条采用单轨概览设计：滑块、诊断、搜索、mark、TODO、冲突和 Git 改动始终
 共用一列，同一高度只显示优先级最高的标记。诊断沿用左列的 `E/W/I/H`，FIX、TODO、
