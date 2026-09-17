@@ -59,6 +59,8 @@
 
 复跑：
 
+本页数据使用 `f6028e8` 中的测量脚本。后续[多语言检查](multilanguage-scrolling.md)修正了诊断虚拟行和边界处的配对方式，并增加起始位置与等待时间选项；新版脚本的数据不应与本页直接合并。
+
 ```sh
 python3 scripts/benchmark-wheel-pty.py --file ~/Projects/transformer/transformer.py \
   --baseline /path/to/6dbda23-checkout --runs 4

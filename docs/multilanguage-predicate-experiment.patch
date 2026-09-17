@@ -1,0 +1,220 @@
+diff --git a/lua/user/core/treesitter.lua b/lua/user/core/treesitter.lua
+index 1e05699..88f8d00 100644
+--- a/lua/user/core/treesitter.lua
++++ b/lua/user/core/treesitter.lua
+@@ -120 +120,2 @@ function M.enable(event)
+-	if vim.bo[event.buf].filetype == "python" then
++	local lang = vim.treesitter.language.get_lang(vim.bo[event.buf].filetype)
++	if lang then
+@@ -124 +125 @@ function M.enable(event)
+-			require("user.core.treesitter_predicates").setup()
++			require("user.core.treesitter_predicates").setup(lang)
+@@ -135 +135,0 @@ function M.enable(event)
+-	local lang = vim.treesitter.language.get_lang(vim.bo[event.buf].filetype)
+diff --git a/lua/user/core/treesitter_predicates.lua b/lua/user/core/treesitter_predicates.lua
+index d28d18b..8767600 100644
+--- a/lua/user/core/treesitter_predicates.lua
++++ b/lua/user/core/treesitter_predicates.lua
+@@ -6 +6 @@ local buffers = {}
+-local serial, ready = 0, false
++local serial, ready, registered = 0, {}, false
+@@ -110,0 +111,8 @@ local function register()
++	local group = api.nvim_create_augroup("user_scroll_query_cache", { clear = true })
++	api.nvim_create_autocmd({ "BufUnload", "BufWipeout" }, {
++		group = group,
++		callback = function(event)
++			buffers[event.buf] = nil
++		end,
++	})
++	registered = true
+@@ -118 +126 @@ function M.rewrite(source)
+-	assert(not tree:root():has_error(), "Invalid Python highlight query")
++	assert(not tree:root():has_error(), "Invalid highlight query")
+@@ -135,3 +143,8 @@ end
+-function M.setup()
+-	if ready then
+-		return true
++function M.is_enabled(lang)
++	return ready[lang] ~= nil and query.get(lang, "highlights") == ready[lang]
++end
++
++function M.setup(lang)
++	lang = lang or "python"
++	if ready[lang] then
++		return M.is_enabled(lang)
+@@ -140 +153 @@ function M.setup()
+-	for _, path in ipairs(query.get_files("python", "highlights")) do
++	for _, path in ipairs(query.get_files(lang, "highlights")) do
+@@ -146 +159 @@ function M.setup()
+-	if original == "" or query.get("python", "highlights") ~= query.parse("python", original) then
++	if original == "" or query.get(lang, "highlights") ~= query.parse(lang, original) then
+@@ -153,12 +166,11 @@ function M.setup()
+-	local source = "\n" .. M.rewrite(original)
+-	query.parse("python", source)
+-	register()
+-	query.set("python", "highlights", source)
+-	local group = api.nvim_create_augroup("user_scroll_query_cache", { clear = true })
+-	api.nvim_create_autocmd({ "BufUnload", "BufWipeout" }, {
+-		group = group,
+-		callback = function(event)
+-			buffers[event.buf] = nil
+-		end,
+-	})
+-	ready = true
++	local rewritten = M.rewrite(original)
++	if rewritten == original then
++		return false
++	end
++	local source = "\n" .. rewritten
++	local compiled = query.parse(lang, source)
++	if not registered then
++		register()
++	end
++	query.set(lang, "highlights", source)
++	ready[lang] = compiled
+diff --git a/scripts/checks/treesitter_multilang.lua b/scripts/checks/treesitter_multilang.lua
+new file mode 100644
+--- /dev/null
++++ b/scripts/checks/treesitter_multilang.lua
+@@ -0,0 +1,136 @@
++return function()
++	local api, query = vim.api, vim.treesitter.query
++	local cache = require("user.core.treesitter_predicates")
++	local samples = {
++		lua = [[---@param value string
++local VALUE = math.pi
++local M = {}
++function M.value(self, input)
++  assert(type(input) == "string", "雪")
++  return string.format("%s", input), VALUE
++end
++return M]],
++		c = [[#include <stdio.h>
++#define VALUE 42
++typedef struct Item { int value; } Item;
++int main(void) {
++  Item item = { VALUE };
++  printf("%d", item.value);
++  return 0;
++}]],
++		cpp = [[#include <vector>
++constexpr int VALUE = 42;
++template <typename T> class Item {
++public:
++  std::vector<T> values;
++  auto count() const -> size_t { return values.size(); }
++};
++auto item = std::make_unique<Item<int>>();]],
++		go = [[package main
++import "fmt"
++const VALUE = 42
++type Item struct { Value int }
++func main() {
++  item := &Item{Value: VALUE}
++  if item != nil { fmt.Println(item.Value) }
++}]],
++		java = [[import java.util.List;
++public class Example {
++  private static final int VALUE = 42;
++  public String format(List<String> items) {
++    return String.join(",", items) + VALUE;
++  }
++}]],
++		javascript = [[/** @param {string} name */
++const VALUE = 42;
++export class Item extends Object {
++  async run(name) {
++    const value = await Promise.resolve(`${name}: 雪`);
++    return /[a-z]+/i.test(value) ? this.name : null;
++  }
++}]],
++		typescript = [[type Item<T> = { value: T; name?: string };
++const VALUE: number = 42;
++interface Store { get(): Promise<Item<string>>; }
++export async function run(store: Store): Promise<string> {
++  const item = await store.get();
++  return item.name ?? String(VALUE);
++}]],
++		tsx = [[import React from "react";
++const VALUE = 42;
++type Props = { title: string; onClick(): void };
++export function Card({ title, onClick }: Props) {
++  return <section data-value={VALUE}>
++    <button onClick={onClick}>{title.toUpperCase()}</button>
++  </section>;
++}]],
++		rust = [[use std::collections::HashMap;
++const VALUE: usize = 42;
++#[derive(Debug)]
++struct Item<'a> { name: &'a str }
++impl<'a> Item<'a> {
++  fn value(&self) -> Option<usize> {
++    println!("{} 雪", self.name);
++    Some(VALUE)
++  }
++}]],
++	}
++	local function captures(q, root, buf, first, last)
++		local result = {}
++		for id, node, metadata in q:iter_captures(root, buf, first or 0, last or -1) do
++			result[#result + 1] = { q.captures[id], { node:range() }, vim.deepcopy(metadata) }
++		end
++		return result
++	end
++	local buffers = {}
++	for _, lang in ipairs(vim.tbl_keys(samples)) do
++		local native = query.get(lang, "highlights")
++		assert(not cache.is_enabled(lang), "A different language's setup enabled " .. lang)
++		assert(cache.setup(lang) and cache.is_enabled(lang), "Cache setup failed: " .. lang)
++		local cached = query.get(lang, "highlights")
++		assert(cache.setup(lang) and query.get(lang, "highlights") == cached, "Setup was not idempotent: " .. lang)
++		local buf = api.nvim_create_buf(true, false)
++		local lines = vim.split(samples[lang], "\n", { plain = true })
++		api.nvim_buf_set_lines(buf, 0, -1, false, lines)
++		local function compare()
++			local root = vim.treesitter.get_parser(buf, lang):parse()[1]:root()
++			for first = 0, #lines - 1 do
++				assert(
++					vim.deep_equal(
++						captures(native, root, buf, first, first + 3),
++						captures(cached, root, buf, first, first + 3)
++					),
++					"Viewport captures/ranges/metadata changed: " .. lang
++				)
++			end
++		end
++		compare()
++		for _, name in ipairs({ "value", "VALUE" }) do
++			api.nvim_buf_set_lines(
++				buf,
++				0,
++				-1,
++				false,
++				vim.split(samples[lang]:gsub("VALUE", name), "\n", { plain = true })
++			)
++			compare()
++		end
++		buffers[#buffers + 1] = { buf = buf, compare = compare }
++	end
++	-- Shared memory limits must not mix results across language queries or
++	-- drop cleanup handlers when a second language is initialized.
++	for _, item in ipairs(buffers) do
++		item.compare()
++		api.nvim_buf_delete(item.buf, { force = true })
++	end
++	assert(#api.nvim_get_autocmds({ group = "user_scroll_query_cache" }) == 2, "Languages duplicated cleanup handlers")
++	local native = query.get("toml", "highlights")
++	assert(not cache.setup("toml"), "A query with no supported predicates was changed")
++	assert(query.get("toml", "highlights") == native, "Unchanged query was replaced")
++	local explicit = "(identifier) @test.override"
++	query.set("lua", "highlights", explicit)
++	assert(not cache.is_enabled("lua") and not cache.setup("lua"), "A later explicit query was replaced")
++	assert(query.get("lua", "highlights") == query.parse("lua", explicit), "Explicit override was not retained")
++	assert(cache.is_enabled("python"), "Overriding Lua disabled another language")
++	print("Nine-language predicate parity, inherited queries, edits, shared eviction and explicit overrides passed")
++end
+diff --git a/scripts/checks/treesitter_predicates.lua b/scripts/checks/treesitter_predicates.lua
+--- a/scripts/checks/treesitter_predicates.lua
++++ b/scripts/checks/treesitter_predicates.lua
+@@ -150,0 +151 @@
++	dofile(vim.env.NVIM_TEST_ROOT .. "/scripts/checks/treesitter_multilang.lua")()

@@ -225,6 +225,7 @@ Git 行 blame 默认启用，可用 `<leader>ghB` 切换；scrollview 搜索结�
 [滚动性能验证](docs/scrolling.md)和[后续性能优化](docs/performance-followup.md)。
 Python 高亮在文本未变时复用文本判断结果，保持原查询的颜色和范围；编辑后自动作废缓存。
 容量上限、首次打开的代价及连续滚轮对照见[高亮缓存验证](docs/wheel-predicate-cache.md)。
+此缓存仍只默认用于 Python。其他九种语言的试验与未启用原因见[多语言滚动对照](docs/multilanguage-scrolling.md)。
 
 右侧滚动条采用单轨概览设计：滑块、诊断、搜索、mark、TODO、冲突和 Git 改动始终
 共用一列，同一高度只显示优先级最高的标记。诊断沿用左列的 `E/W/I/H`，FIX、TODO、
@@ -427,6 +428,7 @@ Go 汇编仅在 `.s`、Go 项目和 Plan 9 指令特征同时匹配时使用 asm
   添加 `--file /path/to/code.py` 可在原项目内来回滚动实文件；本次结果见 [Python 滚动验证](docs/python-scrolling.md)。
 - `python3 scripts/benchmark-wheel-pty.py --file /path/to/code.py --baseline /path/to/old-checkout`
   使用 kitty 终端类型和定频 SGR 滚轮事件测量 Neovim 重绘，包含终端输入解码，不包含 kitty 的实际显示。
+  文件需至少 140 行；保留诊断虚拟行和折行，按解码事件配对视口重绘。可加 `--settle-ms 8000` 测量初始化后的状态。
 - `./scripts/check.sh treesitter_predicates` 对照原生高亮验证缓存，包括编辑、撤销、Unicode 和容量淘汰。
 - 依赖准备与 CI 复跑见 [CI 验证](docs/ci-validation.md)，语言端到端检查见
   [工作流矩阵](docs/workflow-matrix.md)，升级和恢复见 [维护指南](docs/maintenance.md)。
