@@ -5,10 +5,22 @@ return function()
 	require("lazy").load({ plugins = { "vim-matchup", "nvim-treesitter" } })
 	local plugin = require("treesitter-matchup.internal")
 	local syntax = require("treesitter-matchup.syntax")
+	local highlight_helper = require("treesitter-matchup.third-party.utils")
 	local cache = require("user.core.matchup_cache")
 	cache.shutdown()
 	local native = plugin.get_matches
 	local native_skips = syntax.get_skips
+	local native_highlights = highlight_helper.get_hl_groups_at_position
+	local restore_bridge, bridges = require("user.core.matchup_bridge").setup()
+	assert(bridges == 2, "Source-checked Vimscript/Lua bridges did not activate")
+	restore_bridge()
+	local restore_new, new_bridges = require("user.core.matchup_bridge").setup()
+	assert(new_bridges == 2, "Native bridges were not restored")
+	restore_bridge()
+	local restore_unused, duplicate_bridges = require("user.core.matchup_bridge").setup()
+	assert(duplicate_bridges == 0, "An obsolete cleanup removed replacement bridges")
+	restore_unused()
+	restore_new()
 	assert(cache.setup(), "Locked match-up adapter did not activate")
 	local function buffer(lang, lines)
 		local buf = api.nvim_create_buf(true, false)
@@ -81,6 +93,17 @@ return function()
 	local exposed = plugin.get_matches(buf)
 	exposed[1].range[1], exposed[1].text = 999, "mutated"
 	assert(vim.deep_equal(normalize(plugin.get_matches(buf)), expected), "Caller mutation leaked into cached records")
+	local native_active = plugin.get_active_matches
+	plugin.get_active_matches = function(matches)
+		matches[1].text = "changed by an external consumer"
+		return native_active(matches)
+	end
+	plugin.get_delim(buf, { direction = "current", side = "both_all", type = "all" })
+	plugin.get_active_matches = native_active
+	assert(
+		vim.deep_equal(normalize(plugin.get_matches(buf)), expected),
+		"Modified consumer received owned cache records"
+	)
 	query.iter_matches = iterate
 	-- Changed text, ranges and tree objects must retire old TSNodes, including
 	-- edits made through APIs before TextChanged has been dispatched.
@@ -138,10 +161,12 @@ return function()
 	vim.fn["matchup#loader#init_buffer"]()
 	vim.wo.foldenable = false
 	local wrapped = plugin.get_matches
-	local wrapped_skips = syntax.get_skips
 	local function implementation(use)
-		plugin.get_matches = use
-		syntax.get_skips = use == native and native_skips or wrapped_skips
+		if use == native then
+			cache.shutdown()
+		else
+			assert(cache.setup(), "Match-up adapters did not reactivate")
+		end
 	end
 	local positions = { { 1, 0 }, { 1, 10 }, { 2, 4 }, { 4, 12 }, { 5, 17 }, { 7, 16 } }
 	local moved, visible = false, false
@@ -263,6 +288,10 @@ return function()
 	replacement.shutdown()
 	assert(plugin.get_matches == native, "Shutdown did not restore native matching")
 	assert(syntax.get_skips == native_skips, "Shutdown did not restore native skip regions")
+	assert(
+		highlight_helper.get_hl_groups_at_position == native_highlights,
+		"Shutdown did not restore native highlights"
+	)
 	plugin.get_matches = function()
 		return {}
 	end

@@ -6,6 +6,7 @@ local max_buffers, max_matches, max_text_bytes = 4, 1024, 65536
 -- update keeps its native implementation until the adapter is revalidated.
 local source_hash = "c17981d46f1ca32efc0db56c893c32b5b7d0ed8559bde1b9f0854a007d6f50e4"
 local syntax_hash = "dbaa69a93bdc254ca66c982fb559161c8a99cb5e27f80a4344cb97ae5db5c536"
+local highlights_hash = "0aeeac94273d49ef5f1eb0563f3a0d3d39e7dceb28a0a08781d2f524c0ed7eeb"
 
 local function same(left, right)
 	if #left ~= #right then
@@ -118,6 +119,11 @@ function M.shutdown()
 	if previous.syntax.get_skips == previous.skip_wrapper then
 		previous.syntax.get_skips = previous.native_skips
 	end
+	if previous.highlights.get_hl_groups_at_position == previous.highlight_wrapper then
+		previous.highlights.get_hl_groups_at_position = previous.native_highlights
+	end
+	previous.clear_highlights()
+	previous.restore_bridge()
 	pcall(api.nvim_del_augroup_by_id, previous.group)
 	if vim._user_matchup_cache == M then
 		vim._user_matchup_cache = nil
@@ -132,7 +138,12 @@ function M.setup()
 	M.shutdown()
 	local plugin = require("treesitter-matchup.internal")
 	local syntax = require("treesitter-matchup.syntax")
-	if not has_source(plugin.get_matches, source_hash) or not has_source(syntax.get_skips, syntax_hash) then
+	local highlights = require("treesitter-matchup.third-party.utils")
+	if
+		not has_source(plugin.get_matches, source_hash)
+		or not has_source(syntax.get_skips, syntax_hash)
+		or not has_source(highlights.get_hl_groups_at_position, highlights_hash)
+	then
 		return false
 	end
 	local state = {
@@ -143,7 +154,43 @@ function M.setup()
 		native = plugin.get_matches,
 		syntax = syntax,
 		native_skips = syntax.get_skips,
+		highlights = highlights,
+		native_highlights = highlights.get_hl_groups_at_position,
 	}
+	-- The locked native consumers only read these records. They can borrow
+	-- the cache internally; public callers still receive isolated copies.
+	local readers, dependencies = {}, {}
+	local internal_source = debug.getinfo(state.native, "S").source
+	local compatible = true
+	for _, name in ipairs({
+		"get_delim",
+		"get_matching",
+		"get_active_matches",
+		"do_match_result",
+		"containing_scope",
+		"get_scopes",
+	}) do
+		local fn = plugin[name]
+		if type(fn) ~= "function" or debug.getinfo(fn, "S").source ~= internal_source then
+			compatible = false
+		else
+			dependencies[name] = fn
+		end
+	end
+	if compatible then
+		readers[plugin.get_delim], readers[plugin.get_matching] = true, true
+	end
+	local function can_borrow(caller)
+		if not readers[caller] then
+			return false
+		end
+		for name, fn in pairs(dependencies) do
+			if plugin[name] ~= fn then
+				return false
+			end
+		end
+		return true
+	end
 	local function obtain(bufnr)
 		bufnr = (bufnr == nil or bufnr == 0) and api.nvim_get_current_buf() or bufnr
 		local ok, key = pcall(context, bufnr)
@@ -183,7 +230,11 @@ function M.setup()
 			return state.native(bufnr)
 		end
 		local matches, cached = obtain(bufnr)
-		-- Preserve fresh records and get_matching() identity comparisons.
+		if cached and can_borrow(debug.getinfo(2, "f").func) then
+			-- get_matching also excludes its seed by strict row/column order,
+			-- so sharing that record cannot change the matching candidates.
+			return matches
+		end
 		return cached and copy_matches(matches) or matches or state.native(bufnr)
 	end
 	state.skip_wrapper = function(bufnr)
@@ -202,15 +253,20 @@ function M.setup()
 		end
 		return result
 	end
+	state.highlight_wrapper, state.clear_highlights =
+		require("user.core.matchup_highlights")(state, state.native_highlights)
 	owner = state
 	plugin.get_matches = state.wrapper
 	syntax.get_skips = state.skip_wrapper
+	highlights.get_hl_groups_at_position = state.highlight_wrapper
+	state.restore_bridge = require("user.core.matchup_bridge").setup()
 	vim._user_matchup_cache = M
 	state.group = api.nvim_create_augroup("user_matchup_cache", { clear = true })
 	api.nvim_create_autocmd({ "BufUnload", "BufWipeout" }, {
 		group = state.group,
 		callback = function(event)
 			state.buffers[event.buf] = nil
+			state.clear_highlights(event.buf)
 		end,
 	})
 	api.nvim_create_autocmd("VimLeavePre", { group = state.group, callback = M.shutdown })

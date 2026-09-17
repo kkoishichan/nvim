@@ -8,6 +8,8 @@ assert(
 		"editing_cost",
 		"treesitter_predicates",
 		"matchup_cache",
+		"matchup_highlights",
+		"matchup_input",
 		"startup_loading",
 		"ui_runtime",
 		"scrolling_colors",
