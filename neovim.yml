@@ -2,6 +2,13 @@
 base: lua51
 
 globals:
+  # LuaJIT's Lua 5.1 collector accepts an option and an optional numeric value.
+  collectgarbage:
+    args:
+      - type: string
+        required: false
+      - type: number
+        required: false
   vim:
     any: true
   MiniIcons:

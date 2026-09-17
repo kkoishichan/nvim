@@ -131,10 +131,10 @@ class Editor:
                 break
         self.notifications.clear()
 
-    def wheel(self):
+    def wheel(self, direction="down"):
         self.notifications.clear()
         started = time.perf_counter()
-        self.call("nvim_input_mouse", "wheel", "down", "", 0, 10, 40)
+        self.call("nvim_input_mouse", "wheel", direction, "", 0, 10, 40)
         scrolled = False
         while time.perf_counter() - started < 5:
             message = (
@@ -193,6 +193,11 @@ def main():
     parser.add_argument("--runs", type=int, default=2)
     parser.add_argument("--events", type=int, default=80)
     parser.add_argument(
+        "--file",
+        type=Path,
+        help="read an existing file in its project; scroll down and back up",
+    )
+    parser.add_argument(
         "--scene",
         action="append",
         choices=("code", "colors", "css_vars"),
@@ -201,6 +206,12 @@ def main():
     args = parser.parse_args()
     if args.runs < 1 or args.events < 20 or args.events > 500:
         parser.error("Use at least one run and 20–500 events")
+    if args.file and args.scene:
+        parser.error("Choose an existing --file or generated --scene fixtures")
+    if args.file:
+        args.file = args.file.expanduser().resolve()
+        if not args.file.is_file():
+            parser.error("--file must be an existing file")
     root = (args.root or Path(__file__).resolve().parent.parent).resolve()
     output = args.output or Path(tempfile.mkdtemp(prefix="nvim-scroll-benchmark-"))
     if args.output:
@@ -218,22 +229,22 @@ def main():
         "targets": {name: metadata(path) for name, path in targets.items()},
         "scenes": {},
     }
-    for scene in args.scene or ("code", "colors"):
+    if args.file:
+        result["file"] = {
+            "path": str(args.file),
+            "sha256": hashlib.sha256(args.file.read_bytes()).hexdigest(),
+        }
+        result["method"] += (
+            " Existing files use alternating directions, reversing at viewport boundaries."
+            " The source is not edited."
+        )
+    for scene in args.scene or (("file",) if args.file else ("code", "colors")):
         filetype = "css" if scene == "css_vars" else "lua"
         sample = output / (scene + "." + filetype)
-        blocks = []
-        for index in range(500):
-            line = (
-                '  local color = "#44aaff"'
-                if scene == "colors" and index % 10 == 0
-                else "  -- Local calculation"
-            )
-            blocks.append(
-                "do\n"
-                + line
-                + "\n  local function square(value)\n    return value * value\n  end\nend\n"
-            )
-        if scene == "css_vars":
+        if scene == "file":
+            sample = args.file
+            filetype = None
+        elif scene == "css_vars":
             sample.write_text(
                 ":root { --accent: #44aaff; }\n"
                 + "".join(
@@ -242,6 +253,18 @@ def main():
                 )
             )
         else:
+            blocks = []
+            for index in range(500):
+                line = (
+                    '  local color = "#44aaff"'
+                    if scene == "colors" and index % 10 == 0
+                    else "  -- Local calculation"
+                )
+                blocks.append(
+                    "do\n"
+                    + line
+                    + "\n  local function square(value)\n    return value * value\n  end\nend\n"
+                )
             sample.write_text("".join(blocks))
         rows = {name: [] for name in targets}
         for run_index in range(args.runs):
@@ -260,18 +283,43 @@ def main():
                         "nvim_exec_lua",
                         """
                       assert(require('user.core.buffer_policy').allow(0), 'Fixture unexpectedly disabled document features')
-                      assert(vim.bo.filetype == ..., 'Fixture filetype was not recognized')
-                      assert(package.loaded['nvim-highlight-colors'] and require('nvim-highlight-colors').is_active(), 'Color plugin is inactive')
+                      local expected = ...
+                      assert(not expected or vim.bo.filetype == expected, 'Fixture filetype was not recognized')
+                      local colors = package.loaded['nvim-highlight-colors']
+                      local colors_active = colors and colors.is_active and colors.is_active() or false
+                      assert(not expected or colors_active, 'Generated color fixture has no active color plugin')
                       assert(package.loaded.scrollview and vim.g.scrollview_enabled, 'Scrollview is inactive')
                       assert(not package.loaded.neoscroll, 'Wheel unexpectedly loaded Neoscroll')
+                      local highlighter = vim.treesitter.highlighter.active[vim.api.nvim_get_current_buf()]
                       return {filetype=vim.bo.filetype, clients=vim.tbl_map(function(c) return c.name end, vim.lsp.get_clients({bufnr=0})),
+                        treesitter_active=highlighter ~= nil, redraws=highlighter and highlighter.redraw_count or 0,
+                        diagnostics=#vim.diagnostic.get(0), colors_active=colors_active,
                         neoscroll_loaded=package.loaded.neoscroll ~= nil}
                     """,
-                        [filetype],
+                        [filetype or False],
                     )
                     samples = []
-                    for _ in range(args.events):
-                        samples.append(editor.wheel())
+                    directions = []
+                    direction = "down"
+                    for event_index in range(args.events):
+                        if args.file:
+                            view = editor.call(
+                                "nvim_exec_lua",
+                                "return {vim.fn.line('w0'),vim.fn.line('w$'),vim.api.nvim_buf_line_count(0)}",
+                                [],
+                            )
+                            if event_index and event_index % 30 == 0:
+                                direction = "up" if direction == "down" else "down"
+                            if view[0] <= 1 and view[1] >= view[2]:
+                                raise RuntimeError(
+                                    "The file fits in the viewport; use a taller file for scrolling measurements"
+                                )
+                            if view[1] >= view[2]:
+                                direction = "up"
+                            elif view[0] <= 1:
+                                direction = "down"
+                        directions.append(direction)
+                        samples.append(editor.wheel(direction))
                         editor.drain(0.008)
                     editor.drain(0.2)
                     error = editor.call("nvim_eval", "v:errmsg")
@@ -293,11 +341,18 @@ def main():
                     """,
                         [],
                     )
+                    redraws = editor.call(
+                        "nvim_exec_lua",
+                        "local h=vim.treesitter.highlighter.active[vim.api.nvim_get_current_buf()]; return h and h.redraw_count or 0",
+                        [],
+                    )
                     rows[name].append(
                         {
                             "samples_ms": samples,
                             "conditions": conditions,
                             "color_extmarks_after_scroll": marks,
+                            "directions": directions,
+                            "treesitter_redraws": redraws - conditions["redraws"],
                         }
                     )
                 finally:
@@ -315,6 +370,12 @@ def main():
                 flush=True,
             )
         result["scenes"][scene] = summaries
+    if args.file and (
+        hashlib.sha256(args.file.read_bytes()).hexdigest() != result["file"]["sha256"]
+    ):
+        raise RuntimeError(
+            "The source file changed during measurement; rerun for comparable samples"
+        )
     (output / "results.json").write_text(json.dumps(result, indent=2) + "\n")
     print(output / "results.json")
 

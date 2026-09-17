@@ -16,7 +16,7 @@ import time
 
 
 SNAPSHOT = r'''
-function _G.NvimScrollSnapshot(name)
+function _G.NvimScrollSnapshot(name, attempt)
   local windows = {}
   local bars = {}
   local tab_windows = vim.api.nvim_tabpage_list_wins(0)
@@ -55,6 +55,16 @@ function _G.NvimScrollSnapshot(name)
         cursor = vim.api.nvim_win_get_cursor(win), color_rows = vim.tbl_keys(rows),
         scrollbar = bars[win],
       }
+    end
+  end
+  -- VimEnter does not guarantee that the first deferred scrollbar draw has
+  -- completed. Wait for its actual readiness, with a bounded retry budget.
+  if name == "ready" and (attempt or 0) < 60 then
+    for _, win in ipairs(windows) do
+      if not win.scrollbar then
+        vim.defer_fn(function() NvimScrollSnapshot(name, (attempt or 0) + 1) end, 50)
+        return
+      end
     end
   end
   vim.fn.writefile({vim.json.encode({
@@ -156,7 +166,10 @@ def main():
 
     def snapshot(name, ready=False):
         if not ready:
-            command('lua NvimScrollSnapshot("' + name + '")')
+            # Start the settling interval after Nvim has consumed the wheel
+            # burst and this command. Waiting only on the PTY sender races the
+            # queued color/scrollbar timers when terminal drawing is busy.
+            command('lua vim.defer_fn(function() NvimScrollSnapshot("' + name + '") end, 150)')
         path = output / (name + ".json")
         deadline = time.monotonic() + 15
         while not path.exists() and time.monotonic() < deadline:

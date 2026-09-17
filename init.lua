@@ -2,6 +2,10 @@ if vim.fn.has("nvim-0.12") ~= 1 then
 	error("This configuration requires Neovim 0.12 or newer")
 end
 
+-- Spread Lua collection across smaller steps during allocation-heavy redraws.
+-- Keep automatic collection enabled and retain its default pause threshold.
+collectgarbage("setstepmul", 100)
+
 vim.g.mapleader = " "
 vim.g.maplocalleader = "\\"
 

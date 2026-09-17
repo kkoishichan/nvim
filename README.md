@@ -422,5 +422,6 @@ Go 汇编仅在 `.s`、Go 项目和 Plan 9 指令特征同时匹配时使用 asm
   保存终端日志与窗口数据。它模拟无图片协议与 SSH 环境变量，不连接远程主机。
 - `python3 scripts/benchmark-scroll.py --baseline /path/to/old-checkout` 对比完整配置中的原生
   滚轮输入到屏幕刷新；`python3 scripts/scroll-smoke.py` 验证终端鼠标协议、分屏和颜色更新。
+  添加 `--file /path/to/code.py` 可在原项目内来回滚动实文件；本次结果见 [Python 滚动验证](docs/python-scrolling.md)。
 - 依赖准备与 CI 复跑见 [CI 验证](docs/ci-validation.md)，语言端到端检查见
   [工作流矩阵](docs/workflow-matrix.md)，升级和恢复见 [维护指南](docs/maintenance.md)。

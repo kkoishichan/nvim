@@ -21,6 +21,8 @@ local function queue()
 	pending = request
 	-- A fixed window, not a restarted debounce: continuous input still redraws.
 	-- The upstream callback retains its two deferred turns and native geometry.
+	-- The rail needs fewer frames than the text. A 40 ms cap avoids repeatedly
+	-- invalidating syntax highlights under its floating windows during a swipe.
 	timer = vim.defer_fn(function()
 		if pending ~= request or not active then
 			return
@@ -29,7 +31,7 @@ local function queue()
 		if vim.g.scrollview_enabled then
 			original()
 		end
-	end, 16)
+	end, 40)
 end
 
 function M.shutdown()
