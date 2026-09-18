@@ -7,9 +7,6 @@ local pure = {
 	["not-eq?"] = true,
 	["lua-match?"] = true,
 	["any-of?"] = true,
-	["user-scroll-eq?"] = true,
-	["user-scroll-lua-match?"] = true,
-	["user-scroll-any-of?"] = true,
 	["set!"] = true,
 }
 

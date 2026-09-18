@@ -6,7 +6,6 @@ assert(
 	vim.tbl_contains({
 		"performance",
 		"editing_cost",
-		"treesitter_predicates",
 		"matchup_cache",
 		"matchup_highlights",
 		"matchup_input",

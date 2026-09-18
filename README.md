@@ -223,9 +223,9 @@ Git 行 blame 默认启用，可用 `<leader>ghB` 切换；scrollview 搜索结�
 滚动条按 40 ms 时间窗合并事件，保留折叠和拖动；全局状态栏每批只计算活动窗口一次。
 分屏分别绘制可见区域，键盘分页动画保持原有行为。验证方法、测量结果及适用范围见
 [滚动性能验证](docs/scrolling.md)和[后续性能优化](docs/performance-followup.md)。
-Python 高亮在文本未变时复用文本判断结果，保持原查询的颜色和范围；编辑后自动作废缓存。
-容量上限、首次打开的代价及连续滚轮对照见[高亮缓存验证](docs/wheel-predicate-cache.md)。
-此缓存仍只默认用于 Python。其他九种语言的试验与未启用原因见[多语言滚动对照](docs/multilanguage-scrolling.md)。
+Python 高亮使用原生查询，保留原有颜色和范围；已撤除收益有限、增加首次打开开销的谓词缓存。
+启动与滚动取舍见[启动优化复核](docs/startup-tradeoffs.md)。其他九种语言的历史试验见
+[多语言滚动对照](docs/multilanguage-scrolling.md)。
 修复 warning 后的真实 LSP、诊断绘制和配对提示成本见[Python 诊断与滚动复测](docs/python-lsp-scrolling.md)。
 配对提示复用未变化的查询结果和跳过区域，保留原有提示及跳转；效果与适用范围见
 [vim-matchup 缓存验证](docs/matchup-scrolling.md)。
@@ -434,6 +434,5 @@ Go 汇编仅在 `.s`、Go 项目和 Plan 9 指令特征同时匹配时使用 asm
 - `python3 scripts/benchmark-wheel-pty.py --file /path/to/code.py --baseline /path/to/old-checkout`
   使用 kitty 终端类型和定频 SGR 滚轮事件测量 Neovim 重绘，包含终端输入解码，不包含 kitty 的实际显示。
   文件需至少 140 行；保留诊断虚拟行和折行，按解码事件配对视口重绘。可加 `--settle-ms 8000` 测量初始化后的状态。
-- `./scripts/check.sh treesitter_predicates` 对照原生高亮验证缓存，包括编辑、撤销、Unicode 和容量淘汰。
 - 依赖准备与 CI 复跑见 [CI 验证](docs/ci-validation.md)，语言端到端检查见
   [工作流矩阵](docs/workflow-matrix.md)，升级和恢复见 [维护指南](docs/maintenance.md)。

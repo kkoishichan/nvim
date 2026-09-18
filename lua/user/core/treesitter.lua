@@ -117,14 +117,6 @@ function M.enable(event)
 		return
 	end
 
-	if vim.bo[event.buf].filetype == "python" then
-		-- Optional optimization: unsupported query syntax/parsers retain the
-		-- original native highlighter, including all colors and captures.
-		pcall(function()
-			require("user.core.treesitter_predicates").setup()
-		end)
-	end
-
 	local ok = pcall(vim.treesitter.start, event.buf)
 	if not ok then
 		return
