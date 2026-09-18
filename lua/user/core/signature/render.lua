@@ -541,9 +541,10 @@ local function render_virtual(context, signature_help, already_normalized)
 	local placement_line = api.nvim_buf_get_lines(bufnr, show_row, show_row + 1, false)[1] or ""
 	api.nvim_buf_set_extmark(bufnr, virtual_namespace, show_row, #placement_line, {
 		virt_text = chunks,
-		-- "eol" renders after Neovim's EOL screen cell, leaving a visible gap
-		-- outside the card. Inline at the final byte column starts immediately.
-		virt_text_pos = "inline",
+		-- Paint over unused cells at EOL without widening the source line.
+		-- Inline text moves the insertion cursor's display column past the
+		-- whole card, triggering horizontal scroll/reflow feedback while typing.
+		virt_text_pos = "overlay",
 		hl_mode = "combine",
 		priority = vim.hl.priorities.user,
 	})

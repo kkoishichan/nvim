@@ -133,6 +133,70 @@ return function(_)
 		"Rendering changed the server response"
 	)
 
+	-- Model the insertion cursor at EOL with virtualedit=onemore. A signature
+	-- must not become part of that cursor's display column or scroll the source
+	-- viewport, even when the card occupies the cursor's neighbouring line.
+	signature.set_expanded(false)
+	api.nvim_win_set_width(winid, 44)
+	vim.wo.virtualedit = "onemore"
+	vim.wo.sidescrolloff = 8
+	vim.bo[bufnr].tabstop = 4
+	local trigger = require("blink.cmp.signature.trigger")
+	local blocked = string.rep("x", 140)
+	local cases = {
+		{ name = "same line", lines = { blocked, "call(value", blocked }, row = 2 },
+		{ name = "cursor on neighbour", lines = { blocked, "    call(", "  " }, row = 3 },
+		{ name = "tabs and Unicode", lines = { blocked, "\t界call(value", blocked }, row = 2 },
+		{
+			name = "horizontal viewport",
+			lines = { blocked, "call(" .. string.rep("x", 60), blocked },
+			row = 2,
+			leftcol = 35,
+		},
+		{ name = "wrapped line", lines = { blocked, string.rep("x", 48) .. "(value", blocked }, row = 2, wrap = true },
+	}
+	local function source_view()
+		return {
+			view = vim.fn.winsaveview(),
+			cursor = api.nvim_win_get_cursor(winid),
+			column = vim.fn.virtcol("."),
+			row = vim.fn.winline(),
+		}
+	end
+	help = {
+		signatures = {
+			{
+				label = "call(value: SomeVeryLongType, other: string)",
+				parameters = { { label = "value: SomeVeryLongType" } },
+			},
+		},
+	}
+	for index, case in ipairs(cases) do
+		trigger.hide_emitter:emit()
+		vim.wo.wrap = case.wrap or false
+		api.nvim_buf_set_lines(bufnr, 0, -1, false, case.lines)
+		api.nvim_win_set_cursor(winid, { case.row, #case.lines[case.row] })
+		vim.fn.winrestview({ topline = 1, leftcol = case.leftcol or 0, skipcol = 0 })
+		vim.cmd("redraw!")
+		local expected = source_view()
+		context = { id = 910 + index, bufnr = bufnr, cursor = api.nvim_win_get_cursor(winid) }
+		for _ = 1, 3 do
+			window.open_with_signature_help(context, help)
+			vim.cmd("redraw!")
+			assert(#api.nvim_buf_get_extmarks(bufnr, namespace, 0, -1, {}) == 1, case.name .. ": signature is missing")
+			assert(
+				vim.deep_equal(source_view(), expected),
+				case.name .. ": showing a signature moved the source view/cursor"
+			)
+			trigger.hide_emitter:emit()
+			vim.cmd("redraw!")
+			assert(
+				vim.deep_equal(source_view(), expected),
+				case.name .. ": hiding a signature moved the source view/cursor"
+			)
+		end
+	end
+
 	signature.teardown()
 	api.nvim_win_close(winid, true)
 	api.nvim_set_current_win(original_win)
