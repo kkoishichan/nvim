@@ -11,6 +11,7 @@ function M.setup(notify, dismiss_notifications)
 	-- Progress events can be very noisy while a large workspace is indexing.
 	-- A 4 Hz spinner remains legible without forcing redraws every 120 ms.
 	local spinner_interval = 250
+	local show_delay = 500
 	local frame = 1
 	local progress = {}
 	local records = {}
@@ -29,16 +30,7 @@ function M.setup(notify, dismiss_notifications)
 		-- nvim-notify only exposes a public all-windows dismiss operation.
 		-- Use it only when this generation still owns a progress notification;
 		-- this prevents timeout=false windows from surviving a plugin reload.
-		local owns_notification = next(records) ~= nil
-		if not owns_notification then
-			for _, items in pairs(progress) do
-				if #items > 0 then
-					owns_notification = true
-					break
-				end
-			end
-		end
-		if owns_notification and dismiss_notifications then
+		if next(records) ~= nil and dismiss_notifications then
 			pcall(dismiss_notifications)
 		end
 		pcall(function()
@@ -79,6 +71,17 @@ function M.setup(notify, dismiss_notifications)
 		return table.concat(lines, "\n")
 	end
 
+	local function visible_items(items, now)
+		local visible = {}
+		for _, item in ipairs(items) do
+			if item.shown or (now and now - item.started >= show_delay) then
+				item.shown = true
+				visible[#visible + 1] = item
+			end
+		end
+		return visible
+	end
+
 	local function notify_client_progress(client, items, done_items)
 		if closed then
 			return
@@ -97,7 +100,7 @@ function M.setup(notify, dismiss_notifications)
 			title = client.name,
 			icon = active and spinner[frame] or " ",
 			replace = records[client.id],
-			timeout = active and false or 1200,
+			timeout = not active and 1200 or false,
 			hide_from_history = active,
 			animate = records[client.id] == nil,
 			on_close = function()
@@ -128,12 +131,14 @@ function M.setup(notify, dismiss_notifications)
 			return
 		end
 		frame = frame % #spinner + 1
+		local now = vim.uv.hrtime() / 1e6
 
 		for client_id, items in pairs(progress) do
 			if #items > 0 then
 				local client = vim.lsp.get_client_by_id(client_id)
 				if client then
-					notify_client_progress(client, items, items)
+					local visible = visible_items(items, now)
+					notify_client_progress(client, visible, {})
 				else
 					-- A client may exit without sending an `end` event. Finish its
 					-- notification and remove its work so the spinner timer can stop.
@@ -141,7 +146,7 @@ function M.setup(notify, dismiss_notifications)
 					notify_client_progress({
 						id = client_id,
 						name = client_names[client_id] or "LSP",
-					}, {}, items)
+					}, {}, visible_items(items))
 					client_names[client_id] = nil
 				end
 			end
@@ -159,65 +164,64 @@ function M.setup(notify, dismiss_notifications)
 		end
 
 		spinner_running = true
-		timer:start(spinner_interval, spinner_interval, vim.schedule_wrap(redraw_spinner))
+		-- One shared timer; short tasks do not allocate notification windows or
+		-- per-task delayed callbacks. Age is tracked per token, not per client.
+		timer:start(show_delay, spinner_interval, vim.schedule_wrap(redraw_spinner))
 	end
 
 	local progress_group = vim.api.nvim_create_augroup("user_lsp_progress_notify", { clear = true })
 	vim.api.nvim_create_autocmd("LspProgress", {
 		group = progress_group,
 		callback = function(event)
+			if closed then
+				return
+			end
 			local client = vim.lsp.get_client_by_id(event.data.client_id)
 			local params = event.data.params
 			local value = params and params.value
-			if not client or type(value) ~= "table" then
+			if
+				not client
+				or type(value) ~= "table"
+				or params.token == nil
+				or not (value.kind == "begin" or value.kind == "report" or value.kind == "end")
+			then
 				return
 			end
-			client_names[client.id] = client.name
 
 			local client_progress = progress[client.id] or {}
-			progress[client.id] = client_progress
-			local was_active = #client_progress > 0
-
-			local percentage = value.kind == "end" and 100 or value.percentage or 0
-			local title = value.title or "Working"
-			local message = value.message and (" " .. value.message) or ""
-			local progress_item = {
-				token = params.token,
-				message = ("[%3d%%] %s%s"):format(percentage, title, message),
-				done = value.kind == "end",
-			}
-
-			local updated = false
+			local progress_item, position
 			for index, item in ipairs(client_progress) do
 				if item.token == params.token then
-					client_progress[index] = progress_item
-					updated = true
+					progress_item, position = item, index
 					break
 				end
 			end
-			if not updated then
-				table.insert(client_progress, progress_item)
+			-- A late completion (or one received before this listener loaded)
+			-- must not create a new "100%" notification by itself.
+			if not progress_item and value.kind == "end" then
+				return
 			end
+			if not progress_item then
+				progress_item = { token = params.token, started = vim.uv.hrtime() / 1e6 }
+				client_progress[#client_progress + 1] = progress_item
+			end
+			-- Report/end payloads may omit the title, message and percentage.
+			-- Retain the task's last metadata instead of replacing it with Working.
+			progress_item.title = value.title or progress_item.title or "Working"
+			progress_item.detail = value.message or progress_item.detail or ""
+			progress_item.percentage = value.kind == "end" and 100 or value.percentage or progress_item.percentage or 0
+			local title = progress_item.title ~= "" and progress_item.title or "Working"
+			local detail = progress_item.detail ~= "" and (" " .. progress_item.detail) or ""
+			progress_item.message = ("[%3d%%] %s%s"):format(progress_item.percentage, title, detail)
 
-			local done_items = {}
-			local active_items = {}
-			for _, item in ipairs(client_progress) do
-				table.insert(done_items, item)
-				if not item.done then
-					table.insert(active_items, item)
+			if value.kind == "end" then
+				table.remove(client_progress, position)
+				if progress_item.shown then
+					notify_client_progress(client, visible_items(client_progress), { progress_item })
 				end
 			end
-
-			progress[client.id] = #active_items > 0 and active_items or nil
-			-- Intermediate reports are rendered by the bounded-rate spinner. Only
-			-- beginnings and final completions notify immediately, so a server that
-			-- emits hundreds of indexing reports cannot force hundreds of redraws.
-			if not was_active or #active_items == 0 then
-				notify_client_progress(client, active_items, done_items)
-			end
-			if #active_items == 0 then
-				client_names[client.id] = nil
-			end
+			progress[client.id] = #client_progress > 0 and client_progress or nil
+			client_names[client.id] = #client_progress > 0 and client.name or nil
 
 			if has_active_progress() then
 				start_spinner()

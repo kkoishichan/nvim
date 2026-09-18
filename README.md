@@ -18,6 +18,7 @@ Neovim 打磨成接近 IDE 的日常工作流。
 - `toggleterm.nvim` 提供 VSCode 风格的多终端管理。
 - `overseer.nvim` 任务运行，`neotest` 测试，`nvim-dap` + `dap-ui` 调试。
 - `snacks.nvim` 提供 dashboard、scratch、input 与 zen；通知由 `nvim-notify` 提供。
+- LSP 任务持续至少 500 ms 才显示进度，短检查静默完成；长任务按 250 ms 刷新，完成后提示保留 1.2 秒。
 - 除通知外，小型临时弹窗统一使用 Pmenu 背景的无边框 padding 设计；`Esc` 一次收起当前
   标签页内重叠的补全、签名、文档、提示与预览。通知按超时自动消失（`<leader>un` 可立即
   清空），Glance、Fzf、Lazy、Mason、Oil 等界面走各自关闭接口；终端、scratch、zen 等

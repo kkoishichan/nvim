@@ -9,6 +9,7 @@ assert(
 		"matchup_cache",
 		"matchup_highlights",
 		"matchup_input",
+		"lsp_progress",
 		"startup_loading",
 		"ui_runtime",
 		"scrolling_colors",
