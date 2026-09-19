@@ -62,6 +62,64 @@ vim.api.nvim_feedkeys("-", "xt", false)
 check_oil()
 ]],
 		},
+		directory_then_explorer = {
+			argument = directory,
+			code = [[
+check_oil()
+local oil_buffer = vim.api.nvim_get_current_buf()
+for _ = 1, 2 do
+  check_explorer(directory, "listed.txt")
+  vim.api.nvim_feedkeys(vim.g.mapleader .. "e", "xt", false)
+  vim.wait(200)
+  assert(vim.api.nvim_get_current_buf() == oil_buffer, "Closing the tree lost the Oil buffer")
+end
+local nested = directory .. "/nested child"
+vim.fn.mkdir(nested, "p")
+vim.fn.writefile({ "nested file" }, nested .. "/nested.txt")
+vim.cmd.edit(vim.fn.fnameescape(nested))
+assert(vim.wait(5000, function()
+  return vim.bo.filetype == "oil" and vim.bo.modifiable
+    and require("oil").get_current_dir() == nested .. "/"
+end, 10), "Opening a nested directory stopped using Oil after loading the tree")
+check_explorer(nested, "nested.txt")
+]],
+		},
+		file_oil_then_explorer = {
+			argument = directory .. "/original.txt",
+			code = [[
+local original = vim.api.nvim_get_current_buf()
+vim.api.nvim_win_set_cursor(0, { 2, 0 })
+vim.api.nvim_feedkeys("-", "xt", false)
+check_oil()
+check_explorer(directory, "listed.txt")
+vim.api.nvim_feedkeys(vim.g.mapleader .. "e", "xt", false)
+vim.wait(200)
+require("oil").close()
+assert(vim.api.nvim_get_current_buf() == original, "The tree broke Oil's return to the original file")
+assert(vim.api.nvim_win_get_cursor(0)[1] == 2, "The tree broke Oil's saved cursor")
+check_explorer(directory, "original.txt", directory .. "/original.txt")
+]],
+		},
+		explorer_then_oil = {
+			argument = directory .. "/original.txt",
+			code = [[
+assert(not package.loaded.oil, "Oil loaded before the first directory")
+local editor = vim.api.nvim_get_current_win()
+vim.cmd.cd(vim.fn.fnameescape(directory))
+local tree = check_explorer(directory, "original.txt", directory .. "/original.txt")
+assert(not package.loaded.oil, "Opening the tree eagerly loaded Oil")
+vim.api.nvim_set_current_win(editor)
+vim.cmd.edit(vim.fn.fnameescape(directory))
+check_oil()
+vim.wait(200)
+assert(vim.api.nvim_win_is_valid(tree), "Entering Oil closed the existing sidebar")
+assert(vim.bo[vim.api.nvim_win_get_buf(tree)].filetype == "neo-tree", "Oil replaced the sidebar")
+vim.api.nvim_feedkeys(vim.g.mapleader .. "e", "xt", false)
+vim.wait(200)
+assert(not vim.api.nvim_win_is_valid(tree), "Oil could not toggle the existing tree closed")
+check_explorer(directory, "listed.txt")
+]],
+		},
 		session = {
 			code = [[
 vim.cmd("Oil " .. vim.fn.fnameescape(directory))
@@ -86,6 +144,33 @@ local function check_oil()
       and table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), "\n"):find("listed.txt", 1, true)
   end, 10), "Oil did not display the real directory listing: " .. vim.api.nvim_buf_get_name(0))
   assert(vim.api.nvim_buf_get_name(0):match("^oil://"), "Directory was not handled by Oil")
+end
+local explorer_errors, notify = {}, vim.notify
+vim.notify = function(message, level, ...)
+  if level and level >= vim.log.levels.ERROR then
+    explorer_errors[#explorer_errors + 1] = tostring(message)
+  end
+  return notify(message, level, ...)
+end
+local function check_explorer(path, filename, selected)
+  vim.api.nvim_feedkeys(vim.g.mapleader .. "e", "xt", false)
+  assert(vim.wait(5000, function() return vim.bo.filetype == "neo-tree" end, 10),
+    "Explorer did not open: " .. table.concat(explorer_errors, "\n"))
+  -- Allow delayed layout enforcement and file-following to settle; a momentary
+  -- tree window is insufficient if the panel budget immediately closes it.
+  vim.wait(200)
+  local state = require("neo-tree.sources.manager").get_state("filesystem")
+  assert(state.winid and vim.api.nvim_win_is_valid(state.winid), "Explorer closed after rendering")
+  assert(vim.bo.filetype == "neo-tree", "Explorer failed to retain focus")
+  assert(vim.fs.normalize(state.path) == vim.fs.normalize(path), "Explorer opened the wrong directory: " .. state.path)
+  assert(table.concat(vim.api.nvim_buf_get_lines(state.bufnr, 0, -1, false), "\n"):find(filename, 1, true),
+    "Explorer did not list the requested directory")
+  if selected then
+    assert(state.tree:get_node():get_id() == selected, "Explorer stopped revealing the current file")
+  end
+  assert(vim.v.errmsg == "", vim.v.errmsg)
+  assert(#explorer_errors == 0, table.concat(explorer_errors, "\n"))
+  return state.winid
 end
 vim.api.nvim_create_autocmd("VimEnter", { once = true, callback = function()
   vim.schedule(function()
@@ -134,6 +219,9 @@ end })
 		"uri_argument",
 		"command",
 		"mapping",
+		"directory_then_explorer",
+		"file_oil_then_explorer",
+		"explorer_then_oil",
 		"session",
 	}) do
 		run(name, cases[name])
@@ -142,6 +230,6 @@ end })
 	-- A directory URI in the session must activate the same public read handler.
 	run("session_restore", { session = true, code = "check_oil()" })
 	print(
-		"Startup loading evidence: Oil stays unloaded for empty/text startup; native directory, URI, hidden buffer, command, mapping and session paths passed"
+		"Startup loading evidence: Oil stays unloaded for empty/text startup; directory, URI, hidden buffer, command, mapping, explorer coexistence and session paths passed"
 	)
 end

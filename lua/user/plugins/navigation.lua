@@ -1,6 +1,21 @@
 local panels = require("user.core.panels")
 local float_style = require("user.core.float_style")
 
+local function toggle_explorer()
+	local name = vim.api.nvim_buf_get_name(0)
+	local args = {
+		toggle = true,
+		position = "left",
+		reveal = vim.bo.buftype == "" and name ~= "" and not name:match("^%w[%w+.-]*://"),
+	}
+	if vim.bo.filetype == "oil" then
+		-- Oil names its buffers with a URI; Neo-tree's reveal expects a file path.
+		-- Open the displayed local directory, leaving remote adapters on cwd.
+		args.dir = require("oil").get_current_dir() or vim.fn.getcwd()
+	end
+	require("neo-tree.command").execute(args)
+end
+
 local function has_invalid_restored_neotree_buffer()
 	for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
 		local name = vim.fn.bufname(bufnr)
@@ -77,6 +92,19 @@ return {
 				end,
 			},
 		},
+		config = function(_, opts)
+			require("oil").setup(opts)
+			require("user.core.highlights").on_colorscheme("oil", function()
+				local palette = require("user.core.palette")
+				local p = palette.get()
+				-- Auxiliary file information should be quiet UI text, not inherit
+				-- the active theme's syntax comment colour (green in VS Code).
+				local muted = palette.blend(p.fg, p.bg, 0.60)
+				for _, group in ipairs({ "OilEmpty", "OilHidden", "OilLinkTarget", "OilTrashSourcePath" }) do
+					vim.api.nvim_set_hl(0, group, { fg = muted })
+				end
+			end)
+		end,
 	},
 	{
 		"nvim-neo-tree/neo-tree.nvim",
@@ -100,7 +128,7 @@ return {
 		keys = {
 			{
 				"<leader>e",
-				"<cmd>Neotree toggle reveal position=left<cr>",
+				toggle_explorer,
 				desc = "Explorer",
 			},
 		},
@@ -158,6 +186,8 @@ return {
 				width = panels.left_panel_width,
 			},
 			filesystem = {
+				-- Oil owns directory buffers regardless of which browser loads first.
+				hijack_netrw_behavior = "disabled",
 				bind_to_cwd = false,
 				follow_current_file = {
 					enabled = true,

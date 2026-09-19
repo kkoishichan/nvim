@@ -106,7 +106,13 @@ function M.editor_fits()
 	local roles = require("user.core.window_roles")
 	local found = false
 	for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-		if roles.get(win) == "editor" then
+		-- In-place Oil occupies the main editing area, although its manager role
+		-- keeps close actions routed through Oil. It can coexist with a sidebar.
+		local role = roles.get(win)
+		local oil = role == "manager"
+			and vim.bo[vim.api.nvim_win_get_buf(win)].filetype == "oil"
+			and vim.api.nvim_win_get_config(win).relative == ""
+		if role == "editor" or oil then
 			found = true
 			if
 				vim.api.nvim_win_get_width(win) < minimum.min_editor_width
