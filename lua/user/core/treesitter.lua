@@ -125,6 +125,9 @@ function M.enable(event)
 	-- A parser does not imply that the language ships an indentation query.
 	-- Keep the filetype's native indentation when no query is available.
 	local lang = vim.treesitter.language.get_lang(vim.bo[event.buf].filetype)
+	if lang == "python" then
+		require("user.core.python_indent").setup()
+	end
 	local has_query, query = pcall(vim.treesitter.query.get, lang, "indents")
 	if has_query and query then
 		vim.bo[event.buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"

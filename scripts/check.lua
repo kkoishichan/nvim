@@ -13,6 +13,7 @@ for _, topic in ipairs({
 	"floats",
 	"tools",
 	"language_wiring",
+	"python_indent",
 	"editing",
 }) do
 	local path = vim.fs.joinpath(root, "scripts", "checks", "integration", topic .. ".lua")
