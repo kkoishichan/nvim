@@ -15,7 +15,7 @@ return function(tmp)
 	-- Only process completion and terminal image drawing are simulated here.
 	-- The real Poppler build/render/watcher flow is in workflow_java_docs.
 	local system, executable, list_uis = vim.system, vim.fn.executable, vim.api.nvim_list_uis
-	local old_image, old_lualine = package.loaded.image, package.loaded.lualine
+	local old_image = package.loaded.image
 	local terminal =
 		{ TERM = vim.env.TERM, TERM_PROGRAM = vim.env.TERM_PROGRAM, KITTY_WINDOW_ID = vim.env.KITTY_WINDOW_ID }
 	vim.env.TERM, vim.env.TERM_PROGRAM, vim.env.KITTY_WINDOW_ID = "xterm-kitty", nil, nil
@@ -47,7 +47,6 @@ return function(tmp)
 		end,
 		clear = function() end,
 	}
-	package.loaded.lualine = { refresh = function() end, setup = function() end }
 	local jobs = {}
 	vim.system = function(cmd, opts, callback)
 		if cmd[1] ~= "pdfinfo" and cmd[1] ~= "pdftoppm" then
@@ -290,7 +289,7 @@ return function(tmp)
 	)
 	rawget(vim, "_user_core_autocmds_lifecycle").cleanup()
 	vim.system, vim.fn.executable, vim.api.nvim_list_uis = system, executable, list_uis
-	package.loaded.image, package.loaded.lualine = old_image, old_lualine
+	package.loaded.image = old_image
 	for _, name in ipairs({ "TERM", "TERM_PROGRAM", "KITTY_WINDOW_ID" }) do
 		vim.env[name] = terminal[name]
 	end
