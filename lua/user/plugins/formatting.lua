@@ -101,7 +101,7 @@ return {
 				ruff_format = { command = command("ruff") },
 				ruff_organize_imports = { command = command("ruff") },
 				shfmt = { command = command("shfmt") },
-				sqruff = { command = command("sqruff") },
+				sqruff = { command = command("sqruff"), prepend_args = { "--dialect", "postgres" } },
 				stylua = { command = command("stylua") },
 				taplo = { command = command("taplo") },
 				typstyle = { command = command("typstyle") },

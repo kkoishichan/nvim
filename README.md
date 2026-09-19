@@ -263,7 +263,7 @@ formatter / linter、Neotest、DAP 与预览工具则按语言独立配置。表
 | HTML / CSS | html-lsp、css-lsp、Emmet、Tailwind CSS | Prettier；按项目启用 Biome / Stylelint | HTML live preview | Node.js 用于相关工具 |
 | Lua | lua-language-server | StyLua；按项目启用 Selene | — | — |
 | Bash / POSIX sh | bash-language-server | shfmt、ShellCheck | — | 对应 shell |
-| SQL | sql-language-server | sqruff | — | — |
+| SQL / PostgreSQL | sql-language-server（补全，关闭其通用 SQL 诊断） | sqruff（postgres 方言，含语法错误检查） | — | 表名、列名补全需配置数据库连接；支持 psql 元命令 |
 | Dockerfile | dockerfile-language-server | hadolint | — | 运行容器时需要 Docker / Podman |
 | Verilog / SystemVerilog | Verible LSP | Verible formatter / rules | — | HDL 工具链按项目安装 |
 | JSON / YAML / TOML | json-lsp、yaml-language-server、Taplo | Biome / Prettier、yamllint、Taplo | — | — |

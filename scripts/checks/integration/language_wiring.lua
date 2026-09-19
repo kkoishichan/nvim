@@ -108,6 +108,11 @@ return function(tmp)
 	do
 		require("lazy").load({ plugins = { "nvim-lint" } })
 		local lint = require("lint")
+		local sqruff_args = vim.deepcopy(lint.linters.sqruff.args)
+		for _ = 1, 2 do
+			require("lazy.core.config").plugins["nvim-lint"].config()
+			assert(vim.deep_equal(lint.linters.sqruff.args, sqruff_args), "Reload duplicated the SQL linter arguments")
+		end
 		for filetype, names in pairs(lint.linters_by_ft) do
 			for _, name in ipairs(names) do
 				assert(lint.linters[name] ~= nil, ("unknown linter %s for %s"):format(name, filetype))

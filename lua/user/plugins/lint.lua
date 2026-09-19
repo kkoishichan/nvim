@@ -30,6 +30,10 @@ return {
 				-- No zsh: shellcheck only supports sh/bash/dash/ksh.
 			}
 
+			-- Keep SQL diagnostics on the same PostgreSQL dialect as formatting.
+			-- Sqruff is the sole SQL diagnostic provider, including parse errors.
+			lint.linters.sqruff.args = { "--dialect", "postgres", "--parsing-errors", "lint", "--format=json", "-" }
+
 			local function buffer_dir(bufnr)
 				local name = vim.api.nvim_buf_get_name(bufnr)
 				if name == "" then

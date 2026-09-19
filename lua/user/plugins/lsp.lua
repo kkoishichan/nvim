@@ -304,6 +304,14 @@ return {
 				cmd = node_lsp_command("biome", { "lsp-proxy" }),
 			})
 
+			vim.lsp.config("sqlls", {
+				-- Keep database completion; its generic SQL parser rejects psql
+				-- commands such as \echo and \dt. Sqruff owns PostgreSQL diagnostics.
+				handlers = {
+					["textDocument/publishDiagnostics"] = function() end,
+				},
+			})
+
 			vim.lsp.config("typos_lsp", {
 				-- Prose uses Neovim's spell checker. Restrict typos-lsp to code and
 				-- structured data so the two systems do not duplicate diagnostics.
