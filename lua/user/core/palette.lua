@@ -31,7 +31,7 @@ end
 ---applied (startup + every ColorScheme) so it always reflects the live theme.
 function M.get()
 	local fg = attr("Normal", "fg") or 0xebdbb2
-	local bg = attr("Normal", "bg") or 0x1d2021
+	local bg = attr("Normal", "bg") or require("user.core.transparency").background() or 0x1d2021
 	return {
 		fg = fg,
 		bg = bg,

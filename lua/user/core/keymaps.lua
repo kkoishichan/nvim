@@ -231,6 +231,8 @@ map("n", "<leader>ut", function()
 	require("user.core.theme").pick()
 end, { desc = "Theme picker" })
 
+map("n", "<leader>uT", "<cmd>TransparentToggle<cr>", { desc = "Toggle transparent background" })
+
 map("n", "<leader>L", "<cmd>Lazy<cr>", { desc = "Lazy" })
 map("n", "<leader>M", "<cmd>Mason<cr>", { desc = "Mason" })
 

@@ -1,5 +1,9 @@
 local project = require("user.core.project")
 
+vim.api.nvim_create_user_command("TransparentToggle", function()
+	require("user.core.transparency").toggle()
+end, { desc = "Toggle and save transparent background" })
+
 vim.api.nvim_create_user_command("DiffDisk", function()
 	local source_win = vim.api.nvim_get_current_win()
 	local source_buf = vim.api.nvim_get_current_buf()

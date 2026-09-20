@@ -55,6 +55,7 @@ function M.set(name, persist)
 		vim.notify("Failed to apply theme " .. name .. ": " .. tostring(err), vim.log.levels.ERROR)
 		return
 	end
+	require("user.core.transparency").apply()
 	if persist then
 		save(name)
 	end
@@ -74,6 +75,7 @@ function M.bootstrap()
 	bootstrapped = true
 	vim.o.background = "dark"
 	require("user.core.ui_highlights").setup()
+	require("user.core.transparency").setup()
 	M.apply_saved()
 end
 
