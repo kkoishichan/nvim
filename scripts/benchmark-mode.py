@@ -158,6 +158,11 @@ function _G.BenchStop(phase)
   vim.fn.writefile({ vim.json.encode(result) }, run .. "/phase-" .. phase .. ".json")
 end
 
+function _G.BenchProgress()
+  local last = active.frames[#active.frames]
+  return { received = active.received, painted = last and last.received or 0 }
+end
+
 function _G.BenchAnchor(index, line)
   api.nvim_set_current_win(win)
   vim.cmd("normal! " .. line .. "Gzt")
@@ -375,7 +380,7 @@ def build_fixtures(directory):
         ]
     files["markdown"] = ("sample.md", "\n".join(markdown) + "\n")
 
-    long_lines = ["-- Long lines stay under the reduced-feature ceiling on purpose."]
+    long_lines = ["-- Long-line stress: average width triggers the existing reduced-feature policy."]
     for index in range(1, 181):
         long_lines.append(f"local row_{index} = {{ " + ", ".join(f'"{n:04d}"' for n in range(90)) + " }")
     files["long_lines"] = ("long-lines.lua", "\n".join(long_lines) + "\n")
@@ -715,6 +720,16 @@ def drive(session, phase, keys, sequences, interval_ms):
         sent.append(time.monotonic_ns())
         os.write(session.master, sequence)
     session.pump(1.0)
+    # A pressure sample can still have input queued after one second. Control
+    # RPCs may overtake that input; stopping then would report missing keys.
+    # Wait for the actual inputs and their frames, bounded so a broken mapping
+    # still fails below instead of hanging or yielding a fabricated fast result.
+    deadline = time.monotonic() + 15
+    while time.monotonic() < deadline:
+        progress = session.request("nvim_exec_lua", ["return BenchProgress()", []])
+        if progress["received"] >= len(sent) and progress["painted"] >= len(sent):
+            break
+        session.pump(0.05)
     session.command(f"lua BenchStop({json.dumps(phase)})")
     path = session.await_file(session.run / f"phase-{phase}.json")
     result = json.loads(path.read_text())

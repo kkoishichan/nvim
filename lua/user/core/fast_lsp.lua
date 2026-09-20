@@ -11,7 +11,7 @@
 
 local M = {}
 
--- client id -> { name = string, buffers = { [bufnr] = true } }
+-- client id -> { name = string, owned = boolean, buffers = { [bufnr] = true } }
 local managed = {}
 local pending = {}
 local group
@@ -74,7 +74,7 @@ function M.release(id)
 			pcall(vim.lsp.buf_detach_client, bufnr, id)
 		end
 	end
-	if next(client.attached_buffers) == nil then
+	if entry.owned and next(client.attached_buffers) == nil then
 		client:stop()
 	end
 end
@@ -116,6 +116,10 @@ local function launch(name, bufnr, request)
 		for _, client in ipairs(vim.lsp.get_clients({ bufnr = bufnr })) do
 			attached[client.id] = true
 		end
+		local existing = {}
+		for _, client in ipairs(vim.lsp.get_clients()) do
+			existing[client.id] = true
+		end
 		local ok, id = pcall(vim.lsp.start, config, { bufnr = bufnr })
 		if not ok or not id then
 			notify(name .. " did not start: " .. (ok and "no client" or tostring(id)), vim.log.levels.ERROR)
@@ -126,7 +130,8 @@ local function launch(name, bufnr, request)
 			return
 		end
 		watch_buffers()
-		managed[id] = managed[id] or { name = name, buffers = {} }
+		-- Reusing a client gives us an attachment, not ownership of its process.
+		managed[id] = managed[id] or { name = name, owned = not existing[id], buffers = {} }
 		managed[id].buffers[bufnr] = true
 		notify(name .. " attached to " .. vim.fn.fnamemodify(vim.api.nvim_buf_get_name(bufnr), ":~:."))
 	end
@@ -215,7 +220,7 @@ function M.stop()
 		M.release(id)
 	end
 	table.sort(names)
-	notify("Stopped " .. table.concat(names, ", "))
+	notify("Released " .. table.concat(names, ", "))
 end
 
 ---One line for `:ModeInfo`.

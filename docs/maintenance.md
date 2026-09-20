@@ -12,6 +12,13 @@
 | 真实终端 | `python3 scripts/ui-smoke.py` | 三个 PTY 尺寸的键盘、模式与实际补全菜单；保存日志，不连接真实 SSH 主机 |
 | 启动比较 | `python3 scripts/benchmark.py` | 保留输入、逐次启动日志、版本信息与 JSON，默认丢弃首次并取其余中位数 |
 | 模式比较 | `python3 scripts/benchmark-mode.py` | PTY 中比较完整模式、快速模式与原生 Neovim 的启动、输入、保存、滚轮和翻页延迟，以及空闲客户端、定时器、监听、子进程、内存和新增状态文件 |
+| 测量安全检查 | `python3 scripts/check-benchmark-mode.py` | 验证输入文件副本隔离、保存内容有效，以及缺少输入或重绘时拒绝生成成功结果；需要 Python msgpack |
+
+模式比较的每轮输入和保存都在独立临时副本上完成，`--file` 不会改写原文件。
+`--runs 2 --startup-cache both --file /path/to/code.py --fast-lsp-sample diagnostics`
+可同时测冷/热编译缓存、真实代码和首次手动语言服务。生成的 Rust 样例带独立 Cargo 清单；
+真实文件仅复制自身，不复制整个项目。基准禁止 npm/Cargo 联网，避免后台下载干扰结果。
+指标定义、固定版本数据和尚未覆盖的远程环境见[运行模式实测](fast-mode-measurements.md)。
 
 原集成入口 `scripts/check.lua` 仅负责顺序运行 `scripts/checks/integration/` 下的主题模块；保持同进程插件加载互操作验证。其它行为组分别运行于独立进程，避免上一组的替身或缓存污染下一组。主题检查关注实际文字可读性；原集成中大量逐项复制调色常量的断言已移除。
 

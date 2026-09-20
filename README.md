@@ -349,6 +349,8 @@ NVIM_MODE=full nvim path/to/file.py
 `auto`），未配置时仍用 `full`。`auto` 只看连接本身：`SSH_CONNECTION` 或 `SSH_TTY`
 非空时选择 `fast`。模式在启动时确定，换模式需要重启；快速模式的原生状态栏显示
 `FAST`，`:ModeInfo` 按需列出选择来源、关闭的能力、降级原因和存储路径。
+功能取舍见[快速模式设计](docs/fast-mode.md)，性能数据与测量边界见
+[运行模式实测](docs/fast-mode-measurements.md)。
 
 `runtime.state_dir` 可把 swap、undo、view 和 ShaDa 指向本机磁盘，目录由当前用户拥有
 且权限为 `0700`。目录不可用时仍可编辑，但磁盘恢复关闭并在 `:ModeInfo` 与

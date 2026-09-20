@@ -561,6 +561,53 @@ assert(not package.loaded.jdtls and not package.loaded.rustaceanvim, "Manual LSP
 		cancelled.extra.starts == 0 and cancelled.extra.summary == "none",
 		"Stop did not cancel a pending LSP request"
 	)
+	local ownership = run("fast_lsp_ownership", {
+		mode = "fast",
+		arguments = { vim.fs.joinpath(root, "lua", "user", "core", "mode.lua") },
+		code = [[
+local fast = require("user.core.fast_lsp")
+fast.candidates(0)
+local current = vim.api.nvim_get_current_buf()
+local external = vim.api.nvim_create_buf(true, false)
+local real = { start = vim.lsp.start, clients = vim.lsp.get_clients, client = vim.lsp.get_client_by_id, detach = vim.lsp.buf_detach_client }
+local client = { id = 900001, attached_buffers = { [external] = true } }
+local exists = true
+report.extra.stops = 0
+client.stop = function() report.extra.stops = report.extra.stops + 1; exists = false end
+vim.lsp.get_clients = function(opts)
+  return exists and (not opts or not opts.bufnr or client.attached_buffers[opts.bufnr]) and { client } or {}
+end
+vim.lsp.get_client_by_id = function(id) return id == client.id and client or nil end
+vim.lsp.buf_detach_client = function(bufnr, _) client.attached_buffers[bufnr] = nil end
+vim.lsp.start = function()
+  exists = true
+  client.attached_buffers[current] = true
+  return client.id
+end
+-- A client reused from another buffer remains owned by its original starter,
+-- even when that other attachment disappears before FastLspStop.
+fast.start("lua_ls")
+assert(vim.wait(2000, function() return fast.summary() ~= "none" end, 25))
+client.attached_buffers[external] = nil
+fast.stop()
+assert(not client.attached_buffers[current] and report.extra.stops == 0, "Stopped a borrowed client")
+-- An already attached external client does not become ours either.
+client.attached_buffers[current] = true
+fast.start("lua_ls")
+vim.wait(200, function() return false end, 25)
+fast.stop()
+assert(client.attached_buffers[current] and report.extra.stops == 0, "Released someone else's attachment")
+-- A newly started client is ours and must terminate with the final attachment.
+exists, client.attached_buffers = false, {}
+fast.start("lua_ls")
+assert(vim.wait(2000, function() return fast.summary() ~= "none" end, 25))
+fast.stop()
+report.extra.detached = not client.attached_buffers[current]
+vim.lsp.start, vim.lsp.get_clients = real.start, real.clients
+vim.lsp.get_client_by_id, vim.lsp.buf_detach_client = real.client, real.detach
+]],
+	})
+	assert(ownership.extra.stops == 1 and ownership.extra.detached, "Manual LSP ownership was not respected")
 
 	-- 9. Without a search stack the picker keys still open, complete and search.
 	local bare = vim.fs.joinpath(tmp, "empty-path")
