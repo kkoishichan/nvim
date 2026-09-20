@@ -222,6 +222,30 @@ function M.is_fast()
 	return resolve().name == "fast"
 end
 
+---Save the default for future processes; never unload the active plugin set.
+function M.set_default(name)
+	local ok, err = require("user.core.preferences").set("runtime", "mode", name)
+	if not ok then
+		vim.notify(err, vim.log.levels.ERROR, { title = "Editor mode" })
+		return false
+	end
+	local message = "Saved editor mode: " .. name .. ". Restart Neovim to apply."
+	if vim.env.NVIM_MODE and vim.env.NVIM_MODE ~= "" then
+		message = message .. " NVIM_MODE=" .. vim.env.NVIM_MODE .. " still takes priority."
+	end
+	vim.notify(message, vim.log.levels.INFO, { title = "Editor mode" })
+	return true
+end
+
+function M.toggle()
+	local preferences = require("user.core.preferences")
+	local selected = preferences.provided("runtime.mode") and preferences.get("runtime").mode or M.name()
+	if selected == "auto" then
+		selected = automatic()
+	end
+	return M.set_default(selected == "fast" and "full" or "fast")
+end
+
 ---Where the mode came from, for `:ModeInfo` and health output.
 function M.source()
 	return resolve().source

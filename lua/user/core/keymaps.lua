@@ -244,6 +244,7 @@ map("n", "<leader>ut", function()
 end, { desc = "Theme picker" })
 
 map("n", "<leader>uT", "<cmd>TransparentToggle<cr>", { desc = "Toggle transparent background" })
+map("n", "<leader>uf", "<cmd>FastModeToggle<cr>", { desc = "Toggle saved fast mode (restart)" })
 
 map("n", "<leader>L", "<cmd>Lazy<cr>", { desc = "Lazy" })
 

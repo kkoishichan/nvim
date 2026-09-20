@@ -204,7 +204,7 @@ nvim
 
 ## 性能策略
 
-面向日常轻量编辑和服务器环境的[快速模式设计](docs/fast-mode.md)已确定功能取舍、缓存策略与精简部署范围；目前为待实现方案，文中的新入口尚不可用。
+面向日常轻量编辑和服务器环境的[快速模式](docs/fast-mode.md)已实现，功能取舍、缓存策略与精简部署范围见设计文档；启用方式见下方「运行模式」。
 
 共享 buffer 策略会在读取和编辑时识别超过 1.5 MiB、10,000 行、单行超过 2,000 字节，
 或平均行长过高的文件，按 buffer 关闭 Tree-sitter、LSP、颜色扫描和 indent guide 等高成本功能。
@@ -334,6 +334,11 @@ Claude 原生 IDE 集成在一个 Neovim 中只有一个终端：首次打开时
 `full` 是默认模式，保留本文描述的全部功能。`fast` 保留熟悉的编辑方式、主题和
 Tree-sitter 语法高亮，默认不启动语言服务、补全、Git 标记、装饰、折叠提供者和
 附加界面，适合 SSH、容器和资源有限的服务器。
+
+按 `<leader>uf`（空格、u、f）或执行 `:FastModeToggle` 切换并保存默认模式；
+`:FastMode on` 开启，`:FastMode off` 关闭，`:FastMode auto` 按 SSH 环境选择。
+设置写入 `preferences.json`，重启 Neovim 后生效；连续切换可撤销尚未生效的选择，
+其他个人偏好保持不变。配置目录只读或 JSON 损坏时会明确报告保存失败。
 
 ```sh
 NVIM_MODE=fast nvim path/to/file.py

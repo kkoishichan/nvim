@@ -85,6 +85,11 @@ end
 function M.selected_plugins(root, data, mode)
 	local plugins = M.spec(root, data, { mode = mode })
 	local names = vim.tbl_keys(plugins)
+	local profiles = vim.env.NVIM_DEPLOY_PROFILES
+	if mode == "fast" and profiles and profiles ~= "" and profiles ~= "none" then
+		-- Installer dependency only: it never enters the fast runtime spec.
+		table.insert(names, "mason.nvim")
+	end
 	table.sort(names)
 	return names
 end

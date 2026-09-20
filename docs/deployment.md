@@ -15,7 +15,7 @@
 | `--ref REF` | 克隆后单独 fetch 并验证分支、tag 或提交，使用 detached checkout；默认 `main`。 |
 | `--nvim-version vX.Y.Z` | 精确匹配版本，最低为 0.12；找不到时从该官方 release 安装到 `~/.local/opt`，不使用 `latest`。 |
 | `--profile NAME` | 选择需要恢复的 Mason 工具及相应系统依赖；可重复，工具去重。完整模式默认 `minimal`，快速模式默认不选。 |
-| `--editor-mode NAME` | `full`（默认）或 `fast`：这台主机启动时使用的运行模式。`fast` 只安装精简插件集和基础 parser，并把 `runtime.mode=fast` 写入 `preferences.json`。 |
+| `--editor-mode NAME` | `full`（默认）或 `fast`：这台主机启动时使用的运行模式。两种选择都会更新 `preferences.json` 中的 `runtime.mode`；`fast` 只安装精简插件集和基础 parser。 |
 | `--parsers a,b,c` | 在快速模式的基础 parser 之外追加语言；可重复，只接受目录中已有的 parser 名。 |
 | `--mason` | 等同 `--profile full`，恢复全部锁定工具。 |
 | `--repo URL` / `--ssh` | 更换配置仓库地址或使用预设 SSH 地址。 |
@@ -40,6 +40,10 @@
 准备、恢复和校验三步都按所选模式运行，因此装到磁盘上的资产就是该模式会加载的资产：Lazy、当前主题、nvim-treesitter、mini.nvim、Oil、fzf-lua、Conform，以及作为显式语言能力扩展的 nvim-lspconfig；其余主题、Blink、预览二进制和整套 Mason 工具都不安装。默认 parser 为 Bash、Lua、Python、JSON、YAML、TOML、Markdown（含 `markdown_inline` 注入）、Vim、Vimdoc、query、comment 和 luadoc，其他语言通过 `--parsers` 显式加入；名称不在目录中时直接失败，不会静默少装。
 
 完整锁文件仍是唯一版本来源：精简安装只决定放多少东西到磁盘上，不会删除锁条目，也不会清理完整模式已安装的资产。因此快速模式不提供会按当前子集执行 `clean/sync/update` 的入口，`:Lazy` 会说明管理操作应在完整模式下运行。
+
+显式追加 `--profile` 时，还会准备并校验锁定的 Mason 安装器。工具安装运行在独立进程，
+不依赖完整模式，也不会把 Mason 加入快速模式的日常插件集。从 fast 重新部署为 full
+会同步修改保存的默认模式。日常可用 `<leader>uf` 或 `:FastMode on|off|auto` 保存选择，重启生效。
 
 搜索依赖（fzf、ripgrep、fd）在快速模式下是可选的：缺少时给出警告并继续，编辑器使用原生打开、补全和 quickfix 搜索入口。构建 parser 仍需要 C 编译器和固定版本的 tree-sitter CLI。
 

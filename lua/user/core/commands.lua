@@ -6,6 +6,27 @@ vim.api.nvim_create_user_command("TransparentToggle", function()
 	require("user.core.transparency").toggle()
 end, { desc = "Toggle and save transparent background" })
 
+vim.api.nvim_create_user_command("FastModeToggle", function()
+	mode.toggle()
+end, { desc = "Toggle saved fast mode (restart required)" })
+
+vim.api.nvim_create_user_command("FastMode", function(command)
+	local names = { on = "fast", off = "full", auto = "auto" }
+	if command.args == "" then
+		mode.toggle()
+	elseif names[command.args] then
+		mode.set_default(names[command.args])
+	else
+		vim.notify("Use :FastMode on|off|auto", vim.log.levels.ERROR)
+	end
+end, {
+	nargs = "?",
+	complete = function()
+		return { "on", "off", "auto" }
+	end,
+	desc = "Save editor mode for the next launch",
+})
+
 -- Everything the mode decided, on demand. Startup prints at most one line and
 -- never walks the cache or state directories to produce a size report.
 vim.api.nvim_create_user_command("ModeInfo", function()
@@ -14,6 +35,7 @@ vim.api.nvim_create_user_command("ModeInfo", function()
 		{ "Editor mode: ", "Title" },
 		{ mode.name() .. "\n" },
 		{ "  selected by      " .. mode.source() .. "\n" },
+		{ "  saved default    " .. require("user.core.preferences").get("runtime").mode .. " (restart to apply)\n" },
 	}
 
 	local disabled = {}

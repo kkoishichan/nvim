@@ -6,6 +6,7 @@ root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 fixture=$(mktemp -d /tmp/nvim-deploy-check.XXXXXX)
 trap 'rm -rf -- "$fixture"' EXIT
 real_nvim=$(command -v nvim)
+export FIXTURE_REAL_NVIM="$real_nvim" FIXTURE_PREFERENCES_HELPER="$root/scripts/deploy-preferences.lua"
 mkdir -p "$fixture/repository with spaces/scripts" "$fixture/bin"
 printf 'new config\n' >"$fixture/repository with spaces/init.lua"
 printf '{}\n' >"$fixture/repository with spaces/lazy-lock.json"
@@ -84,9 +85,8 @@ if [ -n "${NVIM_DEPLOY_LINK_SOURCE:-}" ]; then
 fi
 case "$*" in
 *deploy-preferences.lua*)
-	# The real script merges into the staged file; the fixture only records that
-	# the deployment asked for a mode and with which value.
-	printf '{"runtime":{"mode":"%s"}}\n' "$NVIM_DEPLOY_EDITOR_MODE" > "$NVIM_DEPLOY_PREFERENCES"
+	# Use the real writer: a log entry cannot prove the persisted mode changed.
+	NVIM_LOG_FILE="$FIXTURE_CASE/nvim.log" "$FIXTURE_REAL_NVIM" --headless -u NONE -i NONE -n -l "$FIXTURE_PREFERENCES_HELPER"
 	exit 0 ;;
 esac
 case "$*" in
@@ -243,7 +243,8 @@ expect_code 0 --no-deps --ref 1234567890123456789012345678901234567890 --profile
 [ -L "$FIXTURE_TARGET" ]
 assert_backup
 rg -q 'profiles=java' "$FIXTURE_LOG"
-[ "$(cat "$FIXTURE_TARGET/preferences.json")" = '{"tools":{"prefer_mason":true}}' ]
+rg -q '"prefer_mason":true' "$FIXTURE_TARGET/preferences.json"
+rg -q '"mode":"full"' "$FIXTURE_TARGET/preferences.json"
 rg -q 'Deployment complete at commit' "$FIXTURE_CASE/output"
 new_case alternate-neovim
 export FIXTURE_NVIM_VERSION=v0.12.4
@@ -277,12 +278,16 @@ expect_code 0 --no-deps --editor-mode fast --parsers rust
 [ -L "$FIXTURE_TARGET" ]
 assert_backup
 rg -q 'mode=fast;parsers=rust' "$FIXTURE_LOG"
-[ "$(cat "$FIXTURE_TARGET/preferences.json")" = '{"runtime":{"mode":"fast"}}' ]
+rg -q '"mode":"fast"' "$FIXTURE_TARGET/preferences.json"
+rg -q '"prefer_mason":true' "$FIXTURE_TARGET/preferences.json"
 if rg -q 'deploy-tools.lua' "$FIXTURE_LOG"; then
 	printf 'Fast deployment restored Mason tools without a selected group\n' >&2
 	exit 1
 fi
 rg -q 'fast mode, tools: none' "$FIXTURE_CASE/output"
+expect_code 0 --no-deps --editor-mode full
+rg -q '"mode":"full"' "$FIXTURE_TARGET/preferences.json"
+rg -q '"prefer_mason":true' "$FIXTURE_TARGET/preferences.json"
 new_case fast-with-tools
 original
 expect_code 0 --no-deps --editor-mode fast --profile python
@@ -324,7 +329,7 @@ assert(tools.version(copy[1][1]) ~= "mutated")
 -- package:is_installed() says an older package remains present.
 if vim.env.NVIM_DEPLOY_CHECK_FAILURE == "tools" then
 	tools.ensure_installed = function() return { { "fixture", version = "1" } } end
-	package.loaded.lazy = { load = function() end }
+	package.loaded.mason = { setup = function() end }
 	package.loaded["mason-registry"] = {
 		refresh = function(callback) callback(true) end,
 		get_package = function()

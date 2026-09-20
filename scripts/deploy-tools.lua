@@ -1,7 +1,10 @@
 -- Explicit deployment operation. No tools are installed by requiring toolchain.
 local profiles = vim.split(vim.env.NVIM_DEPLOY_PROFILES or "minimal", ",", { trimempty = true })
 local function install()
-	require("lazy").load({ plugins = { "mason.nvim" } })
+	-- Deployment prepares this pinned plugin separately from the runtime set.
+	-- Start no editor plugins just to install explicitly selected tools.
+	vim.opt.rtp:prepend(vim.fn.stdpath("data") .. "/lazy/mason.nvim")
+	require("mason").setup({ PATH = "skip" })
 	local registry = require("mason-registry")
 	local ready, refreshed = false, false
 	registry.refresh(function(ok)

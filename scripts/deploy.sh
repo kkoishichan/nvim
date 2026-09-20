@@ -483,7 +483,7 @@ deploy_configuration() {
 	if [ -f "$config_dir/preferences.json" ]; then
 		cp "$config_dir/preferences.json" "$stage_dir/config/preferences.json" || fail 20 'Could not preserve preferences.json in staging'
 	fi
-	if [ "$editor_mode" = fast ]; then
+	if [ -f "$stage_dir/config/scripts/deploy-preferences.lua" ] || [ "$editor_mode" = fast ]; then
 		[ -f "$stage_dir/config/scripts/deploy-preferences.lua" ] ||
 			fail 20 "Revision $resolved_ref lacks scripts/deploy-preferences.lua; choose a mode-aware revision"
 		NVIM_DEPLOY_PREFERENCES="$stage_dir/config/preferences.json" NVIM_DEPLOY_EDITOR_MODE="$editor_mode" \
@@ -502,12 +502,12 @@ deploy_configuration() {
 		info "Preparing, restoring and verifying the staged plugin lock for $editor_mode mode"
 		# The staged runs use the same mode selection a session does, so the
 		# assets prepared here are exactly the assets that mode loads.
-		XDG_CONFIG_HOME="$stage_dir/xdg-config" NVIM_APPNAME=nvim NVIM_TEST_ROOT="$stage_dir/config" NVIM_MODE="$editor_mode" NVIM_PARSERS="$parser_csv" NVIM_PREPARE_PARSERS=1 NVIM_PREPARE_TOOLS=0 NVIM_PREPARE_ASSETS=1 NVIM_PREPARE_NVIM_VERSION="$nvim_version" \
+		XDG_CONFIG_HOME="$stage_dir/xdg-config" NVIM_APPNAME=nvim NVIM_TEST_ROOT="$stage_dir/config" NVIM_MODE="$editor_mode" NVIM_DEPLOY_PROFILES="$profile_csv" NVIM_PARSERS="$parser_csv" NVIM_PREPARE_PARSERS=1 NVIM_PREPARE_TOOLS=0 NVIM_PREPARE_ASSETS=1 NVIM_PREPARE_NVIM_VERSION="$nvim_version" \
 			nvim --headless -u NONE -i NONE -l "$stage_dir/config/scripts/prepare-checks.lua" || fail 21 'Plugin preparation failed; original configuration unchanged'
 		XDG_CONFIG_HOME="$stage_dir/xdg-config" NVIM_APPNAME=nvim NVIM_DEPLOY_ROOT="$stage_dir/config" NVIM_TEST_ROOT="$stage_dir/config" NVIM_MODE="$editor_mode" NVIM_PARSERS="$parser_csv" nvim --headless -n -i NONE \
 			--cmd 'lua vim.opt.runtimepath:prepend(vim.env.NVIM_DEPLOY_ROOT)' -u "$stage_dir/config/init.lua" \
 			-l "$stage_dir/config/scripts/deploy-plugins.lua" || fail 21 'Plugin restore failed; original configuration unchanged'
-		XDG_CONFIG_HOME="$stage_dir/xdg-config" NVIM_APPNAME=nvim NVIM_TEST_ROOT="$stage_dir/config" NVIM_MODE="$editor_mode" NVIM_PARSERS="$parser_csv" NVIM_VERIFY_TOOLS=0 NVIM_VERIFY_PARSERS=1 NVIM_VERIFY_ASSETS=1 \
+		XDG_CONFIG_HOME="$stage_dir/xdg-config" NVIM_APPNAME=nvim NVIM_TEST_ROOT="$stage_dir/config" NVIM_MODE="$editor_mode" NVIM_DEPLOY_PROFILES="$profile_csv" NVIM_PARSERS="$parser_csv" NVIM_VERIFY_TOOLS=0 NVIM_VERIFY_PARSERS=1 NVIM_VERIFY_ASSETS=1 \
 			nvim --headless -u NONE -i NONE -l "$stage_dir/config/scripts/verify-lock.lua" || fail 21 'Plugin lock verification failed; original configuration unchanged'
 	fi
 	[ "$(identity)" = "$original_identity" ] || fail 20 'Destination changed during staging; refusing to replace it'
@@ -528,7 +528,7 @@ deploy_configuration() {
 		info 'No Mason tool group was selected; no language tools were restored'
 	else
 		XDG_CONFIG_HOME="$stage_dir/xdg-config" NVIM_APPNAME=nvim NVIM_DEPLOY_ROOT="$stage_dir/config" NVIM_MODE="$editor_mode" NVIM_DEPLOY_PROFILES="$profile_csv" nvim --headless -n -i NONE \
-			--cmd 'lua vim.opt.runtimepath:prepend(vim.env.NVIM_DEPLOY_ROOT)' -u "$stage_dir/config/init.lua" \
+			--cmd 'lua vim.opt.runtimepath:prepend(vim.env.NVIM_DEPLOY_ROOT)' -u NONE \
 			-l "$stage_dir/config/scripts/deploy-tools.lua" || tools_partial=1
 	fi
 	if [ "$with_dict" -eq 1 ] && [ ! -s "$dict_db" ]; then

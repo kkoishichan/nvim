@@ -72,7 +72,7 @@ vim.fn.writefile({ vim.json.encode(report) }, file)
 vim.cmd("qa!")
 ]]
 
-	local function case_config(name, preferences)
+	local function case_config(name, preferences, keep)
 		local home = vim.fs.joinpath(tmp, name, "config")
 		local dir = vim.fs.joinpath(home, "nvim")
 		vim.fn.mkdir(dir, "p")
@@ -85,7 +85,7 @@ vim.cmd("qa!")
 		local path = vim.fs.joinpath(dir, "preferences.json")
 		if preferences then
 			vim.fn.writefile({ encode(preferences) }, path)
-		else
+		elseif not keep then
 			vim.fn.delete(path)
 		end
 		return home
@@ -104,7 +104,7 @@ vim.cmd("qa!")
 		vim.fn.writefile(vim.split(body, "\n", { plain = true }), script)
 
 		local env = {
-			XDG_CONFIG_HOME = case_config(name, options.preferences),
+			XDG_CONFIG_HOME = case_config(name, options.preferences, options.keep_preferences),
 			XDG_CACHE_HOME = vim.fs.joinpath(case, "cache"),
 			XDG_STATE_HOME = options.state_home or vim.fs.joinpath(case, "state"),
 			NVIM_LOG_FILE = vim.fs.joinpath(case, "nvim.log"),
@@ -188,6 +188,64 @@ vim.cmd("qa!")
 	-- still starts in fast mode.
 	local auto_detached = run("auto_detached", { preferences = { runtime = { mode = "fast" } } })
 	assert(auto_detached.mode == "fast", "A stored fast preference did not survive a lost SSH environment")
+
+	local toggled = run("persistent_toggle", {
+		preferences = { tools = { prefer_mason = true }, format = { timeout_ms = 950 } },
+		code = [[
+local preferences = require("user.core.preferences")
+vim.cmd("FastModeToggle")
+report.extra.saved = preferences.get()
+report.extra.current = mode.name()
+report.extra.mapping = vim.fn.maparg("<leader>uf", "n")
+vim.cmd("FastModeToggle")
+report.extra.toggled_back = preferences.get("runtime").mode
+vim.cmd("FastMode on")
+]],
+	})
+	assert(
+		toggled.extra.saved.runtime.mode == "fast" and toggled.extra.current == "full",
+		"Toggle changed the running mode or failed to save"
+	)
+	assert(
+		toggled.extra.saved.tools.prefer_mason and toggled.extra.saved.format.timeout_ms == 950,
+		"Toggle lost other preferences"
+	)
+	assert(toggled.extra.toggled_back == "full", "A second toggle did not cancel the pending change")
+	assert(toggled.extra.mapping:find("FastModeToggle", 1, true), "Fast mode toggle mapping missing")
+	local restarted = run(
+		"persistent_toggle",
+		{ keep_preferences = true, code = [[
+vim.cmd("FastMode off")
+report.extra.current = mode.name()
+]] }
+	)
+	assert(restarted.mode == "fast" and restarted.extra.current == "fast", "Saved fast mode did not survive restart")
+	assert(
+		run("persistent_toggle", { keep_preferences = true }).mode == "full",
+		"Saved full mode did not survive restart"
+	)
+	local failed_toggle = run("failed_toggle", {
+		code = [[
+local path = vim.fn.stdpath("config") .. "/preferences.json"
+vim.fn.writefile({ "{broken JSON" }, path)
+report.extra.invalid_saved = mode.set_default("fast")
+report.extra.kept = vim.fn.readfile(path)[1]
+vim.fn.delete(path)
+local directory = vim.fn.stdpath("config")
+vim.uv.fs_chmod(directory, tonumber("500", 8))
+report.extra.readonly_saved = mode.set_default("fast")
+vim.uv.fs_chmod(directory, tonumber("700", 8))
+report.extra.current = mode.name()
+]],
+	})
+	assert(
+		not failed_toggle.extra.invalid_saved and failed_toggle.extra.kept == "{broken JSON",
+		"Toggle overwrote invalid preferences"
+	)
+	assert(
+		not failed_toggle.extra.readonly_saved and failed_toggle.extra.current == "full",
+		"Unwritable preference changed the mode"
+	)
 
 	-- 4. Fast mode initializes a smaller editor instead of hiding a complete one.
 	local fast = run("fast_runtime", {
@@ -545,6 +603,33 @@ report.extra.decorations = package.loaded["ibl"] ~= nil or package.loaded["illum
 	local lock = support.plugins(root, data)
 	local slim = support.selected_plugins(root, data, "fast")
 	local complete = support.selected_plugins(root, data, "full")
+	local deployment_profiles = vim.env.NVIM_DEPLOY_PROFILES
+	vim.env.NVIM_DEPLOY_PROFILES = "python"
+	local with_installer = support.selected_plugins(root, data, "fast")
+	vim.env.NVIM_DEPLOY_PROFILES = deployment_profiles
+	assert(
+		vim.tbl_contains(with_installer, "mason.nvim") and #with_installer == #slim + 1,
+		"Slim tool deployment did not prepare Mason"
+	)
+	assert(not vim.tbl_contains(slim, "mason.nvim"), "Ordinary fast mode acquired an installer dependency")
+	local installer = run("fast_tool_installer", {
+		mode = "fast",
+		code = [[
+report.extra.in_spec = require("lazy.core.config").plugins["mason.nvim"] ~= nil
+vim.opt.rtp:prepend(vim.fn.stdpath("data") .. "/lazy/mason.nvim")
+-- Exercise the real module and setup; replace only network/package writes.
+local registry = require("mason-registry")
+registry.refresh = function(callback) callback(true) end
+require("user.toolchain").ensure_installed = function() return {} end
+vim.env.NVIM_DEPLOY_PROFILES = "python"
+dofile(vim.env.NVIM_TEST_ROOT .. "/scripts/deploy-tools.lua")
+report.extra.loaded = package.loaded.mason ~= nil
+]],
+	})
+	assert(
+		not installer.extra.in_spec and installer.extra.loaded,
+		"Slim tool installation still depends on the full runtime"
+	)
 	assert(#slim < #complete, "The slim installation is not smaller than the complete one")
 	for _, name in ipairs(slim) do
 		assert(vim.tbl_contains(complete, name), "The slim set contains a plugin the complete set does not: " .. name)

@@ -82,4 +82,44 @@ function M.refresh()
 	cached, errors, provided = nil, {}, {}
 end
 
+---Persist one preference without replacing other settings or invalid JSON.
+---The temporary file lives beside the destination so rename is atomic.
+function M.set(section, key, value)
+	local expected = defaults[section] and defaults[section][key]
+	local allowed = choices[section] and choices[section][key]
+	assert(expected ~= nil and type(value) == type(expected), "Invalid preference value")
+	assert(not allowed or vim.tbl_contains(allowed, value), "Invalid preference choice")
+	local path = vim.fs.joinpath(vim.fn.stdpath("config"), "preferences.json")
+	path = vim.uv.fs_realpath(path) or path
+	local values = {}
+	if vim.uv.fs_stat(path) then
+		local read, lines = pcall(vim.fn.readfile, path)
+		local raw = read and table.concat(lines, "\n") or ""
+		local parsed, result = pcall(vim.json.decode, raw)
+		if not parsed or type(result) ~= "table" or not raw:match("^%s*{") then
+			return nil, "Cannot update invalid or unreadable preferences: " .. path
+		end
+		values = result
+	end
+	values[section] = type(values[section]) == "table" and values[section] or {}
+	values[section][key] = value
+	local fd, temporary = vim.uv.fs_mkstemp(path .. ".XXXXXX")
+	if not fd then
+		return nil, "Cannot save preferences: " .. tostring(temporary)
+	end
+	local data = vim.json.encode(values) .. "\n"
+	local written, err = vim.uv.fs_write(fd, data, 0)
+	vim.uv.fs_close(fd)
+	local ok
+	if written == #data then
+		ok, err = vim.uv.fs_rename(temporary, path)
+	end
+	if not ok then
+		vim.uv.fs_unlink(temporary)
+		return nil, "Cannot save preferences: " .. tostring(err or "incomplete write")
+	end
+	M.refresh()
+	return true
+end
+
 return M
