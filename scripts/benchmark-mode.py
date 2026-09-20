@@ -65,6 +65,7 @@ PROBE = r"""
 local api = vim.api
 local run = assert(vim.env.BENCH_RUN)
 local win = api.nvim_get_current_win()
+local original = api.nvim_buf_get_lines(0, 0, -1, false)
 local namespace = api.nvim_create_namespace("benchmark_mode")
 local active
 
@@ -153,14 +154,22 @@ end
 
 -- Saving is a command, not a key: time it where it happens instead of guessing
 -- from a redraw.
+function _G.BenchRestore()
+  api.nvim_buf_set_lines(0, 0, -1, false, original)
+end
+
 function _G.BenchSave(count)
   local samples = {}
   for index = 1, count do
-    api.nvim_buf_set_lines(0, 0, 1, false, { "-- benchmark write " .. index })
+    -- Each save starts with the same valid source, even if a formatter changed
+    -- the previous copy. No language-specific comment is injected.
+    BenchRestore()
+    vim.bo.modified = true
     local began = vim.uv.hrtime()
     vim.cmd("silent write")
     samples[#samples + 1] = (vim.uv.hrtime() - began) / 1e6
   end
+  BenchRestore()
   vim.fn.writefile({ vim.json.encode(samples) }, run .. "/save.json")
 end
 
@@ -436,6 +445,18 @@ def prepare_run(target, run, data_home):
                 (data / asset).symlink_to(data_home / asset, target_is_directory=True)
 
 
+def copy_sample(sample, run):
+    """All editing and saves use a private file for this target and repetition."""
+    workspace = run / "workspace"
+    workspace.mkdir(parents=True, exist_ok=True)
+    destination = workspace / sample.name
+    # Copy bytes, not links or source permissions: even a read-only input can be
+    # measured safely, and a formatter can never write back through a symlink.
+    with destination.open("xb") as stream:
+        stream.write(sample.read_bytes())
+    return destination
+
+
 def launch_argv(target, sample, probe):
     if target == "native":
         # The control: no configuration at all, with the display settings the
@@ -661,7 +682,8 @@ def measure_startup(target, sample, run, data_home):
 
 
 def run_session(target, sample, run, data_home, options):
-    session = Session(target, sample, run, data_home, options.settle_ms)
+    measured = copy_sample(sample, run)
+    session = Session(target, measured, run, data_home, options.settle_ms)
     record = {"target": target, "sample": sample.name}
     try:
         ready = json.loads(session.await_file(session.run / "ready.json", timeout=90).read_text())
@@ -685,7 +707,7 @@ def run_session(target, sample, run, data_home, options):
         # Typing ran in insert mode; leave it, or the paging keys would be
         # insert-mode editing commands instead of half-page scrolls.
         session.command("stopinsert")
-        session.command("silent! undo")
+        session.command("lua BenchRestore()")
         record["typing"] = summarize(typing["latencies_ms"])
         record["typing_keys"] = {"sent": typing["sent"], "decoded": len(typing["decoded"])}
         record["first_key_ms"] = round(typing["latencies_ms"][0], 3) if typing["latencies_ms"] else None
