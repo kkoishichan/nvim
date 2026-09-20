@@ -15,6 +15,7 @@
 | 测量安全检查 | `python3 scripts/check-benchmark-mode.py` | 验证输入文件副本隔离、保存内容有效，以及缺少输入或重绘时拒绝生成成功结果；需要 Python msgpack |
 
 模式比较的每轮输入和保存都在独立临时副本上完成，`--file` 不会改写原文件。
+`--keep-going` 在单项采样失败后继续其余样本，但最终仍返回失败状态并保留失败证据。
 `--runs 2 --startup-cache both --file /path/to/code.py --fast-lsp-sample diagnostics`
 可同时测冷/热编译缓存、真实代码和首次手动语言服务。生成的 Rust 样例带独立 Cargo 清单；
 真实文件仅复制自身，不复制整个项目。基准禁止 npm/Cargo 联网，避免后台下载干扰结果。
