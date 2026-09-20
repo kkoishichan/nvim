@@ -15,6 +15,19 @@ BENCH = runpy.run_path(str(Path(__file__).with_name("benchmark-mode.py")))
 
 
 class Samples(unittest.TestCase):
+    def test_missing_or_extra_input_is_not_reported_as_success(self):
+        phase = {"phase": "wheel", "decoded": [10, 20], "frames": []}
+        with self.assertRaisesRegex(RuntimeError, "no changed frame"):
+            BENCH["pair_latencies"](phase, 2)
+        with self.assertRaisesRegex(RuntimeError, "decoded 2"):
+            BENCH["pair_latencies"](phase, 3)
+        phase["frames"] = [{"received": 1, "ns": 30}]
+        with self.assertRaisesRegex(RuntimeError, "input 2"):
+            BENCH["pair_latencies"](phase, 2)
+        # One redraw may legitimately reflect multiple input events.
+        phase["frames"] = [{"received": 2, "ns": 40}]
+        self.assertEqual(BENCH["pair_latencies"](phase, 2), [30 / 1e6, 20 / 1e6])
+
     def test_independent_copies_and_valid_saves(self):
         with tempfile.TemporaryDirectory(prefix="nvim-benchmark-check-") as directory:
             root = Path(directory)

@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """Compare full mode, fast mode and plain Neovim on real input in a PTY.
 
-Every target uses the same Neovim binary, the same files, the same 120x36 grid
+Every target uses the same Neovim binary, independent copies of the same files,
+the same 120x36 grid
 and the already-prepared dependencies. Runs alternate target order per sample so
 a warming machine cannot favour whichever target happens to go first.
 
 Latency is measured inside Neovim: a key is timestamped when its decoding is
 observed, and again at the end of the decoration pass that first reflects it.
 That covers the editor's own work, not the terminal's display. The plain-Neovim
-target (-u NONE with syntax and line numbers) is the control for how much of the
-remaining time belongs to file reading, the terminal or the connection.
+target (-u NONE with syntax and line numbers) controls for Neovim's own work;
+terminal painting and network latency are outside this measurement.
 
 Alongside latency the report records what a session is running while idle:
 attached language clients, active libuv timers, file watchers and child
@@ -70,8 +71,12 @@ local namespace = api.nvim_create_namespace("benchmark_mode")
 local active
 
 local function view()
-  local v = vim.fn.winsaveview()
-  return { top = v.topline, line = v.lnum, col = v.col, fill = v.topfill, leftcol = v.leftcol }
+  local info = vim.fn.getwininfo(win)[1]
+  local cursor = api.nvim_win_get_cursor(win)
+  return {
+    top = info.topline, bottom = info.botline, line = cursor[1], col = cursor[2],
+    tick = api.nvim_buf_get_changedtick(api.nvim_win_get_buf(win)), mode = api.nvim_get_mode().mode,
+  }
 end
 
 local function handles()
@@ -118,21 +123,20 @@ api.nvim_set_decoration_provider(namespace, {
   end,
 })
 
--- `typed` is what the terminal delivered; `key` is what it became after
--- mapping. A mode that animates <C-d> must still be measured against the key
--- the user pressed, so prefer `typed` and fall back for unmapped input.
-vim.on_key(function(key, typed)
+-- Empty `typed` means a plugin fed the key. Count only terminal input, including
+-- the original key of a mapping; animation/completion keys are not new samples.
+vim.on_key(function(_, typed)
   if not active then
     return
   end
-  local observed = (typed ~= nil and typed ~= "") and typed or key
-  if active.keys[observed] then
+  if typed and typed ~= "" and active.keys[typed] then
     active.received = active.received + 1
     active.decoded[#active.decoded + 1] = vim.uv.hrtime()
   end
 end, namespace)
 
 function _G.BenchStart(phase, keys)
+  assert(api.nvim_get_current_win() == win, "Sample window lost focus")
   local wanted = {}
   for _, key in ipairs(keys) do
     wanted[vim.keycode(key)] = true
@@ -149,7 +153,24 @@ function _G.BenchStop(phase)
   result.keys = nil
   result.errmsg = vim.v.errmsg
   result.state = state()
+  result.mouse = vim.fn.getmousepos()
+  result.window = win
   vim.fn.writefile({ vim.json.encode(result) }, run .. "/phase-" .. phase .. ".json")
+end
+
+function _G.BenchAnchor(index, line)
+  api.nvim_set_current_win(win)
+  vim.cmd("normal! " .. line .. "Gzt")
+  local info = vim.fn.getwininfo(win)[1]
+  -- Use the text area's far side, clear of the gutter, scrollbar and
+  -- cursor-anchored match-up/diagnostic floats that can appear during a burst.
+  -- Fixed terminal coordinates may hit those floats instead of the document.
+  local position = api.nvim_win_get_position(win)
+  local target = {
+    column = position[2] + math.max(info.textoff + 1, api.nvim_win_get_width(win) - 2),
+    row = position[1] + math.max(1, math.floor(api.nvim_win_get_height(win) / 2)),
+  }
+  vim.fn.writefile({ vim.json.encode(target) }, run .. "/anchor-" .. index .. ".json")
 end
 
 -- Saving is a command, not a key: time it where it happens instead of guessing
@@ -412,11 +433,17 @@ def disk_files(directory):
     return {str(path.relative_to(directory)) for path in directory.rglob("*") if path.is_file()}
 
 
+def disk_usage(directory):
+    files = disk_files(directory)
+    return {"files": len(files), "bytes": sum((directory / path).stat().st_size for path in files)}
+
+
 def environment(target, run):
     env = os.environ | {
         "TERM": "xterm-kitty",
         "NVIM_APPNAME": "nvim",
         "NVIM_CHECK_ONLY": "1",
+        "NVIM_STATE_DIR": "",
         "XDG_CONFIG_HOME": str(run / "config"),
         "XDG_CACHE_HOME": str(run / "cache"),
         "XDG_STATE_HOME": str(run / "state"),
@@ -432,16 +459,18 @@ def environment(target, run):
 
 
 def prepare_run(target, run, data_home):
-    (run / "config" / "nvim").mkdir(parents=True)
+    (run / "config" / "nvim").mkdir(parents=True, exist_ok=True)
     for entry in ("init.lua", "lua", "after", "spell", "lazy-lock.json"):
-        (run / "config" / "nvim" / entry).symlink_to(ROOT / entry)
+        link = run / "config" / "nvim" / entry
+        if not link.exists():
+            link.symlink_to(ROOT / entry)
     (run / "state").mkdir(parents=True, exist_ok=True)
     (run / "cache").mkdir(parents=True, exist_ok=True)
     if target != "native":
         data = run / "data" / "nvim"
-        data.mkdir(parents=True)
+        data.mkdir(parents=True, exist_ok=True)
         for asset in ("lazy", "site", "mason"):
-            if (data_home / asset).exists():
+            if (data_home / asset).exists() and not (data / asset).exists():
                 (data / asset).symlink_to(data_home / asset, target_is_directory=True)
 
 
@@ -611,12 +640,14 @@ def pair_latencies(phase, sent_count):
     Plugins that feed keys of their own show up as extra samples, which is why
     the decoded count is reported next to the number of keys actually sent.
     """
+    if len(phase["decoded"]) != sent_count:
+        raise RuntimeError(f"{phase['phase']}: sent {sent_count} inputs but decoded {len(phase['decoded'])}")
     frames = phase["frames"]
     latencies = []
     for index, decoded in enumerate(phase["decoded"][: max(sent_count, 0)]):
         frame = next((item for item in frames if item["received"] >= index + 1), None)
         if frame is None:
-            continue
+            raise RuntimeError(f"{phase['phase']}: no changed frame for input {index + 1}; inspect phase JSON")
         latencies.append((frame["ns"] - decoded) / 1e6)
     return latencies
 
@@ -643,13 +674,13 @@ def drive(session, phase, keys, sequences, interval_ms):
     return result
 
 
-def measure_startup(target, sample, run, data_home):
+def measure_startup(target, sample, run, data_home, repetition=0):
     """Empty startup and first open, taken outside the PTY from Neovim's own log."""
     prepare_run(target, run, data_home)
     env = environment(target, run)
     if target != "native":
         env["XDG_DATA_HOME"] = str(run / "data")
-    log = run / "startup.log"
+    log = run / f"startup-{repetition}.log"
     argv = ["nvim", "--headless"]
     if target == "native":
         argv += ["-u", "NONE"]
@@ -665,7 +696,7 @@ def measure_startup(target, sample, run, data_home):
     ]
     if sample:
         argv.append(str(sample))
-    with (run / "output.log").open("w") as stream:
+    with (run / f"output-{repetition}.log").open("w") as stream:
         process = subprocess.Popen(argv, cwd=ROOT, env=env, stdout=stream, stderr=stream, start_new_session=True)
         try:
             code = process.wait(timeout=60)
@@ -681,7 +712,7 @@ def measure_startup(target, sample, run, data_home):
     return float(match.group(1))
 
 
-def run_session(target, sample, run, data_home, options):
+def run_session(target, sample, run, data_home, options, sample_name=None):
     measured = copy_sample(sample, run)
     session = Session(target, measured, run, data_home, options.settle_ms)
     record = {"target": target, "sample": sample.name}
@@ -697,6 +728,13 @@ def run_session(target, sample, run, data_home, options):
         record["idle_children"] = child_names(session.pid)
         before = disk_files(run / "state")
 
+        # Send enter-insert + the first character together, timing from `i`.
+        # Native Neovim need not redraw the document just to enter insert mode;
+        # a real edit gives every target the same visible endpoint and includes
+        # InsertEnter setup without adding the inter-character interval.
+        first = drive(session, "first_edit", ["i"], [b"ix"], 0)
+        record["first_edit_ms"] = round(first["latencies_ms"][0], 3)
+
         typing = drive(
             session,
             "typing",
@@ -710,7 +748,6 @@ def run_session(target, sample, run, data_home, options):
         session.command("lua BenchRestore()")
         record["typing"] = summarize(typing["latencies_ms"])
         record["typing_keys"] = {"sent": typing["sent"], "decoded": len(typing["decoded"])}
-        record["first_key_ms"] = round(typing["latencies_ms"][0], 3) if typing["latencies_ms"] else None
 
         session.command(f"lua BenchSave({options.saves})")
         saves = json.loads(session.await_file(session.run / "save.json").read_text())
@@ -720,18 +757,24 @@ def run_session(target, sample, run, data_home, options):
         # or the bottom stops changing the viewport, and an event with no redraw
         # cannot be timed at all.
         lines = record["ready"]["lines"]
-        wheel_span = 20 * 3 + GRID[1]
         top_anchor = 4
-        bottom_anchor = max(top_anchor + 1, lines - wheel_span - GRID[1])
+        wheel_events = min(20, max(0, (lines - 2 * GRID[1]) // 3))
+        bottom_anchor = max(top_anchor + 1, lines - GRID[1])
         wheel = []
-        for index in range(options.wheel_bursts):
+        for index in range(options.wheel_bursts if wheel_events else 0):
             down = index % 2 == 0
-            session.command(f"normal! {top_anchor if down else bottom_anchor}Gzt")
+            session.command(f"lua BenchAnchor({index}, {top_anchor if down else bottom_anchor})")
             session.pump(0.2)
-            sequence = f"\x1b[<{65 if down else 64};41;11M".encode()
-            phase = drive(session, f"wheel{index}", ["<ScrollWheelUp>", "<ScrollWheelDown>"], [sequence] * 20, 8)
+            position = json.loads((run / f"anchor-{index}.json").read_text())
+            sequence = f"\x1b[<{65 if down else 64};{position['column']};{position['row']}M".encode()
+            phase = drive(session, f"wheel{index}", ["<ScrollWheelUp>", "<ScrollWheelDown>"], [sequence] * wheel_events, 8)
+            if phase["mouse"]["winid"] != phase["window"]:
+                raise RuntimeError("Wheel input hit a different window; inspect the recorded mouse position")
             wheel += phase["latencies_ms"]
         record["wheel"] = summarize(wheel)
+        record["wheel_events"] = wheel_events * options.wheel_bursts
+        if not wheel_events or not options.wheel_bursts:
+            record["wheel_skipped"] = "document too short" if not wheel_events else "disabled"
 
         # Half a page per key, so the run goes down and then back to where it
         # started without ever hitting an edge.
@@ -748,7 +791,7 @@ def run_session(target, sample, run, data_home, options):
         record["paging"] = summarize(paging["latencies_ms"])
         record["paging_events"] = 2 * half
 
-        if target == "fast" and sample.stem in options.fast_lsp_sample:
+        if target == "fast" and (sample_name or sample.stem) in options.fast_lsp_sample:
             session.command("lua BenchFastLsp()")
             record["fast_lsp"] = json.loads(session.await_file(session.run / "fastlsp.json", timeout=90).read_text())
 
@@ -757,6 +800,7 @@ def run_session(target, sample, run, data_home, options):
         record["final"] = json.loads((session.run / "ready.json").read_text())
         record["final_rss_kb"] = resident_kb(session.pid)
         record["new_state_files"] = sorted(disk_files(run / "state") - before)
+        record["disk"] = {name: disk_usage(run / name) for name in ("cache", "state")}
     finally:
         session.close()
     return record
@@ -787,6 +831,10 @@ def main():
     options = parser.parse_args()
     if options.runs < 1:
         parser.error("--runs must be at least 1")
+    if options.typing_chars < 1 or options.paging_events < 2:
+        parser.error("--typing-chars must be positive and --paging-events at least 2")
+    if min(options.saves, options.wheel_bursts, options.settle_ms, options.typing_interval_ms, options.paging_interval_ms) < 0:
+        parser.error("counts and intervals cannot be negative")
     targets = options.target or list(TARGETS)
 
     base = options.output or Path(tempfile.mkdtemp(prefix="nvim-mode-benchmark-"))
@@ -804,16 +852,18 @@ def main():
         path = extra.expanduser().resolve()
         if not path.is_file():
             parser.error(f"not a file: {path}")
+        if path.stem in samples:
+            parser.error(f"duplicate sample name: {path.stem}")
         samples[path.stem] = path
 
-    unknown = [name for name in options.fast_lsp_sample if name not in {path.stem for path in samples.values()}]
+    unknown = [name for name in options.fast_lsp_sample if name not in samples]
     if unknown:
         parser.error("--fast-lsp-sample does not match any selected sample: " + ", ".join(unknown))
 
-    # Insert-mode bytes: a leading `i`, then letters and spaces only, so
+    # Insert-mode bytes: letters and spaces only, so
     # autopairs cannot add characters the measurement did not send.
     letters = "the quick brown fox jumps over the lazy dog "
-    typing_bytes = [ord("i")] + [ord(letters[index % len(letters)]) for index in range(options.typing_chars)]
+    typing_bytes = [ord(letters[index % len(letters)]) for index in range(options.typing_chars)]
     options.typing_bytes = typing_bytes
 
     report = {
@@ -853,13 +903,14 @@ def main():
                 for target in order:
                     run = base / "startup" / cache_mode / scene / target / str(run_index)
                     if cache_mode == "warm":
-                        shared = base / "startup" / "warm-cache" / target
-                        shared.mkdir(parents=True, exist_ok=True)
-                        run.mkdir(parents=True)
-                        (run / "cache").symlink_to(shared, target_is_directory=True)
+                        # Lua cache keys include the module's path. Reuse the
+                        # config path as well as cache; symlinked run-specific
+                        # configs would otherwise recompile local modules.
+                        run = base / "startup" / cache_mode / scene / target
+                        run.mkdir(parents=True, exist_ok=True)
                     else:
                         run.mkdir(parents=True)
-                    value = measure_startup(target, sample, run, data_home)
+                    value = measure_startup(target, sample, run, data_home, run_index)
                     if run_index == 0:
                         continue  # discard the first sample of each series
                     report["startup"].append(
@@ -873,7 +924,13 @@ def main():
             for target in order:
                 run = base / "session" / name / target / str(run_index)
                 run.mkdir(parents=True)
-                record = run_session(target, sample, run, data_home, options)
+                try:
+                    record = run_session(target, sample, run, data_home, options, sample_name=name)
+                except (RuntimeError, TimeoutError, OSError) as error:
+                    report["failure"] = {"target": target, "sample": name, "run": run_index, "error": str(error)}
+                    (base / "results.json").write_text(json.dumps(report, indent=2) + "\n")
+                    print(f"Measurement failed: {error}. Evidence: {run}", file=sys.stderr)
+                    return 1
                 record["run"] = run_index
                 report["sessions"].append(record)
                 typing = record.get("typing") or {}
