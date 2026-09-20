@@ -363,13 +363,17 @@ NVIM_MODE=full nvim path/to/file.py
 诊断通过 `<leader>cd` 浮窗或 `<leader>cD` 位置列表查看，默认不画下划线和虚拟行。
 `:FastLspStop` 只撤销本模式建立的附着，最后一个受管缓冲区退出后停止该客户端。
 缺少可执行文件时只提示安装要求，不启动 Mason、不下载 SDK。
+Java / Rust 也可用 `:FastLspStart jdtls` / `:FastLspStart rust_analyzer`，不加载
+完整集成与调试插件。Java 仍需可用的 JDK 21+；Rust 默认关闭保存时检查、构建脚本和过程宏。
 
 快速模式关闭自动 `unnamedplus` 同步，普通寄存器始终可用；`<leader>y` / `<leader>Y` / `<leader>p`
 显式使用系统剪贴板，支持 OSC 52 的连接由 Neovim 自带的提供者带出。界面符号改用 ASCII，
 真彩色由 Neovim 自己的终端检测决定，不强制开启。
 
-缺少 fzf 时，搜索入口改用原生方式：`vim.ui.input` 的文件名补全打开文件，
-`:vimgrep` 把匹配送进 quickfix，缓冲区和最近文件用原生选择列表；
+缺少 fzf 或 rg 时，搜索入口改用原生方式：`vim.ui.input` 的文件名补全打开文件，
+分批读取项目文件，用 Vim 正则把匹配送进 quickfix；遵守目录中的 `.gitignore` 和 `.ignore`，
+跳过版本库内部目录、符号链接、二进制及大于 1.5 MiB 的文件，最多检查 50,000 个目录项、
+收集 10,000 个匹配行，结果受限时会提示。缓冲区和最近文件用原生选择列表；
 没有原生替代的入口会说明可用的替代命令，而不是静默做别的事。
 
 侧栏和输出面板会为正文保留默认 40 列、8 行；可在偏好中设置

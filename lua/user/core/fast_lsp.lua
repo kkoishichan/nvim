@@ -13,6 +13,7 @@ local M = {}
 
 -- client id -> { name = string, buffers = { [bufnr] = true } }
 local managed = {}
+local pending = {}
 local group
 
 -- Settings that keep a server's analysis on the documents that are open, where
@@ -34,7 +35,7 @@ local function definitions()
 	pcall(function()
 		require("lazy").load({ plugins = { "nvim-lspconfig" } })
 	end)
-	return require("user.core.lsp_definitions")
+	return require("user.core.manual_lsp")
 end
 
 local function watch_buffers()
@@ -46,6 +47,7 @@ local function watch_buffers()
 		group = group,
 		desc = "Release a manually started language server with its last buffer",
 		callback = function(event)
+			pending[event.buf] = nil
 			for id, entry in pairs(managed) do
 				entry.buffers[event.buf] = nil
 				if vim.tbl_isempty(entry.buffers) then
@@ -96,16 +98,31 @@ function M.candidates(bufnr, include_auxiliary)
 	return names
 end
 
-local function launch(name, bufnr)
+local function launch(name, bufnr, request)
 	definitions()
 	local config = vim.tbl_deep_extend("force", vim.deepcopy(vim.lsp.config[name] or {}), open_files_only[name] or {})
 	config.name = name
 
 	local function start(root)
+		if pending[bufnr] ~= request or not vim.api.nvim_buf_is_loaded(bufnr) then
+			return
+		end
+		pending[bufnr] = nil
+		if not require("user.core.buffer_policy").allow(bufnr) then
+			return
+		end
 		config.root_dir = root
+		local attached = {}
+		for _, client in ipairs(vim.lsp.get_clients({ bufnr = bufnr })) do
+			attached[client.id] = true
+		end
 		local ok, id = pcall(vim.lsp.start, config, { bufnr = bufnr })
 		if not ok or not id then
 			notify(name .. " did not start: " .. (ok and "no client" or tostring(id)), vim.log.levels.ERROR)
+			return
+		end
+		if attached[id] and not managed[id] then
+			notify(name .. " is already attached; its existing owner keeps control")
 			return
 		end
 		watch_buffers()
@@ -119,9 +136,7 @@ local function launch(name, bufnr)
 		-- The definitions wrap root discovery, including its asynchronous form.
 		root(bufnr, function(directory)
 			vim.schedule(function()
-				if vim.api.nvim_buf_is_valid(bufnr) then
-					start(directory)
-				end
+				start(directory)
 			end)
 		end)
 	else
@@ -141,36 +156,44 @@ function M.start(name)
 		notify("This buffer runs with reduced features; :BufferFeatures on overrides it", vim.log.levels.WARN)
 		return
 	end
+	watch_buffers()
+	local request = {}
+	pending[bufnr] = request
 
 	if name and name ~= "" then
 		local shared = definitions()
 		if not vim.tbl_contains(shared.servers, name) then
+			pending[bufnr] = nil
 			notify("Unknown language server: " .. name, vim.log.levels.ERROR)
 			return
 		end
 		if not vim.tbl_contains(shared.resolve(), name) then
+			pending[bufnr] = nil
 			notify(name .. " is not installed on this host; install its executable first", vim.log.levels.ERROR)
 			return
 		end
-		launch(name, bufnr)
+		launch(name, bufnr, request)
 		return
 	end
 
 	local candidates = M.candidates(bufnr)
 	if #candidates == 0 then
-		candidates = M.candidates(bufnr, true)
-	end
-	if #candidates == 0 then
+		pending[bufnr] = nil
 		notify("No installed language server handles " .. vim.bo[bufnr].filetype, vim.log.levels.WARN)
 		return
 	end
 	if #candidates == 1 then
-		launch(candidates[1], bufnr)
+		launch(candidates[1], bufnr, request)
 		return
 	end
 	vim.ui.select(candidates, { prompt = "Language server" }, function(choice)
-		if choice and vim.api.nvim_buf_is_valid(bufnr) then
-			launch(choice, bufnr)
+		if pending[bufnr] ~= request then
+			return
+		end
+		if choice and vim.api.nvim_buf_is_loaded(bufnr) then
+			launch(choice, bufnr, request)
+		else
+			pending[bufnr] = nil
 		end
 	end)
 end
@@ -178,8 +201,12 @@ end
 ---Give up every client this mode started. Buffers held by another owner keep
 ---their client; only ours are detached.
 function M.stop()
+	local had_pending = not vim.tbl_isempty(pending)
+	pending = {}
 	if vim.tbl_isempty(managed) then
-		notify("No language server was started by this mode")
+		notify(
+			had_pending and "Cancelled pending language-server starts" or "No language server was started by this mode"
+		)
 		return
 	end
 	local names = {}

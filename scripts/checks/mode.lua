@@ -515,6 +515,52 @@ report.extra.summary_after = fast.summary()
 	assert(manual.extra.attached_after == 0, "Stopping left the client attached to the buffer")
 	assert(manual.extra.running_after == 0, "Stopping left the client running")
 	assert(manual.extra.summary_after == "none", "The stopped client is still reported as managed")
+	local cancelled = run("fast_lsp_cancel", {
+		mode = "fast",
+		arguments = { vim.fs.joinpath(root, "lua", "user", "core", "mode.lua") },
+		code = [[
+local fast = require("user.core.fast_lsp")
+fast.candidates(0)
+local start = vim.lsp.start
+report.extra.starts = 0
+vim.lsp.start = function(...) report.extra.starts = report.extra.starts + 1; return start(...) end
+fast.start("lua_ls")
+fast.stop()
+vim.wait(300, function() return false end, 25)
+report.extra.summary = fast.summary()
+-- A delayed picker response must be cancelled as well as root discovery.
+local select = vim.ui.select
+local choose
+vim.ui.select = function(_, _, callback) choose = callback end
+local candidates = fast.candidates
+fast.candidates = function() return { "lua_ls", "typos_lsp" } end
+fast.start()
+fast.stop()
+choose("lua_ls")
+vim.wait(300, function() return false end, 25)
+vim.ui.select, fast.candidates, vim.lsp.start = select, candidates, start
+local tools = require("user.toolchain")
+for name, item in pairs({ rust_analyzer = { "rust", "rust-analyzer" }, jdtls = { "java", "jdtls" } }) do
+  vim.bo.filetype = item[1]
+  if tools.executable(item[2]) then
+    assert(vim.tbl_contains(fast.candidates(0), name), name .. " unavailable to manual startup")
+    -- Exercise root discovery, executable resolution and entry wiring without
+    -- requiring Java/Cargo SDKs in the quick check environment.
+    local captured
+    vim.lsp.start = function(config) captured = config; return nil end
+    fast.start(name)
+    assert(vim.wait(2000, function() return captured ~= nil end, 25), name .. " was not launched")
+    assert(captured.name == name and captured.filetypes[1] == item[1])
+    vim.lsp.start = start
+  end
+end
+assert(not package.loaded.jdtls and not package.loaded.rustaceanvim, "Manual LSP loaded a full integration")
+]],
+	})
+	assert(
+		cancelled.extra.starts == 0 and cancelled.extra.summary == "none",
+		"Stop did not cancel a pending LSP request"
+	)
 
 	-- 9. Without a search stack the picker keys still open, complete and search.
 	local bare = vim.fs.joinpath(tmp, "empty-path")
@@ -537,6 +583,7 @@ vim.ui.input = function(_, callback)
   callback("needle")
 end
 native.grep({ cwd = vim.fn.getcwd() })
+vim.wait(3000, function() return #vim.fn.getqflist() > 0 end, 25)
 vim.ui.input = input
 report.extra.matches = #vim.fn.getqflist()
 report.extra.picker_loaded = package.loaded["fzf-lua"] ~= nil
@@ -546,6 +593,43 @@ report.extra.picker_loaded = package.loaded["fzf-lua"] ~= nil
 	assert(search.extra.opened == "target.txt", "The native open entry did not open the file")
 	assert(search.extra.matches > 0, "The native grep entry produced no quickfix matches")
 	assert(not search.extra.picker_loaded, "A missing picker dependency still loaded the picker")
+	local ignored_search = run("search_paths", {
+		mode = "fast",
+		env = { PATH = bare },
+		code = [[
+local native = require("user.core.native_search")
+local directory = vim.fn.getcwd() .. "/project with spaces | literal"
+local files = {
+  ["target.txt"] = "needle here",
+  ["ignored/generated.txt"] = "needle hidden",
+  [".git/objects/object"] = "needle hidden",
+  ["nested/private.txt"] = "needle hidden",
+  ["nested/public.txt"] = "needle here",
+  ["drop.log"] = "needle hidden",
+  ["keep.log"] = "needle here",
+}
+for name, text in pairs(files) do
+  local path = directory .. "/" .. name
+  vim.fn.mkdir(vim.fs.dirname(path), "p")
+  vim.fn.writefile({ text }, path)
+end
+vim.fn.writefile({ "ignored/", "*.log", "!keep.log" }, directory .. "/.gitignore")
+vim.fn.writefile({ "/private.txt" }, directory .. "/nested/.ignore")
+assert(vim.uv.fs_symlink(directory, directory .. "/loop"))
+vim.ui.input = function(_, callback) callback("needle") end
+native.grep({ cwd = directory })
+assert(vim.wait(3000, function() return #vim.fn.getqflist() > 0 end, 25))
+report.extra.paths = {}
+for _, match in ipairs(vim.fn.getqflist()) do
+  report.extra.paths[#report.extra.paths + 1] = vim.api.nvim_buf_get_name(match.bufnr):sub(#directory + 2)
+end
+table.sort(report.extra.paths)
+]],
+	})
+	assert(
+		vim.deep_equal(ignored_search.extra.paths, { "keep.log", "nested/public.txt", "target.txt" }),
+		"Native search escaped its ignore rules or mishandled a path"
+	)
 
 	-- 10. A mapping for a feature this mode does not run must not exist at all,
 	--     so it cannot become an implicit load entry.

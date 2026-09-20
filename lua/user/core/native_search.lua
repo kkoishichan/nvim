@@ -4,6 +4,7 @@
 -- picker that cannot run.
 
 local M = {}
+local generation = 0
 
 local function project_root()
 	return require("user.core.project").root()
@@ -12,7 +13,7 @@ end
 ---True when the picker's own dependency is present. Checked at the moment a key
 ---is pressed, so installing fzf during a session takes effect without a restart.
 function M.usable()
-	return vim.fn.executable("fzf") == 1
+	return vim.fn.executable("fzf") == 1 and vim.fn.executable("rg") == 1
 end
 
 local function notify(message, level)
@@ -36,18 +37,70 @@ end
 
 local function quickfix_grep(pattern, opts)
 	local root = (opts or {}).cwd or project_root()
-	-- :vimgrep is Neovim's own search: no ripgrep, no shell, and results land in
-	-- the quickfix list where the existing ]q / [q entries already work.
-	local ok, err = pcall(vim.cmd, ("noautocmd vimgrep /%s/gj %s/**/*"):format(vim.fn.escape(pattern, "/"), root))
+	local insensitive = vim.o.ignorecase and not (vim.o.smartcase and pattern:find("%u"))
+	local ok, regex = pcall(vim.regex, (insensitive and "\\c" or "") .. pattern)
 	if not ok then
-		notify("No matches: " .. tostring(err), vim.log.levels.WARN)
+		notify("Invalid search: " .. tostring(regex), vim.log.levels.WARN)
 		return
 	end
-	if vim.tbl_isempty(vim.fn.getqflist()) then
-		notify("No matches for " .. pattern, vim.log.levels.WARN)
-		return
+	generation = generation + 1
+	local current = generation
+	local next_file, stats = require("user.core.search_files").iter(root)
+	local matches, skipped = {}, 0
+	vim.fn.setqflist({}, " ", { title = "Search: " .. pattern, items = {} })
+	local list_id = vim.fn.getqflist({ id = 0 }).id
+	local function finish()
+		vim.fn.setqflist({}, "r", { id = list_id, items = matches })
+		if #matches > 0 and vim.fn.getqflist({ id = 0 }).id == list_id then
+			vim.cmd("botright copen")
+		elseif #matches == 0 then
+			notify("No matches for " .. pattern, vim.log.levels.WARN)
+		end
+		if skipped > 0 or stats.unreadable > 0 or stats.truncated or #matches >= 10000 then
+			notify(
+				"Search limited: skipped binary, unreadable or >1.5 MiB files, or reached the entry/match limit",
+				vim.log.levels.WARN
+			)
+		end
 	end
-	vim.cmd("botright copen")
+	local function step()
+		if current ~= generation then
+			return
+		end
+		local began = vim.uv.hrtime()
+		for _ = 1, 100 do
+			local path, done = next_file()
+			if done or #matches >= 10000 then
+				finish()
+				return
+			end
+			if path then
+				local stat = vim.uv.fs_stat(path)
+				local fd = stat and stat.size <= 1.5 * 1024 * 1024 and vim.uv.fs_open(path, "r", 0)
+				local contents = fd and vim.uv.fs_read(fd, stat.size, 0)
+				if fd then
+					vim.uv.fs_close(fd)
+				end
+				if contents and not contents:find("\0", 1, true) then
+					local row = 0
+					for line in (contents .. "\n"):gmatch("(.-)\n") do
+						row = row + 1
+						local column = regex:match_str(line)
+						if column and #matches < 10000 then
+							matches[#matches + 1] = { filename = path, lnum = row, col = column + 1, text = line }
+						end
+					end
+				else
+					skipped = skipped + 1
+				end
+			end
+			if vim.uv.hrtime() - began > 8000000 then
+				break
+			end
+		end
+		vim.schedule(step)
+	end
+	vim.schedule(step)
 end
 
 function M.grep(opts)
