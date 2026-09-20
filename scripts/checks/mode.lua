@@ -241,6 +241,33 @@ report.extra.mini_after = package.loaded["mini.ai"] ~= nil
 	for _, name in ipairs({ "blink.cmp", "gitsigns.nvim", "lualine.nvim", "neo-tree.nvim", "neoscroll.nvim" }) do
 		assert(not vim.tbl_contains(fast.plugins, name), "The fast plugin set still imported " .. name)
 	end
+	-- Every capability the mode reports as disabled must correspond to something
+	-- this session genuinely does not have, so the list is a verified claim
+	-- rather than a label.
+	local evidence = {
+		completion = "blink.cmp",
+		decorations = "vim-illuminate",
+		explorer_extras = "neo-tree.nvim",
+		extended_workflows = "nvim-dap",
+		folding_provider = "nvim-ufo",
+		git = "gitsigns.nvim",
+		lint = "nvim-lint",
+		scroll_animation = "neoscroll.nvim",
+		session = "persistence.nvim",
+		signature = "blink.cmp",
+		statusline_plugin = "lualine.nvim",
+		terminal_manager = "toggleterm.nvim",
+		ui_panels = "bufferline.nvim",
+	}
+	for capability, plugin in pairs(evidence) do
+		assert(vim.tbl_contains(fast.disabled, capability), capability .. " is not reported as disabled in fast mode")
+		assert(vim.tbl_contains(default.plugins, plugin), "Full mode no longer provides " .. plugin)
+		assert(
+			not vim.tbl_contains(fast.plugins, plugin),
+			capability .. " is reported off but " .. plugin .. " is installed"
+		)
+	end
+
 	-- The language extension is installed but not started: only an explicit
 	-- request puts it on the runtimepath.
 	for _, name in ipairs({ "nvim-lspconfig", "conform.nvim", "fzf-lua", "mini.nvim", "oil.nvim" }) do

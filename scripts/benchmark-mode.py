@@ -726,7 +726,7 @@ def run_session(target, sample, run, data_home, options):
         record["paging"] = summarize(paging["latencies_ms"])
         record["paging_events"] = 2 * half
 
-        if target == "fast" and options.fast_lsp:
+        if target == "fast" and sample.stem in options.fast_lsp_sample:
             session.command("lua BenchFastLsp()")
             record["fast_lsp"] = json.loads(session.await_file(session.run / "fastlsp.json", timeout=90).read_text())
 
@@ -754,7 +754,13 @@ def main():
     parser.add_argument("--wheel-bursts", type=int, default=4)
     parser.add_argument("--paging-events", type=int, default=12)
     parser.add_argument("--paging-interval-ms", type=float, default=80)
-    parser.add_argument("--fast-lsp", action="store_true", help="also measure the first :FastLspStart in fast mode")
+    parser.add_argument(
+        "--fast-lsp-sample",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="also measure the first :FastLspStart in fast mode for this sample; repeatable",
+    )
     parser.add_argument("--startup-cache", choices=("cold", "warm", "both"), default="both")
     options = parser.parse_args()
     if options.runs < 1:
@@ -778,6 +784,10 @@ def main():
             parser.error(f"not a file: {path}")
         samples[path.stem] = path
 
+    unknown = [name for name in options.fast_lsp_sample if name not in {path.stem for path in samples.values()}]
+    if unknown:
+        parser.error("--fast-lsp-sample does not match any selected sample: " + ", ".join(unknown))
+
     # Insert-mode bytes: a leading `i`, then letters and spaces only, so
     # autopairs cannot add characters the measurement did not send.
     letters = "the quick brown fox jumps over the lazy dog "
@@ -796,6 +806,7 @@ def main():
         "typing": {"chars": options.typing_chars, "interval_ms": options.typing_interval_ms},
         "wheel": {"bursts": options.wheel_bursts, "events_per_burst": 20, "interval_ms": 8},
         "paging": {"events": options.paging_events, "interval_ms": options.paging_interval_ms},
+        "fast_lsp_samples": options.fast_lsp_sample,
         "samples": {
             name: {
                 "path": str(path),
