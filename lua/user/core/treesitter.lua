@@ -98,16 +98,73 @@ M.filetypes = {
 	"zsh",
 }
 
+-- What a slim installation starts with: the languages a configuration and
+-- operations host actually edits, together with the parsers their injections
+-- and queries depend on. Every other language is added by an explicit
+-- deployment parameter, never by opening a file.
+M.base_parsers = {
+	"bash",
+	"comment",
+	"json",
+	"lua",
+	"luadoc",
+	"markdown",
+	"markdown_inline",
+	"python",
+	"query",
+	"toml",
+	"vim",
+	"vimdoc",
+	"yaml",
+}
+
+---The parser set for a mode, plus any languages a deployment asked for. An
+---unknown name is a mistake in the request, not a silent omission.
+---@param mode string "full" or "fast"
+---@param extra string[]|nil additional language names
+function M.select(mode, extra)
+	if mode ~= "fast" then
+		return vim.deepcopy(M.parsers)
+	end
+	local catalog = {}
+	for _, parser in ipairs(M.parsers) do
+		catalog[parser] = true
+	end
+	local selected, seen = {}, {}
+	local function add(name)
+		assert(catalog[name], "Unknown Tree-sitter parser: " .. name)
+		if not seen[name] then
+			seen[name] = true
+			table.insert(selected, name)
+		end
+	end
+	for _, parser in ipairs(M.base_parsers) do
+		add(parser)
+	end
+	for _, parser in ipairs(extra or {}) do
+		add(parser)
+	end
+	table.sort(selected)
+	return selected
+end
+
+---The parsers this installation manages. A deployment narrows the set with the
+---mode it installed and NVIM_PARSERS; a full installation keeps the catalog.
+function M.selected()
+	return M.select(require("user.core.mode").name(), vim.split(vim.env.NVIM_PARSERS or "", ",", { trimempty = true }))
+end
+
 function M.sync()
 	local treesitter = require("nvim-treesitter")
 	treesitter.setup({ install_dir = M.install_dir })
 
 	-- update() deliberately ignores missing parsers on nvim-treesitter's main
-	-- branch, so install the complete catalog before refreshing its revisions.
-	assert(treesitter.install(M.parsers):wait(300000), "failed to install Tree-sitter parsers")
-	assert(treesitter.update(M.parsers):wait(300000), "failed to update Tree-sitter parsers")
+	-- branch, so install the selected set before refreshing its revisions.
+	local parsers = M.selected()
+	assert(treesitter.install(parsers):wait(300000), "failed to install Tree-sitter parsers")
+	assert(treesitter.update(parsers):wait(300000), "failed to update Tree-sitter parsers")
 
-	for _, parser in ipairs(M.parsers) do
+	for _, parser in ipairs(parsers) do
 		assert(vim.treesitter.language.add(parser), "Tree-sitter parser is not loadable after sync: " .. parser)
 	end
 end

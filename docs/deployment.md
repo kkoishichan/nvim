@@ -1,6 +1,6 @@
 # 部署、配置组与恢复
 
-默认部署选择 `minimal`，固定使用 Neovim `v0.12.5` 和 tree-sitter CLI `0.26.9`。配置默认取 `main`；需要重现同一次部署时，传入明确的提交 SHA。脚本会输出实际提交，并把仓库、请求引用、提交、Neovim 版本和配置组写入保留的 release 目录下 `deployment.txt`。
+默认部署选择 `minimal`，固定使用 Neovim `v0.12.5` 和 tree-sitter CLI `0.26.9`。配置默认取 `main`；需要重现同一次部署时，传入明确的提交 SHA。脚本会输出实际提交，并把仓库、请求引用、提交、Neovim 版本、运行模式、配置组和追加的 parser 写入保留的 release 目录下 `deployment.txt`。
 
 ```bash
 ./scripts/deploy.sh --dry-run --ref main --profile python --profile web
@@ -8,13 +8,15 @@
 ./scripts/deploy.sh --ref <commit-sha> --mason
 ```
 
-`--dry-run` 只读取平台信息并输出计划，不创建目录、文件或链接，不启动 Neovim，也不安装或下载任何东西。可以在未配置依赖的新机器上先查看计划。实际部署会检查 fzf 至少为 `0.36.0`；系统包版本过旧时明确失败，不将不能工作的搜索配置视作完成。
+`--dry-run` 只读取平台信息并输出计划，不创建目录、文件或链接，不启动 Neovim，也不安装或下载任何东西。可以在未配置依赖的新机器上先查看计划。完整模式的实际部署会检查 fzf 至少为 `0.36.0`；系统包版本过旧时明确失败，不将不能工作的搜索配置视作完成。
 
 | 参数 | 行为 |
 | --- | --- |
 | `--ref REF` | 克隆后单独 fetch 并验证分支、tag 或提交，使用 detached checkout；默认 `main`。 |
 | `--nvim-version vX.Y.Z` | 精确匹配版本，最低为 0.12；找不到时从该官方 release 安装到 `~/.local/opt`，不使用 `latest`。 |
-| `--profile NAME` | 选择需要恢复的 Mason 工具及相应系统依赖；可重复，工具去重。 |
+| `--profile NAME` | 选择需要恢复的 Mason 工具及相应系统依赖；可重复，工具去重。完整模式默认 `minimal`，快速模式默认不选。 |
+| `--editor-mode NAME` | `full`（默认）或 `fast`：这台主机启动时使用的运行模式。`fast` 只安装精简插件集和基础 parser，并把 `runtime.mode=fast` 写入 `preferences.json`。 |
+| `--parsers a,b,c` | 在快速模式的基础 parser 之外追加语言；可重复，只接受目录中已有的 parser 名。 |
 | `--mason` | 等同 `--profile full`，恢复全部锁定工具。 |
 | `--repo URL` / `--ssh` | 更换配置仓库地址或使用预设 SSH 地址。 |
 | `--config-dir PATH` | 更换配置目标，默认 `${XDG_CONFIG_HOME:-$HOME/.config}/nvim`；支持空格。 |
@@ -23,7 +25,23 @@
 | `--with-extras` | 额外安装 lazygit、SQLite、ImageMagick 和 Poppler。 |
 | `--dict` | 下载可选 ECDICT 数据库，约 300 MB 压缩包、1.2 GB 解压文件。 |
 
-所有配置组均包含 `minimal`。组只决定这次显式恢复哪些工具，不禁用其他语言配置，也不会卸载已有工具。正常启动与打开文件不会触发 Mason 安装；编辑器中的 `:MasonToolsInstall` 仍表示完整目录恢复。
+所有配置组均包含 `minimal`。组只决定这次显式恢复哪些工具，不禁用其他语言配置，也不会卸载已有工具。正常启动与打开文件不会触发 Mason 安装；编辑器中的 `:MasonToolsInstall` 仍表示完整目录恢复。`--editor-mode fast` 未显式选择工具组时不恢复任何 Mason 工具，输出中会说明。
+
+## 精简部署
+
+`--editor-mode fast` 面向 SSH、容器和资源有限的服务器：
+
+```bash
+./scripts/deploy.sh --dry-run --editor-mode fast --parsers rust,go
+./scripts/deploy.sh --ref <commit-sha> --editor-mode fast
+./scripts/deploy.sh --ref <commit-sha> --editor-mode fast --parsers rust --profile native
+```
+
+准备、恢复和校验三步都按所选模式运行，因此装到磁盘上的资产就是该模式会加载的资产：Lazy、当前主题、nvim-treesitter、mini.nvim、Oil、fzf-lua、Conform，以及作为显式语言能力扩展的 nvim-lspconfig；其余主题、Blink、预览二进制和整套 Mason 工具都不安装。默认 parser 为 Bash、Lua、Python、JSON、YAML、TOML、Markdown（含 `markdown_inline` 注入）、Vim、Vimdoc、query、comment 和 luadoc，其他语言通过 `--parsers` 显式加入；名称不在目录中时直接失败，不会静默少装。
+
+完整锁文件仍是唯一版本来源：精简安装只决定放多少东西到磁盘上，不会删除锁条目，也不会清理完整模式已安装的资产。因此快速模式不提供会按当前子集执行 `clean/sync/update` 的入口，`:Lazy` 会说明管理操作应在完整模式下运行。
+
+搜索依赖（fzf、ripgrep、fd）在快速模式下是可选的：缺少时给出警告并继续，编辑器使用原生打开、补全和 quickfix 搜索入口。构建 parser 仍需要 C 编译器和固定版本的 tree-sitter CLI。
 
 | 配置组 | Mason 范围 | 额外系统依赖范围 |
 | --- | --- | --- |
@@ -63,7 +81,7 @@ mv "/path/to/nvim" "/path/to/current-kept"
 ln -s "/path/to/nvim.backup.TIMESTAMP.RANDOM/config" "/path/to/nvim"
 ```
 
-现有 `preferences.json` 会在验证前复制到 staging，成功升级后保留工具、窗口和格式预算等个人偏好；不会复制任意 Lua 配置。原目录、旧符号链接、未提交的本地配置修改均保留在 backup 中。不要删除仍被当前入口或备份链接引用的 `.nvim-release.*` 目录。改变配置前已有的个人插件/Mason 数据不会被复制进备份；恢复旧配置后，如其工具锁不同，需显式恢复对应锁定工具。
+现有 `preferences.json` 会在验证前复制到 staging，成功升级后保留工具、窗口和格式预算等个人偏好；不会复制任意 Lua 配置。`--editor-mode fast` 会在同一份文件中写入 `runtime.mode=fast`，其余设置原样保留，因此进入 tmux 后即使 SSH 环境信息丢失也不改变默认选择。原目录、旧符号链接、未提交的本地配置修改均保留在 backup 中。不要删除仍被当前入口或备份链接引用的 `.nvim-release.*` 目录。改变配置前已有的个人插件/Mason 数据不会被复制进备份；恢复旧配置后，如其工具锁不同，需显式恢复对应锁定工具。
 
 | 退出码 | 结果与后续处理 |
 | --- | --- |

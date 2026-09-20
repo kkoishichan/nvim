@@ -287,4 +287,22 @@ function M.reset()
 	state, notices, degradations = nil, {}, {}
 end
 
+---Evaluate `callback` as if this process had started in `name`. Preparation,
+---verification and deployment tooling use this to ask what another mode would
+---install; a live session never changes the mode it started with.
+---@param name string
+---@param callback function
+function M.as(name, callback)
+	local previous = { env = vim.env.NVIM_MODE, state = state, notices = notices, degradations = degradations }
+	vim.env.NVIM_MODE = name
+	state, notices, degradations = nil, {}, {}
+	local ok, result = pcall(callback)
+	vim.env.NVIM_MODE = previous.env
+	state, notices, degradations = previous.state, previous.notices, previous.degradations
+	if not ok then
+		error(result, 0)
+	end
+	return result
+end
+
 return M

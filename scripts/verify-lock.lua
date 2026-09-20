@@ -5,13 +5,16 @@ assert(
 	"lazy.nvim is missing; run scripts/prepare-checks.sh first"
 )
 local support = assert(loadfile(root .. "/scripts/check-support.lua"))()
+-- The complete lock is checked against the complete spec first; what has to be
+-- present on disk is whatever this mode installs.
 local lock, plugins = support.plugins(root, data)
+local mode = support.mode()
 local count = 0
-for name, pin in pairs(lock) do
+for _, name in ipairs(support.selected_plugins(root, data, mode)) do
 	local directory = plugins[name].dir
 	assert(vim.uv.fs_stat(directory .. "/.git"), "Missing plugin; run prepare-checks.sh: " .. name)
 	assert(
-		support.command({ "git", "rev-parse", "HEAD" }, directory) == pin.commit,
+		support.command({ "git", "rev-parse", "HEAD" }, directory) == lock[name].commit,
 		"Plugin differs from lock: " .. name
 	)
 	assert(
@@ -47,7 +50,15 @@ for _, name in ipairs(tools) do
 	assert(receipt.source.id:sub(-#pin - 1) == "@" .. pin, "Check tool differs from configured pin: " .. name)
 	assert(vim.fn.executable(data .. "/mason/bin/" .. name) == 1, "Prepared check tool cannot execute: " .. name)
 end
-if vim.env.NVIM_VERIFY_ASSETS ~= "0" then
+if mode ~= "fast" and vim.env.NVIM_VERIFY_ASSETS ~= "0" then
 	support.verify_blink(data, lock["blink.cmp"].commit)
 end
-print(("Verified %d locked plugins, %d parser revisions and %d check tools."):format(count, #parsers, #tools))
+print(
+	("Verified %d of %d locked plugins, %d parser revisions and %d check tools for %s mode."):format(
+		count,
+		vim.tbl_count(lock),
+		#parsers,
+		#tools,
+		mode
+	)
+)

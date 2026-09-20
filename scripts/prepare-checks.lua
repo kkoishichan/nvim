@@ -18,9 +18,12 @@ if vim.env.NVIM_PREPARE_PARSERS ~= "0" then
 	assert(cli and vim.version.ge(cli, "0.26.1"), "tree-sitter-cli >= 0.26.1 is required (not the npm package)")
 end
 require("user.core.lazy_bootstrap").ensure({ root = root, cache = cache, offline = offline })
+-- The complete lock is still validated against the complete spec: a slim
+-- installation chooses what to put on disk, it never narrows the version
+-- source. Only the names below are actually restored.
 local lock, plugins = support.plugins(root, data)
-local names = vim.tbl_keys(lock)
-table.sort(names)
+local mode = support.mode()
+local names = support.selected_plugins(root, data, mode)
 for _, name in ipairs(names) do
 	local plugin, pin = plugins[name], lock[name].commit
 	local exists = vim.uv.fs_stat(plugin.dir .. "/.git") ~= nil
@@ -48,7 +51,7 @@ for _, name in ipairs(names) do
 	end
 	command({ "git", "checkout", "--detach", pin }, plugin.dir)
 end
-print(("Prepared %d plugins at their locked commits."):format(#names))
+print(("Prepared %d of %d locked plugins for %s mode."):format(#names, vim.tbl_count(lock), mode))
 
 local parsers, info = {}, {}
 if vim.env.NVIM_PREPARE_PARSERS ~= "0" then
@@ -68,7 +71,7 @@ if #missing > 0 then
 		not offline,
 		"Offline environment lacks " .. #missing .. " matching parsers; prepare once with network access"
 	)
-	print(("Building %d parsers from the locked Tree-sitter catalog."):format(#missing))
+	print(("Building %d of %d selected parsers from the locked Tree-sitter catalog."):format(#missing, #parsers))
 	assert(
 		require("nvim-treesitter").install(missing, { force = true, max_jobs = 4, summary = true }):wait(300000),
 		"Parser preparation failed"
@@ -130,7 +133,13 @@ if #pending > 0 then
 end
 
 -- Blink's native matcher is an optional plugin asset, prepared explicitly so
--- opening a completion menu during checks cannot initiate a download.
+-- opening a completion menu during checks cannot initiate a download. A mode
+-- without a completion engine never installs the plugin, so there is nothing
+-- to prepare.
+if mode == "fast" then
+	print("Slim preparation completed; the completion matcher is not part of this installation.")
+	return
+end
 if vim.env.NVIM_PREPARE_ASSETS == "0" then
 	print("Requested dependency preparation completed; optional plugin assets were not requested.")
 	return

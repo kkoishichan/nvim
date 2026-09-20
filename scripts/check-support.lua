@@ -14,19 +14,39 @@ function M.json(path)
 	return vim.json.decode(table.concat(vim.fn.readfile(path), "\n"))
 end
 
-function M.spec(root, data)
+---The mode this preparation or verification is working for. Deployment sets it
+---the same way a session does, so the assets it prepares are the assets that
+---mode will actually load.
+function M.mode()
+	vim.opt.rtp:prepend(vim.env.NVIM_TEST_ROOT or "")
+	return require("user.core.mode").name()
+end
+
+local configured_lazy = false
+
+---Parse the locked Lazy spec without starting plugins or installers.
+---@param opts table|nil `{ mode = "fast" }` reads the slim set instead.
+function M.spec(root, data, opts)
 	vim.opt.rtp:prepend(root)
 	vim.opt.rtp:prepend(data .. "/lazy/lazy.nvim")
-	-- Parse the same locked Lazy spec without starting plugins or installers.
-	require("lazy.core.config").setup({
-		root = data .. "/lazy",
-		lockfile = root .. "/lazy-lock.json",
-		install = { missing = false },
-		pkg = { enabled = false },
-		rocks = { enabled = false },
-		performance = { rtp = { reset = false } },
-	})
-	local spec = require("lazy.core.plugin").Spec.new({ { import = "user.plugins" } }, { pkg = false })
+	if not configured_lazy then
+		configured_lazy = true
+		require("lazy.core.config").setup({
+			root = data .. "/lazy",
+			lockfile = root .. "/lazy-lock.json",
+			install = { missing = false },
+			pkg = { enabled = false },
+			rocks = { enabled = false },
+			performance = { rtp = { reset = false } },
+		})
+	end
+	local source = { { import = "user.plugins" } }
+	if opts and opts.mode == "fast" then
+		source = require("user.core.mode").as("fast", function()
+			return require("user.specs").base()
+		end)
+	end
+	local spec = require("lazy.core.plugin").Spec.new(source, { pkg = false })
 	for _, message in ipairs(spec.notifs) do
 		assert(message.level ~= vim.log.levels.ERROR, message.msg)
 	end
@@ -55,11 +75,22 @@ function M.plugins(root, data)
 	return lock, plugins
 end
 
+---Plugin names a mode installs, dependencies included. The lock itself stays
+---the complete one: a slim installation is a choice about what to put on disk,
+---never a reason to clean an entry out of the shared lockfile.
+---@return string[]
+function M.selected_plugins(root, data, mode)
+	local plugins = M.spec(root, data, { mode = mode })
+	local names = vim.tbl_keys(plugins)
+	table.sort(names)
+	return names
+end
+
 function M.parser_info(data)
 	vim.opt.rtp:prepend(data .. "/lazy/nvim-treesitter")
 	local catalog = require("user.core.treesitter")
 	require("nvim-treesitter").setup({ install_dir = data .. "/site" })
-	return catalog.parsers, require("nvim-treesitter.parsers")
+	return catalog.selected(), require("nvim-treesitter.parsers")
 end
 
 -- Inspect the prepared matcher without calling Blink's downloader. A matching

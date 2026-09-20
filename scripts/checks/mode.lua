@@ -488,10 +488,195 @@ report.extra.decorations = package.loaded["ibl"] ~= nil or package.loaded["illum
 	assert(heavy.extra.recovered_treesitter, "Recovery did not restore Tree-sitter highlighting")
 	assert(not heavy.extra.decorations, "Recovery re-enabled a decoration this mode does not run")
 
+	-- 12. Asset selection: a slim installation is a strict subset of the full
+	--     one, and the shared lockfile stays the complete version source.
+	local support = assert(loadfile(vim.fs.joinpath(root, "scripts", "check-support.lua")))()
+	local data = vim.fn.stdpath("data")
+	local lock = support.plugins(root, data)
+	local slim = support.selected_plugins(root, data, "fast")
+	local complete = support.selected_plugins(root, data, "full")
+	assert(#slim < #complete, "The slim installation is not smaller than the complete one")
+	for _, name in ipairs(slim) do
+		assert(vim.tbl_contains(complete, name), "The slim set contains a plugin the complete set does not: " .. name)
+		assert(lock[name], "A selected plugin has no entry in the shared lockfile: " .. name)
+	end
+	assert(vim.tbl_count(lock) == #complete, "The lockfile and the complete spec disagree about the plugin list")
+
+	local catalog = require("user.core.treesitter")
+	local base = catalog.select("fast", {})
+	local widened = catalog.select("fast", { "rust", "go" })
+	assert(#base == #catalog.base_parsers, "The base parser set is not the documented one")
+	for _, parser in ipairs({ "bash", "lua", "python", "json", "yaml", "toml", "markdown", "vim", "vimdoc", "query" }) do
+		assert(vim.tbl_contains(base, parser), "The base parser set is missing " .. parser)
+	end
+	assert(vim.tbl_contains(base, "markdown_inline"), "The base parser set omits a required injection parser")
+	assert(#widened == #base + 2, "Requested languages were not added to the parser set")
+	assert(#catalog.select("full", {}) == #catalog.parsers, "Full mode narrowed the parser catalog")
+	assert(not pcall(catalog.select, "fast", { "klingon" }), "An unknown parser name was accepted")
+
+	-- 13. Configuration and installation data may be read-only: editing still
+	--     works, and nothing is written back into the configuration.
+	local locked_config = vim.fs.joinpath(tmp, "readonly_config", "config")
+	vim.fn.mkdir(locked_config, "p")
+	local readonly_case = run("readonly_config", {
+		mode = "fast",
+		code = [[
+local file = vim.fs.joinpath(vim.fn.getcwd(), "note.txt")
+vim.cmd.edit(vim.fn.fnameescape(file))
+vim.api.nvim_buf_set_lines(0, 0, -1, false, { "written" })
+vim.cmd.write()
+report.extra.saved = vim.fn.readfile(file)
+report.extra.config = vim.fn.stdpath("config")
+]],
+	})
+	vim.uv.fs_chmod(vim.fs.joinpath(tmp, "readonly_config", "config", "nvim"), tonumber("500", 8))
+	local locked_again = run("readonly_config", {
+		mode = "fast",
+		code = [[
+local file = vim.fs.joinpath(vim.fn.getcwd(), "second.txt")
+vim.cmd.edit(vim.fn.fnameescape(file))
+vim.api.nvim_buf_set_lines(0, 0, -1, false, { "still writable" })
+vim.cmd.write()
+report.extra.saved = vim.fn.readfile(file)
+]],
+	})
+	vim.uv.fs_chmod(vim.fs.joinpath(tmp, "readonly_config", "config", "nvim"), tonumber("700", 8))
+	assert(readonly_case.extra.saved[1] == "written", "A writable configuration could not save a file")
+	assert(locked_again.extra.saved[1] == "still writable", "A read-only configuration stopped editing from working")
+
+	-- 14. No display, no Nerd Font, no clipboard helper: the session still opens
+	--     and never probes a desktop clipboard on yank.
+	local headless = run("bare_terminal", {
+		mode = "fast",
+		env = { DISPLAY = "", WAYLAND_DISPLAY = "", PATH = bare, TERM = "xterm" },
+		code = [[
+report.extra.clipboard_provider = vim.g.loaded_clipboard_provider
+report.extra.fillchars = vim.o.fillchars
+local file = vim.fs.joinpath(vim.fn.getcwd(), "yank.txt")
+vim.fn.writefile({ "copy me" }, file)
+vim.cmd.edit(vim.fn.fnameescape(file))
+vim.cmd("normal! yy")
+report.extra.register = vim.fn.getreg('"')
+]],
+	})
+	assert(headless.clipboard == "", "A bare terminal session still synchronised the system clipboard")
+	assert(not headless.extra.fillchars:find("\239"), "The interface used Nerd Font glyphs without a font")
+	assert(headless.extra.register == "copy me\n", "Yanking into the ordinary register stopped working")
+
+	-- 15. A slim session never treats the rest of the shared installation as
+	--     unused: plugin management stays a full-mode operation.
+	assert(fast.commands.Lazy, "The plugin manager entry disappeared instead of explaining itself")
+	local manager = run("fast_manager", {
+		mode = "fast",
+		code = [[
+local before = vim.fn.readdir(vim.fs.joinpath(vim.fn.stdpath("data"), "lazy"))
+local messages = {}
+local notify = vim.notify
+vim.notify = function(message)
+  table.insert(messages, message)
+end
+vim.cmd("Lazy clean")
+vim.cmd("Lazy sync")
+vim.notify = notify
+report.extra.refusals = messages
+report.extra.kept = #vim.fn.readdir(vim.fs.joinpath(vim.fn.stdpath("data"), "lazy")) == #before
+]],
+	})
+	assert(#manager.extra.refusals == 2, "The plugin manager ran against the slim subset")
+	assert(
+		manager.extra.refusals[1]:find("NVIM_MODE=full", 1, true),
+		"The refusal did not name the mode that manages plugins"
+	)
+	assert(manager.extra.kept, "A slim session removed installed plugins")
+
+	-- 16. Offline preparation restores exactly the selected plugins from an
+	--     existing cache, without reaching the network.
+	local offline = vim.fs.joinpath(tmp, "offline")
+	vim.fn.mkdir(vim.fs.joinpath(offline, "data"), "p")
+	local preparation = vim.system({
+		vim.v.progpath,
+		"--headless",
+		"-u",
+		"NONE",
+		"-i",
+		"NONE",
+		"-l",
+		vim.fs.joinpath(root, "scripts", "prepare-checks.lua"),
+	}, {
+		text = true,
+		env = {
+			NVIM_TEST_ROOT = root,
+			NVIM_MODE = "fast",
+			-- Preparation is exactly the step that is allowed to install; the
+			-- check-only guard belongs to the session that follows it.
+			NVIM_CHECK_ONLY = "",
+			NVIM_PREPARE_OFFLINE = "1",
+			NVIM_PREPARE_CACHE_DATA = data,
+			NVIM_PREPARE_PARSERS = "0",
+			NVIM_PREPARE_TOOLS = "0",
+			NVIM_PREPARE_ASSETS = "0",
+			NVIM_PREPARE_NVIM_VERSION = tostring(vim.version()),
+			XDG_DATA_HOME = vim.fs.joinpath(offline, "data"),
+			XDG_STATE_HOME = vim.fs.joinpath(offline, "state"),
+			XDG_CACHE_HOME = vim.fs.joinpath(offline, "cache"),
+			NVIM_LOG_FILE = vim.fs.joinpath(offline, "nvim.log"),
+			GIT_ALLOW_PROTOCOL = "file",
+			GIT_TERMINAL_PROMPT = "0",
+		},
+	}):wait(300000)
+	assert(
+		preparation.code == 0,
+		"Offline slim preparation failed:\n" .. (preparation.stderr or "") .. (preparation.stdout or "")
+	)
+	local output = (preparation.stdout or "") .. (preparation.stderr or "")
+	local prepared = output:match("Prepared (%d+) of %d+ locked plugins for fast mode")
+	assert(prepared, "Offline preparation did not report a slim plugin selection:\n" .. output)
+	assert(tonumber(prepared) == #slim, "Offline preparation restored a different set than the mode selects")
+	for _, name in ipairs(slim) do
+		assert(
+			vim.uv.fs_stat(vim.fs.joinpath(offline, "data", "nvim", "lazy", name, ".git")),
+			"Offline preparation did not restore " .. name
+		)
+	end
+	assert(
+		not vim.uv.fs_stat(vim.fs.joinpath(offline, "data", "nvim", "lazy", "blink.cmp")),
+		"Offline slim preparation restored a plugin this mode never loads"
+	)
+
+	-- 17. A selected plugin that is simply absent degrades to the native entry
+	--     and is named, rather than failing at the first keypress.
+	local partial = vim.fs.joinpath(tmp, "partial", "nvim", "lazy")
+	vim.fn.mkdir(partial, "p")
+	for _, name in ipairs(slim) do
+		if name ~= "oil.nvim" then
+			assert(
+				vim.uv.fs_symlink(vim.fs.joinpath(data, "lazy", name), vim.fs.joinpath(partial, name), { dir = true })
+			)
+		end
+	end
+	local incomplete = run("missing_asset", {
+		mode = "fast",
+		env = { XDG_DATA_HOME = vim.fs.joinpath(tmp, "partial") },
+		arguments = { vim.fs.joinpath(tmp, "missing_asset", "work") },
+		code = [[
+report.extra.listing = vim.b.user_native_directory ~= nil
+report.extra.oil = package.loaded["oil"] ~= nil
+]],
+	})
+	local named = false
+	for _, entry in ipairs(incomplete.degradations) do
+		named = named or (entry.subject == "plugins" and entry.reason:find("oil.nvim", 1, true) ~= nil)
+	end
+	assert(named, "A missing plugin was not named in the degradation report")
+	assert(incomplete.extra.listing, "A missing explorer did not fall back to the native directory listing")
+	assert(not incomplete.extra.oil, "The missing explorer was reported as loaded")
+
 	print(
-		("Mode evidence: full by default; NVIM_MODE > preference > default; auto follows SSH; fast imports %d plugins (full %d) with %d disabled capabilities; Python colon indent, autopairs, plain save and directory switching kept; one server on request then released (%s); native search, native entry and read-only state handled."):format(
+		("Mode evidence: full by default; NVIM_MODE > preference > default; auto follows SSH; fast imports %d plugins (full %d) and %d of %d parsers, with %d disabled capabilities; Python colon indent, autopairs, plain save and directory switching kept; one server on request then released (%s); native search, native entry, read-only state and read-only config handled; plugin management stayed a full-mode operation."):format(
 			#fast.plugins,
 			#default.plugins,
+			#base,
+			#catalog.parsers,
 			#fast.disabled,
 			manual.extra.summary
 		)

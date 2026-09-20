@@ -77,6 +77,18 @@ if not capabilities.plugin_manager_auto then
 	if not oil or not oil._.installed then
 		require("user.core.native").setup_explorer()
 	end
+
+	-- Lazy's manager acts on the spec of the running session. In a mode that
+	-- imports a subset, clean/sync/update would treat the rest of the shared
+	-- installation as unused, so management stays an explicit full-mode run
+	-- against the complete list.
+	vim.api.nvim_create_user_command("Lazy", function()
+		vim.notify(
+			"Plugin management runs against the complete list: NVIM_MODE=full nvim +Lazy",
+			vim.log.levels.WARN,
+			{ title = "Editor mode" }
+		)
+	end, { nargs = "*", bang = true, desc = "Plugin management is a full-mode operation" })
 end
 
 mode.announce()

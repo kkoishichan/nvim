@@ -9,7 +9,7 @@ real_nvim=$(command -v nvim)
 mkdir -p "$fixture/repository with spaces/scripts" "$fixture/bin"
 printf 'new config\n' >"$fixture/repository with spaces/init.lua"
 printf '{}\n' >"$fixture/repository with spaces/lazy-lock.json"
-for file in deploy-plugins.lua deploy-tools.lua verify-lock.lua prepare-checks.lua check-support.lua; do
+for file in deploy-plugins.lua deploy-tools.lua verify-lock.lua prepare-checks.lua check-support.lua deploy-preferences.lua; do
 	printf '%s\n' '-- fixture' >"$fixture/repository with spaces/scripts/$file"
 done
 for tool in dirname basename date stat readlink awk cat cp; do
@@ -66,7 +66,7 @@ cat >"$fixture/bin/nvim" <<'STUB'
 set -eu
 if [ "$1" = --version ]; then printf 'NVIM %s\nBuild type: Release\n' "${FIXTURE_NVIM_VERSION:-v0.12.5}"; exit 0; fi
 [ "${FIXTURE_DRY:-0}" != 1 ] || { printf 'unexpected nvim\n' >> "$FIXTURE_LOG"; exit 99; }
-printf 'nvim:%s;profiles=%s\n' "$*" "${NVIM_DEPLOY_PROFILES:-}" >> "$FIXTURE_LOG"
+printf 'nvim:%s;profiles=%s;mode=%s;parsers=%s\n' "$*" "${NVIM_DEPLOY_PROFILES:-}" "${NVIM_MODE:-}" "${NVIM_PARSERS:-}" >> "$FIXTURE_LOG"
 if [ -n "${NVIM_DEPLOY_LINK_SOURCE:-}" ]; then
 	if [ ! -e "$FIXTURE_CASE/link-attempted" ]; then
 		: > "$FIXTURE_CASE/link-attempted"
@@ -82,6 +82,13 @@ if [ -n "${NVIM_DEPLOY_LINK_SOURCE:-}" ]; then
 	/bin/ln -s "$NVIM_DEPLOY_LINK_SOURCE" "$NVIM_DEPLOY_LINK_TARGET"
 	exit 0
 fi
+case "$*" in
+*deploy-preferences.lua*)
+	# The real script merges into the staged file; the fixture only records that
+	# the deployment asked for a mode and with which value.
+	printf '{"runtime":{"mode":"%s"}}\n' "$NVIM_DEPLOY_EDITOR_MODE" > "$NVIM_DEPLOY_PREFERENCES"
+	exit 0 ;;
+esac
 case "$*" in
 *deploy-plugins.lua*|*deploy-tools.lua*)
 	[ "$(readlink "$XDG_CONFIG_HOME/nvim")" = "$NVIM_DEPLOY_ROOT" ] || exit 91 ;;
@@ -250,9 +257,43 @@ if rg -q 'deploy-tools.lua|deploy-plugins.lua' "$FIXTURE_LOG"; then
 	printf 'Deferred deployment started installation\n' >&2
 	exit 1
 fi
+# A slim server installation: the fast plugin and parser set, no language tools
+# unless a group is asked for, and the mode written down so a detached shell
+# keeps it.
+new_case fast-plan
+FIXTURE_DRY=1 expect_code 0 --dry-run --editor-mode fast --parsers rust,go
+rg -q 'editor mode: fast' "$FIXTURE_CASE/output"
+rg -q 'Fast editor mode' "$FIXTURE_CASE/output"
+rg -q 'Additional Tree-sitter parsers: rust,go' "$FIXTURE_CASE/output"
+rg -q 'No Mason tool group was selected' "$FIXTURE_CASE/output"
+if rg -q 'restore only pinned Mason profiles' "$FIXTURE_CASE/output"; then
+	printf 'Fast plan promised a Mason restore\n' >&2
+	exit 1
+fi
+new_case fast-success
+original
+export FIXTURE_FAIL=""
+expect_code 0 --no-deps --editor-mode fast --parsers rust
+[ -L "$FIXTURE_TARGET" ]
+assert_backup
+rg -q 'mode=fast;parsers=rust' "$FIXTURE_LOG"
+[ "$(cat "$FIXTURE_TARGET/preferences.json")" = '{"runtime":{"mode":"fast"}}' ]
+if rg -q 'deploy-tools.lua' "$FIXTURE_LOG"; then
+	printf 'Fast deployment restored Mason tools without a selected group\n' >&2
+	exit 1
+fi
+rg -q 'fast mode, tools: none' "$FIXTURE_CASE/output"
+new_case fast-with-tools
+original
+expect_code 0 --no-deps --editor-mode fast --profile python
+rg -q 'profiles=python' "$FIXTURE_LOG"
+rg -q 'deploy-tools.lua' "$FIXTURE_LOG"
 new_case bad-arguments
 expect_code 2 --profile nonexistent
 expect_code 2 --nvim-version latest
+expect_code 2 --editor-mode turbo
+expect_code 2 --parsers rust
+expect_code 2 --editor-mode fast --parsers 'rust;rm -rf /'
 expect_code 2 --ref
 
 # Real Lua profile selection and failure propagation, with only external install
@@ -314,6 +355,15 @@ elseif vim.env.NVIM_DEPLOY_CHECK_FAILURE == "plugins" or vim.env.NVIM_DEPLOY_CHE
 	dofile(vim.env.NVIM_DEPLOY_CHECK_ROOT .. "/scripts/deploy-plugins.lua")
 end
 LUA
+# The real preference writer must record the mode without losing anything the
+# host already configured.
+mkdir -p "$fixture/preferences"
+printf '{"tools":{"prefer_mason":true},"format":{"timeout_ms":900}}\n' >"$fixture/preferences/preferences.json"
+NVIM_DEPLOY_PREFERENCES="$fixture/preferences/preferences.json" NVIM_DEPLOY_EDITOR_MODE=fast \
+	"$real_nvim" --headless -u NONE -i NONE -l "$root/scripts/deploy-preferences.lua" >/dev/null
+NVIM_DEPLOY_CHECK_FILE="$fixture/preferences/preferences.json" "$real_nvim" --headless -u NONE -i NONE \
+	--cmd 'lua local v = vim.json.decode(table.concat(vim.fn.readfile(vim.env.NVIM_DEPLOY_CHECK_FILE), "\n")); assert(v.runtime.mode == "fast", "mode not recorded"); assert(v.tools.prefer_mason == true and v.format.timeout_ms == 900, "existing preferences were lost")' +qa
+
 mkdir -p "$fixture/state" "$fixture/cache"
 for failure in none tools plugins lock startup; do
 	code=0
@@ -328,4 +378,4 @@ for failure in none tools plugins lock startup; do
 	fi
 	if [ "$expected" -eq 21 ]; then cmp "$fixture/plugin-helper/lazy-lock.json.before" "$fixture/plugin-helper/lazy-lock.json"; fi
 done
-printf 'Deployment fixtures passed: 5 platform plans, profiles, failure recovery, concurrency, exit codes.\n'
+printf 'Deployment fixtures passed: 5 platform plans, profiles, editor modes, parser selection, failure recovery, concurrency, exit codes.\n'

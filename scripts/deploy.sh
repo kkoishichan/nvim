@@ -13,6 +13,8 @@ local_opt="$HOME/.local/opt"
 dict_db="$HOME/.local/share/trans/ultimate.db"
 dict_url=https://github.com/skywind3000/ECDICT-ultimate/releases/download/1.0.0/ecdict-ultimate-sqlite.zip
 profiles=()
+editor_mode=full
+extra_parsers=()
 dry_run=0
 skip_deps=0
 skip_sync=0
@@ -34,7 +36,12 @@ Usage: ./scripts/deploy.sh [options]
   --ref REF               Configuration branch, tag or commit (default: main)
   --nvim-version vX.Y.Z    Exact Neovim release (default: v0.12.5)
   --profile NAME          minimal/python/web/java/native/docs/full; repeatable
-                          Every profile includes minimal. Default: minimal.
+                          Every profile includes minimal. Default: minimal in
+                          full editor mode, none in fast editor mode.
+  --editor-mode NAME      full (default) or fast: the mode this host starts in.
+                          fast installs the slim plugin and parser set and
+                          records runtime.mode in preferences.json.
+  --parsers a,b,c         Extra Tree-sitter languages for fast mode; repeatable
   --mason                 Alias for --profile full (complete pinned catalog)
   --dry-run               Print the complete plan; no writes or installations
   --repo URL              Alternate configuration repository
@@ -68,6 +75,24 @@ add_profile() {
 	done
 	profiles+=("$1")
 }
+set_editor_mode() {
+	case "$1" in full | fast) ;;
+	*) fail 2 "Unknown editor mode: $1" ;;
+	esac
+	editor_mode=$1
+}
+add_parsers() {
+	local name existing
+	local IFS=,
+	for name in $1; do
+		[ -n "$name" ] || continue
+		case "$name" in *[!a-z0-9_]*) fail 2 "Invalid Tree-sitter parser name: $name" ;; esac
+		for existing in ${extra_parsers[@]+"${extra_parsers[@]}"}; do
+			[ "$existing" != "$name" ] || continue 2
+		done
+		extra_parsers+=("$name")
+	done
+}
 parse_arguments() {
 	while [ "$#" -gt 0 ]; do
 		case "$1" in
@@ -84,6 +109,16 @@ parse_arguments() {
 		--profile)
 			value "$@"
 			add_profile "$2"
+			shift
+			;;
+		--editor-mode)
+			value "$@"
+			set_editor_mode "$2"
+			shift
+			;;
+		--parsers)
+			value "$@"
+			add_parsers "$2"
 			shift
 			;;
 		--repo)
@@ -114,7 +149,13 @@ parse_arguments() {
 		esac
 		shift
 	done
-	[ "${#profiles[@]}" -gt 0 ] || profiles=(minimal)
+	# A slim installation restores no language tools unless a group was asked
+	# for; the complete installation keeps its minimal default.
+	if [ "${#profiles[@]}" -eq 0 ] && [ "$editor_mode" = full ]; then
+		profiles=(minimal)
+	fi
+	[ "$editor_mode" = fast ] || [ "${#extra_parsers[@]}" -eq 0 ] ||
+		fail 2 '--parsers selects the fast mode parser set; add --editor-mode fast'
 	[[ "$nvim_version" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail 2 '--nvim-version must be an exact release such as v0.12.5'
 	nvim_version="v${nvim_version#v}"
 	version_numbers=${nvim_version#v}
@@ -129,7 +170,12 @@ parse_arguments() {
 	case "$config_dir" in /*) ;; *) config_dir="$PWD/$config_dir" ;; esac
 	profile_csv=$(
 		IFS=,
-		printf '%s' "${profiles[*]}"
+		printf '%s' "${profiles[*]-}"
+	)
+	[ -n "$profile_csv" ] || profile_csv=none
+	parser_csv=$(
+		IFS=,
+		printf '%s' "${extra_parsers[*]-}"
 	)
 
 }
@@ -235,7 +281,11 @@ pkg_install() {
 plan() {
 	info "Plan only: no files, directories, links, installs or downloads will be created"
 	info "Repository: $repo_url; requested ref: $config_ref (resolved to a commit before cutover)"
-	info "Destination: $config_dir; profiles: $profile_csv; package manager: ${pkg_mgr:-unavailable}"
+	info "Destination: $config_dir; editor mode: $editor_mode; profiles: $profile_csv; package manager: ${pkg_mgr:-unavailable}"
+	if [ "$editor_mode" = fast ]; then
+		info 'Fast editor mode: install the slim plugin set and the base parsers only; record runtime.mode=fast'
+		[ -z "$parser_csv" ] || info "Additional Tree-sitter parsers: $parser_csv"
+	fi
 	if [ "$skip_deps" -eq 0 ]; then
 		info "System packages (Neovim is installed separately at its exact release):"
 		print_command "${required[@]}" ${profile_packages[@]+"${profile_packages[@]}"}
@@ -252,7 +302,9 @@ plan() {
 	info 'Clone into an exclusive sibling release directory, fetch/verify ref, detached checkout, validate configuration'
 	if [ "$skip_sync" -eq 0 ]; then
 		info 'Restore plugins in staging from lazy-lock.json; verify plugin commits before moving the original configuration'
-		info "After cutover, restore only pinned Mason profiles: $profile_csv (all include minimal)"
+		if [ "$profile_csv" = none ]; then
+			info 'No Mason tool group was selected, so no language tools are restored'
+		else info "After cutover, restore only pinned Mason profiles: $profile_csv (all include minimal)"; fi
 	else info 'Plugin and Mason restoration explicitly deferred (--no-sync)'; fi
 	info 'Move the old configuration to a unique sibling backup/config; exclusively link the destination to the release'
 	info 'On cutover failure, restore a link to backup/config only if the destination is absent; never overwrite a concurrent directory'
@@ -299,17 +351,35 @@ install_dependencies() {
 			export PATH="$JAVA_HOME/bin:$PATH"
 		fi
 	fi
-	for executable in git curl tar unzip gzip rg; do command -v "$executable" >/dev/null 2>&1 || fail 10 "Missing dependency: $executable"; done
+	for executable in git curl tar unzip gzip; do command -v "$executable" >/dev/null 2>&1 || fail 10 "Missing dependency: $executable"; done
 	command -v cc >/dev/null 2>&1 || command -v gcc >/dev/null 2>&1 || command -v clang >/dev/null 2>&1 || fail 10 'Missing C compiler'
 	if ! command -v fd >/dev/null 2>&1 && command -v fdfind >/dev/null 2>&1; then
 		mkdir -p "$local_bin"
 		[ -e "$local_bin/fd" ] || ln -s "$(command -v fdfind)" "$local_bin/fd"
 		export PATH="$local_bin:$PATH"
 	fi
-	command -v fd >/dev/null 2>&1 || fail 10 'Missing dependency: fd (or fdfind)'
-	fzf_version=$(FZF_DEFAULT_OPTS='' FZF_DEFAULT_OPTS_FILE='' fzf --version 2>/dev/null) || fail 10 'Missing fzf >= 0.36.0'
-	[[ "$fzf_version" =~ ^([0-9]+)\.([0-9]+)(\.[0-9]+)?([[:space:]]|\+|-|$) ]] || fail 10 'Could not read the fzf version'
-	[ "$((10#${BASH_REMATCH[1]}))" -gt 0 ] || [ "$((10#${BASH_REMATCH[2]}))" -ge 36 ] || fail 10 'fzf >= 0.36.0 is required'
+	# The search stack is required by the complete installation's workflow. A
+	# slim installation may go without it and use the native open, completion
+	# and quickfix search entries instead, so report rather than refuse.
+	search_missing=()
+	command -v rg >/dev/null 2>&1 || search_missing+=(ripgrep)
+	command -v fd >/dev/null 2>&1 || search_missing+=(fd)
+	fzf_problem=""
+	if fzf_version=$(FZF_DEFAULT_OPTS='' FZF_DEFAULT_OPTS_FILE='' fzf --version 2>/dev/null); then
+		if [[ "$fzf_version" =~ ^([0-9]+)\.([0-9]+)(\.[0-9]+)?([[:space:]]|\+|-|$) ]]; then
+			[ "$((10#${BASH_REMATCH[1]}))" -gt 0 ] || [ "$((10#${BASH_REMATCH[2]}))" -ge 36 ] ||
+				fzf_problem='fzf >= 0.36.0 is required'
+		else fzf_problem='Could not read the fzf version'; fi
+	else fzf_problem='Missing fzf >= 0.36.0'; fi
+	[ -z "$fzf_problem" ] || search_missing+=(fzf)
+	if [ "${#search_missing[@]}" -gt 0 ]; then
+		if [ "$editor_mode" = fast ]; then
+			warn "Search dependencies unavailable (${search_missing[*]}); the native search entries will be used"
+		else
+			[ -z "$fzf_problem" ] || fail 10 "$fzf_problem"
+			fail 10 "Missing dependency: ${search_missing[*]}"
+		fi
+	fi
 
 }
 
@@ -413,22 +483,31 @@ deploy_configuration() {
 	if [ -f "$config_dir/preferences.json" ]; then
 		cp "$config_dir/preferences.json" "$stage_dir/config/preferences.json" || fail 20 'Could not preserve preferences.json in staging'
 	fi
+	if [ "$editor_mode" = fast ]; then
+		[ -f "$stage_dir/config/scripts/deploy-preferences.lua" ] ||
+			fail 20 "Revision $resolved_ref lacks scripts/deploy-preferences.lua; choose a mode-aware revision"
+		NVIM_DEPLOY_PREFERENCES="$stage_dir/config/preferences.json" NVIM_DEPLOY_EDITOR_MODE="$editor_mode" \
+			nvim --headless -u NONE -i NONE -n -l "$stage_dir/config/scripts/deploy-preferences.lua" ||
+			fail 20 'Could not record the editor mode in the staged preferences'
+	fi
 	info "Resolved configuration commit: $resolved_ref"
 	# Lazy resets runtimepath from stdpath(config); an isolated config namespace
 	# makes both the init and after directories point at this exact checkout.
 	mkdir -p "$stage_dir/xdg-config"
 	ln -s "$stage_dir/config" "$stage_dir/xdg-config/nvim"
 	if [ "$skip_sync" -eq 0 ]; then
-		for file in scripts/deploy-plugins.lua scripts/deploy-tools.lua scripts/verify-lock.lua scripts/prepare-checks.lua scripts/check-support.lua; do
+		for file in scripts/deploy-plugins.lua scripts/deploy-tools.lua scripts/verify-lock.lua scripts/prepare-checks.lua scripts/check-support.lua scripts/deploy-preferences.lua; do
 			[ -f "$stage_dir/config/$file" ] || fail 20 "Revision $resolved_ref lacks $file; choose a deployment-compatible revision or --no-sync"
 		done
-		info 'Preparing, restoring and verifying the staged plugin lock'
-		XDG_CONFIG_HOME="$stage_dir/xdg-config" NVIM_APPNAME=nvim NVIM_TEST_ROOT="$stage_dir/config" NVIM_PREPARE_PARSERS=1 NVIM_PREPARE_TOOLS=0 NVIM_PREPARE_ASSETS=1 NVIM_PREPARE_NVIM_VERSION="$nvim_version" \
+		info "Preparing, restoring and verifying the staged plugin lock for $editor_mode mode"
+		# The staged runs use the same mode selection a session does, so the
+		# assets prepared here are exactly the assets that mode loads.
+		XDG_CONFIG_HOME="$stage_dir/xdg-config" NVIM_APPNAME=nvim NVIM_TEST_ROOT="$stage_dir/config" NVIM_MODE="$editor_mode" NVIM_PARSERS="$parser_csv" NVIM_PREPARE_PARSERS=1 NVIM_PREPARE_TOOLS=0 NVIM_PREPARE_ASSETS=1 NVIM_PREPARE_NVIM_VERSION="$nvim_version" \
 			nvim --headless -u NONE -i NONE -l "$stage_dir/config/scripts/prepare-checks.lua" || fail 21 'Plugin preparation failed; original configuration unchanged'
-		XDG_CONFIG_HOME="$stage_dir/xdg-config" NVIM_APPNAME=nvim NVIM_DEPLOY_ROOT="$stage_dir/config" NVIM_TEST_ROOT="$stage_dir/config" nvim --headless -n -i NONE \
+		XDG_CONFIG_HOME="$stage_dir/xdg-config" NVIM_APPNAME=nvim NVIM_DEPLOY_ROOT="$stage_dir/config" NVIM_TEST_ROOT="$stage_dir/config" NVIM_MODE="$editor_mode" NVIM_PARSERS="$parser_csv" nvim --headless -n -i NONE \
 			--cmd 'lua vim.opt.runtimepath:prepend(vim.env.NVIM_DEPLOY_ROOT)' -u "$stage_dir/config/init.lua" \
 			-l "$stage_dir/config/scripts/deploy-plugins.lua" || fail 21 'Plugin restore failed; original configuration unchanged'
-		XDG_CONFIG_HOME="$stage_dir/xdg-config" NVIM_APPNAME=nvim NVIM_TEST_ROOT="$stage_dir/config" NVIM_VERIFY_TOOLS=0 NVIM_VERIFY_PARSERS=1 NVIM_VERIFY_ASSETS=1 \
+		XDG_CONFIG_HOME="$stage_dir/xdg-config" NVIM_APPNAME=nvim NVIM_TEST_ROOT="$stage_dir/config" NVIM_MODE="$editor_mode" NVIM_PARSERS="$parser_csv" NVIM_VERIFY_TOOLS=0 NVIM_VERIFY_PARSERS=1 NVIM_VERIFY_ASSETS=1 \
 			nvim --headless -u NONE -i NONE -l "$stage_dir/config/scripts/verify-lock.lua" || fail 21 'Plugin lock verification failed; original configuration unchanged'
 	fi
 	[ "$(identity)" = "$original_identity" ] || fail 20 'Destination changed during staging; refusing to replace it'
@@ -441,13 +520,17 @@ deploy_configuration() {
 	committed=1
 	info "Configuration active: $config_dir -> $stage_dir/config"
 	[ "$backup_taken" -eq 0 ] || info "Previous configuration: $backup_dir/config"
-	printf 'repository=%s\nrequested_ref=%s\ncommit=%s\nneovim=%s\nprofiles=%s\n' \
-		"$repo_url" "$config_ref" "$resolved_ref" "$nvim_version" "$profile_csv" >"$stage_dir/deployment.txt"
-	if [ "$skip_sync" -eq 0 ]; then
-		XDG_CONFIG_HOME="$stage_dir/xdg-config" NVIM_APPNAME=nvim NVIM_DEPLOY_ROOT="$stage_dir/config" NVIM_DEPLOY_PROFILES="$profile_csv" nvim --headless -n -i NONE \
+	printf 'repository=%s\nrequested_ref=%s\ncommit=%s\nneovim=%s\neditor_mode=%s\nprofiles=%s\nparsers=%s\n' \
+		"$repo_url" "$config_ref" "$resolved_ref" "$nvim_version" "$editor_mode" "$profile_csv" "$parser_csv" >"$stage_dir/deployment.txt"
+	if [ "$skip_sync" -eq 1 ]; then
+		info 'Plugin and Mason installation deferred by --no-sync'
+	elif [ "$profile_csv" = none ]; then
+		info 'No Mason tool group was selected; no language tools were restored'
+	else
+		XDG_CONFIG_HOME="$stage_dir/xdg-config" NVIM_APPNAME=nvim NVIM_DEPLOY_ROOT="$stage_dir/config" NVIM_MODE="$editor_mode" NVIM_DEPLOY_PROFILES="$profile_csv" nvim --headless -n -i NONE \
 			--cmd 'lua vim.opt.runtimepath:prepend(vim.env.NVIM_DEPLOY_ROOT)' -u "$stage_dir/config/init.lua" \
 			-l "$stage_dir/config/scripts/deploy-tools.lua" || tools_partial=1
-	else info 'Plugin and Mason installation deferred by --no-sync'; fi
+	fi
 	if [ "$with_dict" -eq 1 ] && [ ! -s "$dict_db" ]; then
 		download=$(mktemp -d)
 		mkdir -p "$(dirname "$dict_db")"
@@ -457,7 +540,7 @@ deploy_configuration() {
 	[ "$tools_partial" -eq 0 ] || fail 30 "Configuration is active, but selected Mason tools are incomplete ($profile_csv). Rerun with the same --ref and --profile; backup remains available."
 	[ "$deps_partial" -eq 0 ] || fail 10 'Configuration is active, but requested optional system packages were not all installed'
 	[ "$dict_partial" -eq 0 ] || fail 40 'Configuration is active, but the optional dictionary installation failed'
-	info "Deployment complete at commit $resolved_ref ($profile_csv). Keep the release and backup directories until recovery is no longer needed."
+	info "Deployment complete at commit $resolved_ref ($editor_mode mode, tools: $profile_csv). Keep the release and backup directories until recovery is no longer needed."
 
 }
 
