@@ -18,10 +18,27 @@ M.default = "vscode"
 
 local bootstrapped = false
 
--- Theme names sorted alphabetically, for the picker.
-local function sorted_names()
+-- Theme names sorted alphabetically. The spec factory uses the same order, so
+-- the picker and the installed set never disagree about which theme is which.
+function M.names()
 	local names = vim.tbl_keys(M.themes)
 	table.sort(names)
+	return names
+end
+
+---Themes whose plugin is part of this installation. A fast installation ships
+---only the active theme, so the picker must not offer the rest.
+function M.installed()
+	local ok, config = pcall(require, "lazy.core.config")
+	if not ok then
+		return {}
+	end
+	local names = {}
+	for _, name in ipairs(M.names()) do
+		if config.plugins[M.themes[name].plugin] then
+			table.insert(names, name)
+		end
+	end
 	return names
 end
 
@@ -49,7 +66,13 @@ function M.set(name, persist)
 		vim.notify("Unknown theme: " .. tostring(name), vim.log.levels.WARN)
 		return
 	end
-	require("lazy").load({ plugins = { theme.plugin } })
+	local ok_load = pcall(function()
+		require("lazy").load({ plugins = { theme.plugin } })
+	end)
+	if not ok_load then
+		vim.notify("Theme " .. name .. " is not installed in this mode", vim.log.levels.WARN)
+		return
+	end
 	local ok, err = pcall(vim.cmd.colorscheme, theme.colorscheme)
 	if not ok then
 		vim.notify("Failed to apply theme " .. name .. ": " .. tostring(err), vim.log.levels.ERROR)
@@ -81,7 +104,11 @@ end
 
 ---Pick a theme interactively and persist the choice.
 function M.pick()
-	vim.ui.select(sorted_names(), {
+	local names = M.installed()
+	if #names == 0 then
+		names = M.names()
+	end
+	vim.ui.select(names, {
 		prompt = "Colorscheme",
 		format_item = function(name)
 			-- Prefix match: catppuccin reports colors_name as "catppuccin-mocha".

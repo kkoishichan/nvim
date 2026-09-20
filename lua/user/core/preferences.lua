@@ -3,9 +3,20 @@ local defaults = {
 	tools = { prefer_mason = false },
 	ui = { min_editor_width = 40, min_editor_height = 8 },
 	format = { timeout_ms = 800 },
+	-- An empty state_dir means "use the standard state path"; a server pointing
+	-- at local disk avoids writing recovery data to a network home.
+	runtime = { mode = "full", state_dir = "", persistent_undo = false },
+}
+-- Settings whose value is one name out of a fixed set. Anything else is a
+-- configuration mistake and must not silently pick a neighbouring behaviour.
+local choices = {
+	runtime = { mode = { "full", "fast", "auto" } },
 }
 local cached
 local errors = {}
+-- Which settings the host actually wrote, so callers can tell a deliberate
+-- choice from a default that happens to have the same value.
+local provided = {}
 
 local function load()
 	local path = vim.fs.joinpath(vim.fn.stdpath("config"), "preferences.json")
@@ -29,10 +40,21 @@ local function load()
 		else
 			for key, value in pairs(settings) do
 				local expected = defaults[section][key]
+				local allowed = choices[section] and choices[section][key]
 				if expected == nil or type(expected) ~= type(value) or (type(value) == "number" and value < 1) then
 					table.insert(errors, "Invalid preference: " .. section .. "." .. key)
+				elseif allowed and not vim.tbl_contains(allowed, value) then
+					table.insert(
+						errors,
+						("Invalid preference: %s.%s must be one of %s"):format(
+							section,
+							key,
+							table.concat(allowed, ", ")
+						)
+					)
 				else
 					result[section][key] = value
+					provided[section .. "." .. key] = true
 				end
 			end
 		end
@@ -50,8 +72,14 @@ function M.errors()
 	return vim.deepcopy(errors)
 end
 
+---True when `preferences.json` set this `section.key` itself.
+function M.provided(path)
+	M.get()
+	return provided[path] == true
+end
+
 function M.refresh()
-	cached, errors = nil, {}
+	cached, errors, provided = nil, {}, {}
 end
 
 return M

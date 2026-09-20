@@ -12,18 +12,25 @@ vim.filetype.add({
 	},
 })
 
+local mode = require("user.core.mode")
+local capabilities = mode.capabilities()
 local opt = vim.opt
 
 opt.autowrite = false
 opt.autoread = true
 opt.breakindent = true
-opt.clipboard = "unnamedplus"
+-- Automatic unnamedplus synchronisation probes the desktop clipboard (or talks
+-- to the remote end) on every yank. Fast mode keeps the ordinary registers and
+-- leaves system copy to an explicit action.
+opt.clipboard = capabilities.system_clipboard and "unnamedplus" or ""
 opt.completeopt = { "menu", "menuone", "noselect" }
 opt.confirm = true
-opt.cursorline = true
+opt.cursorline = capabilities.cursorline
 opt.expandtab = true
 opt.foldenable = true
-opt.foldcolumn = "auto:1"
+-- Without a fold provider there is nothing to compute ranges, so the column
+-- would only ever show manual folds the user created.
+opt.foldcolumn = capabilities.folding_provider and "auto:1" or "0"
 opt.foldlevel = 99
 opt.foldlevelstart = 99
 opt.foldmethod = "manual"
@@ -50,11 +57,20 @@ opt.shiftwidth = 2
 opt.shortmess:append({ W = true, I = true, c = true, C = true })
 opt.showmode = false
 opt.sidescrolloff = 8
-opt.signcolumn = "yes"
--- IDE-like gutter order: action/diagnostic signs, hybrid line number, fold
--- control, then a dedicated Git change lane directly beside the source text.
-require("user.core.statuscolumn")
-opt.statuscolumn = [[%s%=%l%C%{%v:lua.vim._user_statuscolumn_git()%}]]
+-- A permanently reserved sign column only pays for itself while something
+-- publishes signs on every buffer.
+opt.signcolumn = capabilities.git and "yes" or "auto"
+if capabilities.git then
+	-- IDE-like gutter order: action/diagnostic signs, hybrid line number, fold
+	-- control, then a dedicated Git change lane directly beside the source text.
+	require("user.core.statuscolumn")
+	opt.statuscolumn = [[%s%=%l%C%{%v:lua.vim._user_statuscolumn_git()%}]]
+end
+if not capabilities.statusline_plugin then
+	-- Native statusline: mode, file, modified flag and position, plus the mode
+	-- badge so a fast session is obvious without running :ModeInfo.
+	opt.statusline = require("user.core.statusline_basic").value(mode.is_fast() and "FAST" or nil)
+end
 opt.smartcase = true
 opt.smartindent = true
 opt.spelllang = { "en", "cjk" }
@@ -65,7 +81,7 @@ opt.splitright = true
 opt.tabstop = 2
 opt.termguicolors = true
 opt.timeoutlen = 400
-opt.undofile = true
+opt.undofile = capabilities.undofile
 opt.updatetime = 250
 opt.virtualedit = "block"
 -- Default for application-sized or third-party panels. Small transient floats
@@ -77,12 +93,31 @@ opt.wrap = false
 -- disable disk-backed undo/swap and expire an unchanged system clipboard.
 opt.shada = "!,'100,<0,s10,h,r/tmp/,r/private/"
 
+-- Swap, undo and ShaDa are recovery data, not caches. A host that points the
+-- state directory at local disk gets all three there; a state directory that
+-- cannot be used safely turns them off rather than failing on every write.
+local storage = mode.storage()
+if not storage.writable then
+	opt.undofile = false
+	opt.swapfile = false
+	opt.shadafile = "NONE"
+elseif storage.relocated then
+	for _, directory in ipairs({ "undo", "swap", "view", "backup", "shada" }) do
+		pcall(vim.fn.mkdir, vim.fs.joinpath(storage.path, directory), "p", tonumber("700", 8))
+	end
+	opt.undodir = vim.fs.joinpath(storage.path, "undo")
+	opt.directory = vim.fs.joinpath(storage.path, "swap") .. "//"
+	opt.viewdir = vim.fs.joinpath(storage.path, "view")
+	opt.backupdir = vim.fs.joinpath(storage.path, "backup") .. "//"
+	opt.shadafile = vim.fs.joinpath(storage.path, "shada", "main.shada")
+end
+
 opt.fillchars = {
 	eob = " ",
 	fold = " ",
-	foldclose = "",
+	foldclose = capabilities.icons and "" or ">",
 	foldinner = " ",
-	foldopen = "",
+	foldopen = capabilities.icons and "" or "v",
 	foldsep = " ",
 }
 

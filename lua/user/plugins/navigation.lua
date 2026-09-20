@@ -27,85 +27,7 @@ local function has_invalid_restored_neotree_buffer()
 	return false
 end
 
-return {
-	{
-		"stevearc/oil.nvim",
-		cmd = "Oil",
-		event = { "BufReadCmd oil://*", "BufReadCmd oil-ssh://*", "BufReadCmd oil-trash://*", "BufReadCmd oil-s3://*" },
-		init = function()
-			require("user.core.oil_registration").setup()
-		end,
-		keys = {
-			{
-				"<leader>E",
-				function()
-					require("oil").open(vim.fn.getcwd())
-				end,
-				desc = "Edit project directory",
-			},
-			{
-				"-",
-				function()
-					require("oil").open()
-				end,
-				desc = "Edit current directory",
-			},
-		},
-		dependencies = {
-			"nvim-mini/mini.icons",
-		},
-		opts = {
-			default_file_explorer = true,
-			delete_to_trash = true,
-			skip_confirm_for_simple_edits = false,
-			watch_for_changes = true,
-			keymaps = {
-				["<Esc>"] = {
-					callback = function()
-						if vim.api.nvim_win_get_config(0).relative ~= "" then
-							require("oil").close()
-							return
-						end
-						require("user.core.popups").close()
-						vim.cmd.nohlsearch()
-					end,
-					desc = "Close floating Oil / dismiss popups",
-					mode = "n",
-				},
-			},
-			columns = {
-				"icon",
-				"permissions",
-				"size",
-				"mtime",
-			},
-			float = {
-				border = "rounded",
-				max_width = 0.86,
-				max_height = 0.86,
-			},
-			view_options = {
-				show_hidden = true,
-				natural_order = true,
-				is_always_hidden = function(name)
-					return name == ".git" or name == ".jj"
-				end,
-			},
-		},
-		config = function(_, opts)
-			require("oil").setup(opts)
-			require("user.core.highlights").on_colorscheme("oil", function()
-				local palette = require("user.core.palette")
-				local p = palette.get()
-				-- Auxiliary file information should be quiet UI text, not inherit
-				-- the active theme's syntax comment colour (green in VS Code).
-				local muted = palette.blend(p.fg, p.bg, 0.60)
-				for _, group in ipairs({ "OilEmpty", "OilHidden", "OilLinkTarget", "OilTrashSourcePath" }) do
-					vim.api.nvim_set_hl(0, group, { fg = muted })
-				end
-			end)
-		end,
-	},
+return vim.list_extend(require("user.specs.explorer")(), {
 	{
 		"nvim-neo-tree/neo-tree.nvim",
 		cmd = "Neotree",
@@ -292,4 +214,4 @@ return {
 			},
 		},
 	},
-}
+})

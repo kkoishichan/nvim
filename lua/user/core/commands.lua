@@ -1,8 +1,64 @@
 local project = require("user.core.project")
+local mode = require("user.core.mode")
+local capabilities = mode.capabilities()
 
 vim.api.nvim_create_user_command("TransparentToggle", function()
 	require("user.core.transparency").toggle()
 end, { desc = "Toggle and save transparent background" })
+
+-- Everything the mode decided, on demand. Startup prints at most one line and
+-- never walks the cache or state directories to produce a size report.
+vim.api.nvim_create_user_command("ModeInfo", function()
+	local storage = mode.storage()
+	local lines = {
+		{ "Editor mode: ", "Title" },
+		{ mode.name() .. "\n" },
+		{ "  selected by      " .. mode.source() .. "\n" },
+	}
+
+	local disabled = {}
+	for _, capability in ipairs(mode.capability_names()) do
+		if not capabilities[capability] then
+			table.insert(disabled, capability)
+		end
+	end
+	table.insert(lines, { "  disabled         " .. (#disabled > 0 and table.concat(disabled, ", ") or "none") .. "\n" })
+
+	for _, entry in ipairs(mode.degradations()) do
+		table.insert(lines, { "  unavailable      " .. entry.subject .. ": " .. entry.reason .. "\n", "WarningMsg" })
+	end
+	for _, notice in ipairs(mode.notices()) do
+		table.insert(lines, { "  notice           " .. notice .. "\n", "WarningMsg" })
+	end
+
+	local location = storage.relocated and "configured location" or "standard location"
+	if storage.writable then
+		table.insert(lines, { "  state directory  " .. storage.path .. " (" .. location .. ")\n" })
+		if storage.volatile then
+			table.insert(lines, {
+				"                   temporary root: recovery files can disappear on cleanup or logout\n",
+				"WarningMsg",
+			})
+		end
+		table.insert(lines, { "  undo             " .. (vim.o.undofile and vim.o.undodir or "off") .. "\n" })
+		table.insert(lines, { "  swap             " .. (vim.o.swapfile and vim.o.directory or "off") .. "\n" })
+		table.insert(
+			lines,
+			{ "  shada            " .. (vim.o.shadafile ~= "" and vim.o.shadafile or "default") .. "\n" }
+		)
+	else
+		table.insert(lines, {
+			"  state directory  unusable: " .. (storage.reason or "unknown") .. "; disk recovery is off\n",
+			"WarningMsg",
+		})
+	end
+
+	local lsp = package.loaded["user.core.fast_lsp"]
+	local managed = lsp and lsp.summary() or "none"
+	table.insert(lines, { "  manual servers   " .. managed .. "\n" })
+
+	vim.api.nvim_echo(lines, false, {})
+end, { desc = "Report the active editor mode, its capabilities and storage" })
 
 vim.api.nvim_create_user_command("DiffDisk", function()
 	local source_win = vim.api.nvim_get_current_win()
@@ -307,158 +363,162 @@ vim.api.nvim_create_user_command("DirectoryPick", pick_directory, {
 	desc = "Pick a directory, set cwd, and open it",
 })
 
-local function pdf_target_from_current_file()
-	if type(vim.b.pdf_preview_file) == "string" and vim.b.pdf_preview_file ~= "" then
-		return vim.b.pdf_preview_file
+-- PDF viewing and Typst builds belong to the extended workflows; a mode that
+-- does not install their dependencies should not advertise their commands.
+if capabilities.extended_workflows then
+	local function pdf_target_from_current_file()
+		if type(vim.b.pdf_preview_file) == "string" and vim.b.pdf_preview_file ~= "" then
+			return vim.b.pdf_preview_file
+		end
+
+		local file = vim.api.nvim_buf_get_name(0)
+		if file == "" or vim.bo.buftype ~= "" then
+			return nil
+		end
+
+		file = vim.uv.fs_realpath(file) or file
+		if file:lower():match("%.pdf$") then
+			return file
+		end
+
+		return vim.fn.fnamemodify(file, ":p:r") .. ".pdf"
 	end
 
-	local file = vim.api.nvim_buf_get_name(0)
-	if file == "" or vim.bo.buftype ~= "" then
-		return nil
+	local function pdf_viewer()
+		for _, viewer in ipairs({ "zathura", "xdg-open", "open" }) do
+			if vim.fn.executable(viewer) == 1 then
+				return { viewer }
+			end
+		end
+		if vim.fn.has("win32") == 1 and vim.fn.executable("cmd.exe") == 1 then
+			return { "cmd.exe", "/c", "start", "" }
+		end
 	end
 
-	file = vim.uv.fs_realpath(file) or file
-	if file:lower():match("%.pdf$") then
+	local function open_pdf(file)
+		local title = "PDF"
+		if not file or file == "" then
+			vim.notify("No PDF target for current buffer", vim.log.levels.WARN, { title = title })
+			return
+		end
+
+		file = normalize_path(file)
+		local stat = vim.uv.fs_stat(file)
+		if not stat or stat.type ~= "file" then
+			vim.notify("PDF not found: " .. cwd_display(file), vim.log.levels.WARN, { title = title })
+			return
+		end
+
+		local viewer = pdf_viewer()
+		if not viewer then
+			vim.notify("Missing a system PDF opener", vim.log.levels.ERROR, { title = title })
+			return
+		end
+
+		local command = vim.list_extend(vim.deepcopy(viewer), { file })
+		local job = vim.fn.jobstart(command, { detach = true })
+		if job <= 0 then
+			vim.notify("Failed to open PDF with " .. viewer[1], vim.log.levels.ERROR, { title = title })
+			return
+		end
+
+		vim.notify("Opened " .. cwd_display(file), vim.log.levels.INFO, { title = title })
+	end
+
+	vim.api.nvim_create_user_command("PdfOpen", function(args)
+		open_pdf(args.args ~= "" and args.args or pdf_target_from_current_file())
+	end, {
+		nargs = "?",
+		complete = "file",
+		desc = "Open a PDF externally",
+	})
+
+	local function current_file_or_notify(title)
+		if vim.bo.buftype ~= "" then
+			vim.notify("Current buffer is not a normal file", vim.log.levels.WARN, { title = title })
+			return nil
+		end
+
+		local file = vim.api.nvim_buf_get_name(0)
+		if file == "" then
+			vim.notify("Current buffer has no file on disk", vim.log.levels.WARN, { title = title })
+			return nil
+		end
+
+		if vim.bo.modified then
+			local ok, err = pcall(vim.cmd.write)
+			if not ok then
+				vim.notify("Could not write buffer: " .. err, vim.log.levels.ERROR, { title = title })
+				return nil
+			end
+		end
+
 		return file
 	end
 
-	return vim.fn.fnamemodify(file, ":p:r") .. ".pdf"
-end
-
-local function pdf_viewer()
-	for _, viewer in ipairs({ "zathura", "xdg-open", "open" }) do
-		if vim.fn.executable(viewer) == 1 then
-			return { viewer }
-		end
-	end
-	if vim.fn.has("win32") == 1 and vim.fn.executable("cmd.exe") == 1 then
-		return { "cmd.exe", "/c", "start", "" }
-	end
-end
-
-local function open_pdf(file)
-	local title = "PDF"
-	if not file or file == "" then
-		vim.notify("No PDF target for current buffer", vim.log.levels.WARN, { title = title })
-		return
-	end
-
-	file = normalize_path(file)
-	local stat = vim.uv.fs_stat(file)
-	if not stat or stat.type ~= "file" then
-		vim.notify("PDF not found: " .. cwd_display(file), vim.log.levels.WARN, { title = title })
-		return
-	end
-
-	local viewer = pdf_viewer()
-	if not viewer then
-		vim.notify("Missing a system PDF opener", vim.log.levels.ERROR, { title = title })
-		return
-	end
-
-	local command = vim.list_extend(vim.deepcopy(viewer), { file })
-	local job = vim.fn.jobstart(command, { detach = true })
-	if job <= 0 then
-		vim.notify("Failed to open PDF with " .. viewer[1], vim.log.levels.ERROR, { title = title })
-		return
-	end
-
-	vim.notify("Opened " .. cwd_display(file), vim.log.levels.INFO, { title = title })
-end
-
-vim.api.nvim_create_user_command("PdfOpen", function(args)
-	open_pdf(args.args ~= "" and args.args or pdf_target_from_current_file())
-end, {
-	nargs = "?",
-	complete = "file",
-	desc = "Open a PDF externally",
-})
-
-local function current_file_or_notify(title)
-	if vim.bo.buftype ~= "" then
-		vim.notify("Current buffer is not a normal file", vim.log.levels.WARN, { title = title })
-		return nil
-	end
-
-	local file = vim.api.nvim_buf_get_name(0)
-	if file == "" then
-		vim.notify("Current buffer has no file on disk", vim.log.levels.WARN, { title = title })
-		return nil
-	end
-
-	if vim.bo.modified then
-		local ok, err = pcall(vim.cmd.write)
-		if not ok then
-			vim.notify("Could not write buffer: " .. err, vim.log.levels.ERROR, { title = title })
-			return nil
-		end
-	end
-
-	return file
-end
-
-local function open_build_errors(title, cwd, output)
-	local items = {}
-	for line in output:gmatch("[^\r\n]+") do
-		local path, row, column, message = line:match("^(.-):(%d+):(%d+):%s*(.*)$")
-		if path then
-			if not path:match("^[/\\]") and not path:match("^%a:[/\\]") then
-				path = vim.fs.joinpath(cwd, path)
+	local function open_build_errors(title, cwd, output)
+		local items = {}
+		for line in output:gmatch("[^\r\n]+") do
+			local path, row, column, message = line:match("^(.-):(%d+):(%d+):%s*(.*)$")
+			if path then
+				if not path:match("^[/\\]") and not path:match("^%a:[/\\]") then
+					path = vim.fs.joinpath(cwd, path)
+				end
+				table.insert(items, { filename = path, lnum = tonumber(row), col = tonumber(column), text = message })
+			else
+				table.insert(items, { text = line, valid = 0 })
 			end
-			table.insert(items, { filename = path, lnum = tonumber(row), col = tonumber(column), text = message })
-		else
-			table.insert(items, { text = line, valid = 0 })
+		end
+
+		if #items > 0 then
+			vim.fn.setqflist({}, " ", { title = title, items = items })
+			vim.cmd.copen()
 		end
 	end
 
-	if #items > 0 then
-		vim.fn.setqflist({}, " ", { title = title, items = items })
-		vim.cmd.copen()
-	end
-end
+	local function run_pdf_build(title, output, args)
+		vim.notify("Building " .. vim.fn.fnamemodify(output, ":~:."), vim.log.levels.INFO, { title = title })
+		local cwd = project.root()
 
-local function run_pdf_build(title, output, args)
-	vim.notify("Building " .. vim.fn.fnamemodify(output, ":~:."), vim.log.levels.INFO, { title = title })
-	local cwd = project.root()
+		vim.system(args, { text = true, cwd = cwd }, function(result)
+			vim.schedule(function()
+				if result.code == 0 then
+					vim.notify("Wrote " .. vim.fn.fnamemodify(output, ":~:."), vim.log.levels.INFO, { title = title })
+					return
+				end
 
-	vim.system(args, { text = true, cwd = cwd }, function(result)
-		vim.schedule(function()
-			if result.code == 0 then
-				vim.notify("Wrote " .. vim.fn.fnamemodify(output, ":~:."), vim.log.levels.INFO, { title = title })
-				return
-			end
-
-			local message = table.concat({
-				result.stderr or "",
-				result.stdout or "",
-			}, "\n")
-			open_build_errors(title, cwd, message)
-			vim.notify("Build failed. See quickfix for details.", vim.log.levels.ERROR, { title = title })
+				local message = table.concat({
+					result.stderr or "",
+					result.stdout or "",
+				}, "\n")
+				open_build_errors(title, cwd, message)
+				vim.notify("Build failed. See quickfix for details.", vim.log.levels.ERROR, { title = title })
+			end)
 		end)
-	end)
-end
-
-vim.api.nvim_create_user_command("TypstCompilePdf", function()
-	local title = "Typst PDF"
-	if vim.fn.executable("typst") == 0 then
-		vim.notify("Missing executable: typst", vim.log.levels.ERROR, { title = title })
-		return
 	end
 
-	local file = current_file_or_notify(title)
-	if not file then
-		return
-	end
+	vim.api.nvim_create_user_command("TypstCompilePdf", function()
+		local title = "Typst PDF"
+		if vim.fn.executable("typst") == 0 then
+			vim.notify("Missing executable: typst", vim.log.levels.ERROR, { title = title })
+			return
+		end
 
-	local output = vim.fn.fnamemodify(file, ":p:r") .. ".pdf"
-	run_pdf_build(title, output, {
-		"typst",
-		"compile",
-		"--diagnostic-format",
-		"short",
-		file,
-		output,
+		local file = current_file_or_notify(title)
+		if not file then
+			return
+		end
+
+		local output = vim.fn.fnamemodify(file, ":p:r") .. ".pdf"
+		run_pdf_build(title, output, {
+			"typst",
+			"compile",
+			"--diagnostic-format",
+			"short",
+			file,
+			output,
+		})
+	end, {
+		desc = "Compile current Typst file to PDF",
 	})
-end, {
-	desc = "Compile current Typst file to PDF",
-})
+end

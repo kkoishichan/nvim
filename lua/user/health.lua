@@ -88,8 +88,30 @@ function M.check()
 	local toolchain = require("user.toolchain")
 	local project = require("user.core.project")
 	local preferences = require("user.core.preferences")
+	local mode = require("user.core.mode")
+	local capabilities = mode.capabilities()
 	local bufnr = source_buffer()
 	local context = project.context(bufnr)
+
+	health.start("Editor mode")
+	health.info("Mode: " .. mode.name() .. "; selected by " .. mode.source())
+	local disabled = {}
+	for _, capability in ipairs(mode.capability_names()) do
+		if not capabilities[capability] then
+			table.insert(disabled, capability)
+		end
+	end
+	health.info("Disabled capabilities: " .. (#disabled > 0 and table.concat(disabled, ", ") or "none"))
+	for _, entry in ipairs(mode.degradations()) do
+		health.warn(entry.subject .. ": " .. entry.reason, "Run :ModeInfo for the full report")
+	end
+	local storage = mode.storage()
+	if storage.writable then
+		health.ok("State directory: " .. storage.path .. (storage.volatile and " (temporary root)" or ""))
+	else
+		health.warn("State directory unusable: " .. (storage.reason or "unknown"), "Disk recovery is off")
+	end
+
 	health.start("Project context")
 	health.info("Workspace: " .. context.root)
 	health.info("Language project: " .. context.language_root)
@@ -108,10 +130,10 @@ function M.check()
 	for _, name in ipairs({ "fzf", "rg", "fd" }) do
 		local resolved = toolchain.resolve(name, { bufnr = bufnr })
 		if not resolved.path then
-			health.error(
-				name .. " is missing",
-				"Install " .. name .. " for the configured file search and picker workflow"
-			)
+			-- A fast installation may deliberately ship without a search stack; the
+			-- native open, completion and quickfix search entries still work.
+			local report = capabilities.picker_extras and health.error or health.warn
+			report(name .. " is missing", "Install " .. name .. " for the configured file search and picker workflow")
 		else
 			local version = probe_version(resolved.path, name)
 			local major, minor = (version or ""):match("(%d+)%.(%d+)")
@@ -212,7 +234,13 @@ function M.check()
 			table.insert(missing, name)
 		end
 	end
-	if #missing > 0 then
+	if #missing > 0 and not capabilities.lsp_auto then
+		health.info(
+			"Tools not installed for this mode: "
+				.. table.concat(missing, ", ")
+				.. "; fast mode starts language servers only through :FastLspStart"
+		)
+	elseif #missing > 0 then
 		health.warn(
 			"Unavailable configured tools: " .. table.concat(missing, ", "),
 			"Run :MasonToolsInstall for the pinned tools, then :ToolsRefresh. Basic editing does not require every language tool."

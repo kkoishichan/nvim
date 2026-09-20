@@ -119,6 +119,13 @@ function M.enable(event)
 
 	local ok = pcall(vim.treesitter.start, event.buf)
 	if not ok then
+		-- No parser for this language on this host. Opening a file must not
+		-- download one, so keep the native syntax and filetype indentation and
+		-- record the loss where :ModeInfo and :checkhealth can report it.
+		require("user.core.mode").degrade(
+			"treesitter",
+			"no parser for " .. vim.bo[event.buf].filetype .. "; using native syntax and indentation"
+		)
 		return
 	end
 

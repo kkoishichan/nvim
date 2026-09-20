@@ -202,8 +202,20 @@ function M.setup()
 	})
 end
 
+---Open a directory in the configured explorer, or in the native listing when
+---Oil is not part of this installation.
 function M.open_oil(path)
-	require("oil").open(path or vim.fn.getcwd())
+	path = path or vim.fn.getcwd()
+	local ok = pcall(function()
+		require("oil").open(path)
+	end)
+	if ok then
+		return
+	end
+	require("user.core.mode").degrade("explorer_extras", "oil.nvim is unavailable; using the native listing")
+	if not require("user.core.native").browse(path) then
+		vim.notify("Cannot open directory: " .. path, vim.log.levels.ERROR, { title = "Directory" })
+	end
 end
 
 return M

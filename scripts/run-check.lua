@@ -11,6 +11,7 @@ assert(
 		"matchup_input",
 		"lsp_progress",
 		"startup_loading",
+		"mode",
 		"ui_runtime",
 		"scrolling_colors",
 		"statusline_refresh",

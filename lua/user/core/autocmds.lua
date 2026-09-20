@@ -1,3 +1,5 @@
+local capabilities = require("user.core.mode").capabilities()
+
 local augroup = function(name)
 	return vim.api.nvim_create_augroup("user_" .. name, { clear = true })
 end
@@ -75,7 +77,9 @@ vim.api.nvim_create_autocmd("VimLeavePre", {
 	callback = cleanup_lifecycle,
 })
 
-require("user.core.pdf")
+if capabilities.extended_workflows then
+	require("user.core.pdf")
+end
 require("user.core.sensitive").setup()
 
 vim.api.nvim_create_autocmd("TextYankPost", {
@@ -160,13 +164,15 @@ vim.api.nvim_create_autocmd("VimResized", {
 
 -- Native spell only for prose. Code spelling is left to typos-lsp, which has far
 -- fewer false positives on identifiers than the dictionary check.
-vim.api.nvim_create_autocmd("FileType", {
-	group = augroup("prose_spell"),
-	pattern = { "markdown", "text", "tex", "plaintex", "typst", "gitcommit", "rst", "asciidoc" },
-	callback = function()
-		vim.opt_local.spell = true
-	end,
-})
+if capabilities.spell_auto then
+	vim.api.nvim_create_autocmd("FileType", {
+		group = augroup("prose_spell"),
+		pattern = { "markdown", "text", "tex", "plaintex", "typst", "gitcommit", "rst", "asciidoc" },
+		callback = function()
+			vim.opt_local.spell = true
+		end,
+	})
+end
 
 -- External file changes (e.g. an AI agent rewriting files during "vibe coding")
 -- are picked up promptly and reconciled safely. Design:
@@ -435,10 +441,12 @@ vim.api.nvim_create_autocmd({ "InsertLeave", "TextChanged" }, {
 	end,
 })
 
-require("user.core.pdf_registration").setup({
-	augroup = augroup,
-	lifecycle = lifecycle,
-	track_uv_handle = track_uv_handle,
-	release_uv_handle = release_uv_handle,
-	add_cleanup = add_cleanup,
-})
+if capabilities.extended_workflows then
+	require("user.core.pdf_registration").setup({
+		augroup = augroup,
+		lifecycle = lifecycle,
+		track_uv_handle = track_uv_handle,
+		release_uv_handle = release_uv_handle,
+		add_cleanup = add_cleanup,
+	})
+end

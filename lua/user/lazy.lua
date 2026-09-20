@@ -1,12 +1,26 @@
+local mode = require("user.core.mode")
+local capabilities = mode.capabilities()
 local bootstrap = require("user.core.lazy_bootstrap")
-local lazypath = bootstrap.ensure()
 local layout = require("user.core.layout")
+
+-- A mode without plugin-manager automation never downloads anything at launch.
+-- Without lazy.nvim there is still an editor: fall back to the native entry and
+-- say so once, leaving the detail to :ModeInfo.
+local ok, lazypath = pcall(bootstrap.ensure, { install = capabilities.plugin_manager_auto })
+if not ok then
+	mode.degrade("plugins", tostring(lazypath))
+	require("user.core.native").setup_explorer()
+	mode.announce()
+	return
+end
 
 vim.opt.rtp:prepend(lazypath)
 
 require("lazy").setup({
 	lockfile = vim.fs.joinpath(bootstrap.root(), "lazy-lock.json"),
-	spec = {
+	-- Fast mode names the modules it wants, so the remaining plugin files are
+	-- never executed; full mode keeps importing the complete directory.
+	spec = mode.is_fast() and require("user.specs").base() or {
 		{ import = "user.plugins" },
 	},
 	defaults = {
@@ -14,7 +28,7 @@ require("lazy").setup({
 		version = false,
 	},
 	install = {
-		missing = vim.env.NVIM_CHECK_ONLY ~= "1",
+		missing = capabilities.plugin_manager_auto and vim.env.NVIM_CHECK_ONLY ~= "1",
 		colorscheme = { "vscode", "habamax" },
 	},
 	checker = {
@@ -24,6 +38,7 @@ require("lazy").setup({
 		enabled = false,
 	},
 	change_detection = {
+		enabled = capabilities.plugin_manager_auto,
 		notify = false,
 	},
 	ui = {
@@ -43,6 +58,28 @@ require("lazy").setup({
 		},
 	},
 })
+
+if not capabilities.plugin_manager_auto then
+	-- Nothing was installed on our behalf, so report what is absent instead of
+	-- letting the first keypress fail. The explorer has a native replacement.
+	local config = require("lazy.core.config")
+	local missing = {}
+	for name, plugin in pairs(config.plugins) do
+		if not plugin._.installed then
+			table.insert(missing, name)
+		end
+	end
+	if #missing > 0 then
+		table.sort(missing)
+		mode.degrade("plugins", "not installed: " .. table.concat(missing, ", "))
+	end
+	local oil = config.plugins["oil.nvim"]
+	if not oil or not oil._.installed then
+		require("user.core.native").setup_explorer()
+	end
+end
+
+mode.announce()
 
 -- Lazy's manager is a floating application window, so the generic transient
 -- popup closer deliberately ignores it. Add the conventional close key beside

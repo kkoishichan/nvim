@@ -5,13 +5,16 @@ function M.root()
 end
 
 ---Only the first explicit bootstrap downloads anything. Checks fail with a
----preparation instruction instead of installing a missing package manager.
+---preparation instruction instead of installing a missing package manager, and
+---so does a mode that has turned plugin-manager automation off: a normal launch
+---must never reach the network.
 function M.ensure(opts)
 	opts = opts or {}
 	local destination = vim.fs.joinpath(vim.fn.stdpath("data"), "lazy", "lazy.nvim")
 	if vim.uv.fs_stat(destination .. "/lua/lazy/init.lua") then
 		return destination
 	end
+	assert(opts.install ~= false, "lazy.nvim is not installed; prepare this host or start in full mode")
 	assert(vim.env.NVIM_CHECK_ONLY ~= "1", "lazy.nvim is missing; run scripts/prepare-checks.sh first")
 	local root = opts.root or M.root()
 	local lock = vim.json.decode(table.concat(vim.fn.readfile(root .. "/lazy-lock.json"), "\n"))

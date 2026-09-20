@@ -1,3 +1,4 @@
+local capabilities = require("user.core.mode").capabilities()
 local map = vim.keymap.set
 
 map({ "n", "v" }, "<Space>", "<Nop>", { silent = true })
@@ -27,15 +28,17 @@ map("n", "<C-Down>", "<cmd>resize -2<cr>", { desc = "Decrease height" })
 map("n", "<C-Left>", "<cmd>vertical resize -2<cr>", { desc = "Decrease width" })
 map("n", "<C-Right>", "<cmd>vertical resize +2<cr>", { desc = "Increase width" })
 
-map("n", "<leader>k", function()
-	require("user.core.dict").lookup()
-end, { desc = "Dictionary" })
-map("x", "<leader>k", function()
-	require("user.core.dict").lookup_visual()
-end, { desc = "Dictionary" })
+if capabilities.extended_workflows then
+	map("n", "<leader>k", function()
+		require("user.core.dict").lookup()
+	end, { desc = "Dictionary" })
+	map("x", "<leader>k", function()
+		require("user.core.dict").lookup_visual()
+	end, { desc = "Dictionary" })
+	map("n", "<leader>mo", "<cmd>PdfOpen<cr>", { desc = "Open PDF" })
+end
 
 map("n", "<leader>gD", "<cmd>DiffDisk<cr>", { desc = "Diff disk" })
-map("n", "<leader>mo", "<cmd>PdfOpen<cr>", { desc = "Open PDF" })
 map("n", "<leader>f.", "<cmd>FileDir<cr>", { desc = "File directory" })
 map("n", "<leader>fd", "<cmd>DirectoryPick<cr>", { desc = "Find directory" })
 map("n", "<leader>fp", "<cmd>ProjectPick<cr>", { desc = "Find project" })
@@ -234,24 +237,27 @@ end, { desc = "Theme picker" })
 map("n", "<leader>uT", "<cmd>TransparentToggle<cr>", { desc = "Toggle transparent background" })
 
 map("n", "<leader>L", "<cmd>Lazy<cr>", { desc = "Lazy" })
-map("n", "<leader>M", "<cmd>Mason<cr>", { desc = "Mason" })
 
-local function ai(method)
-	return function(...)
-		return require("user.core.ai")[method](...)
+if capabilities.extended_workflows then
+	map("n", "<leader>M", "<cmd>Mason<cr>", { desc = "Mason" })
+
+	local function ai(method)
+		return function(...)
+			return require("user.core.ai")[method](...)
+		end
 	end
-end
 
-map("n", "<leader>ap", ai("pick"), { desc = "AI provider" })
-map("n", "<leader>aa", ai("toggle"), { desc = "AI chat" })
-map("n", "<leader>af", ai("focus"), { desc = "AI focus" })
-map("n", "<leader>ab", ai("add_buffer"), { desc = "AI add buffer" })
-map("n", "<leader>as", ai("send_context"), { desc = "AI send context" })
-map("x", "<leader>as", ai("send_selection"), { desc = "AI send selection" })
-map("n", "<leader>at", ai("attach_file"), { desc = "AI attach file" })
-map("n", "<leader>ai", ai("interrupt"), { desc = "AI interrupt" })
-map("n", "<leader>ar", ai("resume"), { desc = "AI resume" })
-map("n", "<leader>ac", ai("continue"), { desc = "AI continue" })
-map("n", "<leader>am", ai("model"), { desc = "AI model" })
-map("n", "<leader>ay", ai("accept"), { desc = "AI accept change" })
-map("n", "<leader>an", ai("deny"), { desc = "AI reject change" })
+	map("n", "<leader>ap", ai("pick"), { desc = "AI provider" })
+	map("n", "<leader>aa", ai("toggle"), { desc = "AI chat" })
+	map("n", "<leader>af", ai("focus"), { desc = "AI focus" })
+	map("n", "<leader>ab", ai("add_buffer"), { desc = "AI add buffer" })
+	map("n", "<leader>as", ai("send_context"), { desc = "AI send context" })
+	map("x", "<leader>as", ai("send_selection"), { desc = "AI send selection" })
+	map("n", "<leader>at", ai("attach_file"), { desc = "AI attach file" })
+	map("n", "<leader>ai", ai("interrupt"), { desc = "AI interrupt" })
+	map("n", "<leader>ar", ai("resume"), { desc = "AI resume" })
+	map("n", "<leader>ac", ai("continue"), { desc = "AI continue" })
+	map("n", "<leader>am", ai("model"), { desc = "AI model" })
+	map("n", "<leader>ay", ai("accept"), { desc = "AI accept change" })
+	map("n", "<leader>an", ai("deny"), { desc = "AI reject change" })
+end

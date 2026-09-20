@@ -4,19 +4,25 @@
 -- messages from overflowing the window the way trailing virtual_text does, shows
 -- code and message together without occluding, and points at the exact column.
 local float_style = require("user.core.float_style")
+local capabilities = require("user.core.mode").capabilities()
+
+-- Without automatic language servers there is nothing to draw until the user
+-- starts one explicitly, and drawing is exactly the part that costs redraws.
+-- Manual floats, jumps and the location list keep working either way.
+local live = capabilities.diagnostics_live
 
 local base = {
-	underline = true,
+	underline = live,
 	update_in_insert = false,
 	severity_sort = true,
-	signs = {
+	signs = live and {
 		text = {
 			[vim.diagnostic.severity.ERROR] = "E",
 			[vim.diagnostic.severity.WARN] = "W",
 			[vim.diagnostic.severity.INFO] = "I",
 			[vim.diagnostic.severity.HINT] = "H",
 		},
-	},
+	} or false,
 	float = float_style.padded({
 		source = true,
 	}),
@@ -38,8 +44,10 @@ local virtual_text = {
 }
 
 -- <leader>ud cycles: expanded current line -> short trailing text -> off.
+-- Fast mode starts at "off"; the same key still cycles display on once a
+-- language server has been started by hand.
 local modes = { "lines", "text", "off" }
-local mode = "lines"
+local mode = live and "lines" or "off"
 
 local function apply_diagnostic_mode()
 	vim.diagnostic.config(vim.tbl_extend("force", base, {

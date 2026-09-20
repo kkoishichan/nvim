@@ -321,12 +321,36 @@ Claude 原生 IDE 集成在一个 Neovim 中只有一个终端：首次打开时
 ```json
 {
   "tools": { "prefer_mason": false },
-  "format": { "timeout_ms": 800 }
+  "format": { "timeout_ms": 800 },
+  "runtime": { "mode": "auto", "state_dir": "", "persistent_undo": false }
 }
 ```
 
 修改后运行 `:ToolsRefresh`；无效值采用默认设置，并在健康报告中说明。
 项目自身的格式化和检查规则继续放在项目原生配置文件中。
+
+## 运行模式
+
+`full` 是默认模式，保留本文描述的全部功能。`fast` 保留熟悉的编辑方式、主题和
+Tree-sitter 语法高亮，默认不启动语言服务、补全、Git 标记、装饰、折叠提供者和
+附加界面，适合 SSH、容器和资源有限的服务器。
+
+```sh
+NVIM_MODE=fast nvim path/to/file.py
+NVIM_MODE=full nvim path/to/file.py
+```
+
+显式环境变量优先，其次是 `preferences.json` 的 `runtime.mode`（`full` / `fast` /
+`auto`），未配置时仍用 `full`。`auto` 只看连接本身：`SSH_CONNECTION` 或 `SSH_TTY`
+非空时选择 `fast`。模式在启动时确定，换模式需要重启；快速模式的原生状态栏显示
+`FAST`，`:ModeInfo` 按需列出选择来源、关闭的能力、降级原因和存储路径。
+
+`runtime.state_dir` 可把 swap、undo、view 和 ShaDa 指向本机磁盘，目录由当前用户拥有
+且权限为 `0700`。目录不可用时仍可编辑，但磁盘恢复关闭并在 `:ModeInfo` 与
+`:checkhealth user` 中说明。`runtime.persistent_undo` 在快速模式下重新打开持久撤销。
+
+缺少 lazy.nvim 或所选插件时进入不依赖插件管理器的原生入口：原生目录浏览、保存、
+文件类型缩进和退出仍然可用，缺失项留给 `:ModeInfo`。
 
 侧栏和输出面板会为正文保留默认 40 列、8 行；可在偏好中设置
 `ui.min_editor_width` / `ui.min_editor_height`。小屏会收起辅助面板，终端进程继续运行；

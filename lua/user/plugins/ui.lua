@@ -1,9 +1,7 @@
 local layout = require("user.core.layout")
 local float_style = require("user.core.float_style")
-local theme = require("user.core.theme")
 local palette = require("user.core.palette")
 local lsp_progress = require("user.core.lsp_progress")
-local active_theme = theme.saved()
 local scrollview_symbols = {
 	diagnostics = {
 		error = "E",
@@ -120,7 +118,9 @@ local function bufferline_highlights()
 	return highlights
 end
 
-return {
+local specs = require("user.specs.theme")()
+
+return vim.list_extend(specs, {
 	{
 		"nvim-mini/mini.icons",
 		lazy = false,
@@ -149,70 +149,6 @@ return {
 				desc = "Pick breadcrumb",
 			},
 		},
-	},
-	{
-		"ellisonleao/gruvbox.nvim",
-		name = "gruvbox",
-		lazy = active_theme ~= "gruvbox",
-		priority = 1001,
-		opts = {
-			terminal_colors = true,
-			undercurl = true,
-			underline = true,
-			bold = true,
-			strikethrough = true,
-			invert_selection = false,
-			invert_signs = false,
-			invert_tabline = false,
-			inverse = true,
-			contrast = "hard",
-			dim_inactive = false,
-			transparent_mode = false,
-		},
-		config = function(_, opts)
-			require("gruvbox").setup(opts)
-			theme.bootstrap()
-		end,
-	},
-	{
-		"folke/tokyonight.nvim",
-		lazy = active_theme ~= "tokyonight",
-		priority = 1000,
-		opts = { style = "night" },
-		config = function(_, opts)
-			require("tokyonight").setup(opts)
-			theme.bootstrap()
-		end,
-	},
-	{
-		"catppuccin/nvim",
-		name = "catppuccin",
-		lazy = active_theme ~= "catppuccin",
-		priority = 1000,
-		opts = { flavour = "mocha" },
-		config = function(_, opts)
-			require("catppuccin").setup(opts)
-			theme.bootstrap()
-		end,
-	},
-	{
-		"Mofiqul/vscode.nvim",
-		lazy = active_theme ~= "vscode",
-		priority = 1000,
-		opts = {
-			style = "dark",
-			transparent = false,
-			-- The stock popup is #202020 against a #1F1F1F editor. Our small
-			-- borderless floats use Pmenu, so lift it enough to remain legible.
-			color_overrides = { vscPopupBack = "#2D2D30" },
-			italic_comments = true,
-			underline_links = true,
-			terminal_colors = true,
-		},
-		config = function(_, opts)
-			require("vscode").setup(opts)
-			theme.bootstrap()
-		end,
 	},
 	{
 		"folke/snacks.nvim",
@@ -834,4 +770,4 @@ return {
 			}
 		end,
 	},
-}
+})

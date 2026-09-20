@@ -1,5 +1,8 @@
 local M = {}
 local states = {}
+-- Restoring an ordinary buffer must put back what this mode actually runs, not
+-- re-enable a decoration or fold provider the mode turned off.
+local capabilities = require("user.core.mode").capabilities()
 
 M.limits = { bytes = 1.5 * 1024 * 1024, lines = 10000, line_bytes = 2000, average = 250, average_min = 10240 }
 
@@ -37,12 +40,16 @@ local function apply(bufnr)
 		vim.wo[win].foldmethod = "manual"
 	end
 	pcall(vim.treesitter.stop, bufnr)
-	loaded_call("ufo", "detach", bufnr)
-	vim.api.nvim_buf_call(bufnr, function()
-		loaded_call("illuminate", "pause_buf")
-	end)
-	loaded_call("ibl", "setup_buffer", bufnr, { enabled = false })
-	loaded_call("nvim-highlight-colors", "clear_highlights", bufnr)
+	if capabilities.folding_provider then
+		loaded_call("ufo", "detach", bufnr)
+	end
+	if capabilities.decorations then
+		vim.api.nvim_buf_call(bufnr, function()
+			loaded_call("illuminate", "pause_buf")
+		end)
+		loaded_call("ibl", "setup_buffer", bufnr, { enabled = false })
+		loaded_call("nvim-highlight-colors", "clear_highlights", bufnr)
+	end
 	for _, client in ipairs(vim.lsp.get_clients({ bufnr = bufnr })) do
 		-- Detach this document; never disable a server shared by other buffers.
 		pcall(vim.lsp.buf_detach_client, bufnr, client.id)
@@ -69,11 +76,15 @@ local function restore(bufnr)
 	if not saved then
 		return
 	end
-	vim.api.nvim_buf_call(bufnr, function()
-		loaded_call("illuminate", "resume_buf")
-	end)
-	loaded_call("ibl", "setup_buffer", bufnr, { enabled = true })
-	loaded_call("ufo", "attach", bufnr)
+	if capabilities.decorations then
+		vim.api.nvim_buf_call(bufnr, function()
+			loaded_call("illuminate", "resume_buf")
+		end)
+		loaded_call("ibl", "setup_buffer", bufnr, { enabled = true })
+	end
+	if capabilities.folding_provider then
+		loaded_call("ufo", "attach", bufnr)
+	end
 	vim.api.nvim_exec_autocmds("FileType", { buffer = bufnr, modeline = false })
 end
 

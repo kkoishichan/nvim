@@ -29,7 +29,7 @@ local function expensive_buffer(bufnr)
 	return not require("user.core.buffer_policy").allow(bufnr)
 end
 
-return {
+return vim.list_extend(require("user.specs.editing")(), {
 	{
 		"folke/persistence.nvim",
 		event = "BufReadPre",
@@ -271,53 +271,6 @@ return {
 		},
 	},
 	{
-		"nvim-mini/mini.nvim",
-		version = false,
-		event = "VeryLazy",
-		config = function()
-			local ai = require("mini.ai")
-			ai.setup({
-				n_lines = 500,
-				custom_textobjects = {
-					c = ai.gen_spec.treesitter({ a = "@class.outer", i = "@class.inner" }),
-					f = ai.gen_spec.treesitter({ a = "@function.outer", i = "@function.inner" }),
-					o = ai.gen_spec.treesitter({
-						a = { "@block.outer", "@conditional.outer", "@loop.outer" },
-						i = { "@block.inner", "@conditional.inner", "@loop.inner" },
-					}),
-					u = ai.gen_spec.function_call(),
-					U = ai.gen_spec.function_call({ name_pattern = "[%w_]" }),
-				},
-			})
-			require("mini.move").setup({
-				mappings = {
-					left = "<M-h>",
-					right = "<M-l>",
-					down = "<M-j>",
-					up = "<M-k>",
-					line_left = "<M-h>",
-					line_right = "<M-l>",
-					line_down = "<M-j>",
-					line_up = "<M-k>",
-				},
-			})
-			require("mini.pairs").setup()
-			require("mini.surround").setup({
-				mappings = {
-					add = "gsa",
-					delete = "gsd",
-					find = "gsf",
-					find_left = "gsF",
-					highlight = "gsh",
-					replace = "gsr",
-				},
-			})
-			-- gaip= aligns a paragraph on "=", gA opens the interactive
-			-- preview (pick delimiter, justification, etc.).
-			require("mini.align").setup()
-		end,
-	},
-	{
 		"folke/ts-comments.nvim",
 		event = "VeryLazy",
 		opts = {},
@@ -356,4 +309,4 @@ return {
 			},
 		},
 	},
-}
+})
