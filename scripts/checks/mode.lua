@@ -198,6 +198,17 @@ report.extra.treesitter = vim.treesitter.highlighter.active[vim.api.nvim_get_cur
 report.extra.indentexpr = vim.bo.indentexpr
 local ok_group, events = pcall(vim.api.nvim_get_autocmds, { group = "user_prose_spell" })
 report.extra.autocmds = ok_group and #events or 0
+-- The editing library must still be reachable through its own keys, without
+-- becoming an implicit load entry for anything else.
+local scratch = vim.api.nvim_create_buf(false, true)
+vim.api.nvim_set_current_buf(scratch)
+vim.bo[scratch].filetype = "lua"
+vim.api.nvim_buf_set_lines(scratch, 0, -1, false, { "local value = compute(alpha, beta)" })
+vim.api.nvim_win_set_cursor(0, { 1, 26 })
+report.extra.mini_before = package.loaded["mini.ai"] ~= nil
+vim.api.nvim_feedkeys(vim.keycode("diu"), "xt", false)
+report.extra.after_textobject = vim.api.nvim_buf_get_lines(scratch, 0, -1, false)[1]
+report.extra.mini_after = package.loaded["mini.ai"] ~= nil
 ]],
 	})
 	assert(fast.mode == "fast", "The fast case did not start in fast mode")
@@ -209,6 +220,12 @@ report.extra.autocmds = ok_group and #events or 0
 	assert(fast.extra.treesitter, "Fast mode lost Tree-sitter highlighting")
 	assert(fast.extra.indentexpr ~= "", "Fast mode lost Tree-sitter indentation")
 	assert(fast.extra.autocmds == 0, "Fast mode registered events for a disabled feature")
+	assert(not fast.extra.mini_before, "The editing library loaded before any of its keys was used")
+	assert(fast.extra.mini_after, "An editing key did not load the library it belongs to")
+	assert(
+		fast.extra.after_textobject == "local value = compute()",
+		"The on-demand text object did not work: " .. tostring(fast.extra.after_textobject)
+	)
 	local expected = {
 		"conform.nvim",
 		"fzf-lua",
@@ -230,7 +247,13 @@ report.extra.autocmds = ok_group and #events or 0
 		assert(not fast.loaded[name], name .. " was loaded during a fast startup")
 	end
 	assert(#fast.plugins < #default.plugins, "Fast mode did not reduce the imported plugin set")
+	-- Nothing keeps working after the file is on screen: no client, no timer,
+	-- no watcher and no child process comes from the configuration itself.
+	for kind, count in pairs(fast.handles) do
+		assert(count == 0, ("Fast mode left %d active %s handles running while idle"):format(count, kind))
+	end
 	assert(fast.commands.ModeInfo, ":ModeInfo is unavailable in fast mode")
+	assert(fast.commands.FastLspStart and fast.commands.FastLspStop, "The explicit language entries are unavailable")
 	assert(not fast.mappings["<Leader>aa"], "Fast mode kept a mapping for a workflow it does not load")
 
 	-- A host that asks for persistent undo gets it back without leaving fast mode.
@@ -671,14 +694,75 @@ report.extra.oil = package.loaded["oil"] ~= nil
 	assert(incomplete.extra.listing, "A missing explorer did not fall back to the native directory listing")
 	assert(not incomplete.extra.oil, "The missing explorer was reported as loaded")
 
+	-- 18. Highlighting is a promise about the theme and the Tree-sitter layer.
+	--     Compare the captures and their resolved colours between modes, and
+	--     state plainly that language-server semantic colouring is the part a
+	--     mode without a client does not have.
+	local highlight_probe = [[
+local bufnr = vim.api.nvim_get_current_buf()
+vim.wait(4000, function()
+  return vim.treesitter.highlighter.active[bufnr] ~= nil
+end, 25)
+-- The highlighter parses lazily on redraw, and a headless check never redraws.
+-- Parse the whole document once so the captures below are the real ones.
+local parser = vim.treesitter.get_parser(bufnr, nil, { error = false })
+if parser then
+  parser:parse(true)
+end
+local samples = {}
+for row = 0, math.min(120, vim.api.nvim_buf_line_count(bufnr) - 1) do
+  local line = vim.api.nvim_buf_get_lines(bufnr, row, row + 1, false)[1] or ""
+  for column = 0, #line - 1, 3 do
+    local names = {}
+    for _, capture in ipairs(vim.treesitter.get_captures_at_pos(bufnr, row, column)) do
+      names[#names + 1] = capture.capture
+    end
+    if #names > 0 then
+      local group = "@" .. names[#names]
+      local resolved = vim.api.nvim_get_hl(0, { name = group, link = false })
+      samples[#samples + 1] = table.concat(names, "+") .. "@" .. tostring(resolved.fg) .. ":" .. tostring(resolved.bold)
+    end
+  end
+end
+report.extra.captures = samples
+report.extra.semantic = vim.lsp.semantic_tokens ~= nil and #vim.lsp.get_clients({ bufnr = bufnr }) or 0
+report.extra.colorscheme = vim.g.colors_name
+]]
+	local sample_file = vim.fs.joinpath(root, "lua", "user", "core", "buffer_policy.lua")
+	local highlight_full = run("highlight_full", { mode = "full", arguments = { sample_file }, code = highlight_probe })
+	local highlight_fast = run("highlight_fast", { mode = "fast", arguments = { sample_file }, code = highlight_probe })
+	assert(#highlight_fast.extra.captures > 200, "The slim session produced almost no Tree-sitter captures")
+	assert(
+		highlight_full.extra.colorscheme == highlight_fast.extra.colorscheme,
+		"The two modes applied different colourschemes"
+	)
+	assert(
+		vim.deep_equal(highlight_full.extra.captures, highlight_fast.extra.captures),
+		"Tree-sitter captures or their colours differ between modes"
+	)
+	-- The honest part of the promise: semantic colouring comes from a language
+	-- server, so a session without one does not have it.
+	assert(highlight_fast.extra.semantic == 0, "The slim session attached a semantic-token provider on its own")
+
+	-- Deleting through the explorer keeps going to the trash in both modes, so a
+	-- host without a usable trash directory reports a failure instead of
+	-- silently performing a permanent delete.
+	local explorer = require("user.core.mode").as("fast", function()
+		return require("user.specs.explorer")()
+	end)
+	assert(explorer[1].opts.delete_to_trash, "The slim explorer would delete permanently")
+	assert(not explorer[1].opts.watch_for_changes, "The slim explorer kept its change watcher")
+	assert(not explorer[1].opts.skip_confirm_for_simple_edits, "The slim explorer dropped its edit confirmation")
+
 	print(
-		("Mode evidence: full by default; NVIM_MODE > preference > default; auto follows SSH; fast imports %d plugins (full %d) and %d of %d parsers, with %d disabled capabilities; Python colon indent, autopairs, plain save and directory switching kept; one server on request then released (%s); native search, native entry, read-only state and read-only config handled; plugin management stayed a full-mode operation."):format(
+		("Mode evidence: full by default; NVIM_MODE > preference > default; auto follows SSH; fast imports %d plugins (full %d) and %d of %d parsers, with %d disabled capabilities; Python colon indent, autopairs, plain save and directory switching kept; one server on request then released (%s); native search, native entry, read-only state and read-only config handled; plugin management stayed a full-mode operation; %d Tree-sitter captures identical to full mode with no semantic provider of its own."):format(
 			#fast.plugins,
 			#default.plugins,
 			#base,
 			#catalog.parsers,
 			#fast.disabled,
-			manual.extra.summary
+			manual.extra.summary,
+			#highlight_fast.extra.captures
 		)
 	)
 end

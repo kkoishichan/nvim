@@ -222,6 +222,15 @@ map("n", "<leader>tE", function()
 	open_external_terminal(vim.fn.getcwd())
 end, { desc = "External terminal cwd" })
 
+if not capabilities.system_clipboard then
+	-- Without automatic synchronisation the ordinary registers are always
+	-- available and the system clipboard is an explicit action. Neovim's own
+	-- OSC 52 provider carries it over a connection that supports the sequence.
+	map({ "n", "x" }, "<leader>y", '"+y', { desc = "Copy to system clipboard" })
+	map("n", "<leader>Y", '"+Y', { desc = "Copy line to system clipboard" })
+	map({ "n", "x" }, "<leader>p", '"+p', { desc = "Paste from system clipboard" })
+end
+
 map("n", "<leader>ul", function()
 	vim.opt.relativenumber = not vim.opt.relativenumber:get()
 end, { desc = "Toggle relative line numbers" })

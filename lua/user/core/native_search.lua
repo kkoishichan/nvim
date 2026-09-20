@@ -67,6 +67,25 @@ function M.grep_cword(opts)
 	quickfix_grep("\\<" .. word .. "\\>", opts)
 end
 
+---Grep the visual selection. Only a single-line selection makes a useful
+---pattern, so a multi-line one falls back to the word under the cursor.
+function M.grep_visual(opts)
+	local start_pos = vim.fn.getpos("v")
+	local end_pos = vim.fn.getpos(".")
+	if start_pos[2] ~= end_pos[2] then
+		return M.grep_cword(opts)
+	end
+	local line = vim.api.nvim_buf_get_lines(0, start_pos[2] - 1, start_pos[2], false)[1] or ""
+	local first = math.min(start_pos[3], end_pos[3])
+	local last = math.max(start_pos[3], end_pos[3])
+	local selection = line:sub(first, last)
+	if selection == "" then
+		return M.grep_cword(opts)
+	end
+	vim.api.nvim_feedkeys(vim.keycode("<Esc>"), "nx", false)
+	quickfix_grep(vim.fn.escape(selection, "\\/.*$^~[]"), opts)
+end
+
 function M.buffers()
 	local items, labels = {}, {}
 	for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
@@ -150,7 +169,6 @@ local unavailable = {
 local aliases = {
 	global = "files",
 	live_grep = "grep",
-	grep_visual = "grep_cword",
 }
 
 ---Dispatch a picker method to its native replacement.

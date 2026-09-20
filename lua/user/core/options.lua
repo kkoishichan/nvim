@@ -79,7 +79,12 @@ opt.splitbelow = true
 opt.splitkeep = "screen"
 opt.splitright = true
 opt.tabstop = 2
-opt.termguicolors = true
+-- Full mode assumes the desktop terminal it is configured for. A slim session
+-- may be anywhere, so leave Neovim's own terminal detection to decide: a
+-- connection without 24-bit colour degrades instead of drawing wrong colours.
+if not mode.is_fast() then
+	opt.termguicolors = true
+end
 opt.timeoutlen = 400
 opt.undofile = capabilities.undofile
 opt.updatetime = 250
