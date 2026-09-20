@@ -24,6 +24,10 @@ require("user.core.lazy_bootstrap").ensure({ root = root, cache = cache, offline
 local lock, plugins = support.plugins(root, data)
 local mode = support.mode()
 local names = support.selected_plugins(root, data, mode)
+if vim.env.NVIM_PREPARE_TOOLS ~= "0" and not vim.tbl_contains(names, "mason.nvim") then
+	-- Check-tool preparation also needs an installer on a fresh slim host.
+	table.insert(names, "mason.nvim")
+end
 for _, name in ipairs(names) do
 	local plugin, pin = plugins[name], lock[name].commit
 	local exists = vim.uv.fs_stat(plugin.dir .. "/.git") ~= nil

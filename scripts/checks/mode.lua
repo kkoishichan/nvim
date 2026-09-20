@@ -565,6 +565,28 @@ assert(not package.loaded.jdtls and not package.loaded.rustaceanvim, "Manual LSP
 	-- 9. Without a search stack the picker keys still open, complete and search.
 	local bare = vim.fs.joinpath(tmp, "empty-path")
 	vim.fn.mkdir(bare, "p")
+	local missing_servers = run("no_language_tools", {
+		mode = "fast",
+		env = {
+			PATH = bare,
+			XDG_DATA_HOME = vim.fs.joinpath(tmp, "no_language_tools", "data"),
+			NVIM_CHECK_LSP_PATH = vim.fs.joinpath(vim.fn.stdpath("data"), "lazy", "nvim-lspconfig"),
+		},
+		code = [[
+vim.opt.rtp:prepend(vim.env.NVIM_CHECK_LSP_PATH)
+vim.bo.filetype = "python"
+local fast = require("user.core.fast_lsp")
+report.extra.candidates = fast.candidates(0)
+report.extra.messages = {}
+vim.notify = function(message) table.insert(report.extra.messages, message) end
+fast.start("basedpyright")
+]],
+	})
+	assert(#missing_servers.extra.candidates == 0, "A missing Node server appeared in the manual picker")
+	assert(
+		table.concat(missing_servers.extra.messages, "\n"):find("not installed", 1, true),
+		"A missing manual server failed silently"
+	)
 	local search = run("no_search", {
 		mode = "fast",
 		env = { PATH = bare },

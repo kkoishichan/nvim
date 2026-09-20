@@ -59,7 +59,7 @@ local function configure()
 end
 
 function M.resolve()
-	local ready = shared.resolve()
+	local ready = shared.resolve({ installed_only = true })
 	configure()
 	for name, command in pairs({ rust_analyzer = "rust-analyzer", jdtls = "jdtls" }) do
 		local executable = toolchain.executable(command)

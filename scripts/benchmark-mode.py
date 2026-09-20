@@ -166,10 +166,29 @@ function _G.BenchAnchor(index, line)
   -- cursor-anchored match-up/diagnostic floats that can appear during a burst.
   -- Fixed terminal coordinates may hit those floats instead of the document.
   local position = api.nvim_win_get_position(win)
-  local target = {
-    column = position[2] + math.max(info.textoff + 1, api.nvim_win_get_width(win) - 2),
-    row = position[1] + math.max(1, math.floor(api.nvim_win_get_height(win) / 2)),
-  }
+  local floats = {}
+  for _, other in ipairs(api.nvim_tabpage_list_wins(0)) do
+    if other ~= win and api.nvim_win_get_config(other).relative ~= "" then
+      local at = api.nvim_win_get_position(other)
+      floats[#floats + 1] = { at[1], at[2], at[1] + api.nvim_win_get_height(other) + 1, at[2] + api.nvim_win_get_width(other) + 1 }
+    end
+  end
+  local width, height = api.nvim_win_get_width(win), api.nvim_win_get_height(win)
+  local rows = { math.max(1, math.floor(height / 2)) }
+  for row = 3, height - 2 do rows[#rows + 1] = row end
+  local target
+  for column = width - 2, info.textoff + 2, -1 do
+    for _, row in ipairs(rows) do
+      local x, y = position[2] + column, position[1] + row
+      local clear = true
+      for _, rect in ipairs(floats) do
+        if y >= rect[1] and y <= rect[3] and x >= rect[2] and x <= rect[4] then clear = false; break end
+      end
+      if clear then target = { column = x, row = y }; break end
+    end
+    if target then break end
+  end
+  assert(target, "No unobstructed document cell for wheel measurement")
   vim.fn.writefile({ vim.json.encode(target) }, run .. "/anchor-" .. index .. ".json")
 end
 
@@ -450,6 +469,11 @@ def environment(target, run):
         "NVIM_LOG_FILE": str(run / "nvim.log"),
         "BENCH_RUN": str(run),
         "SHELL": "/bin/sh",
+        # A benchmark must not fetch packages or pollute the user's package
+        # cache when a full-mode language server tries automatic type discovery.
+        "npm_config_offline": "true",
+        "npm_config_cache": str(run / "cache" / "npm"),
+        "CARGO_NET_OFFLINE": "true",
     }
     if target != "native":
         env["NVIM_MODE"] = target
@@ -474,7 +498,7 @@ def prepare_run(target, run, data_home):
                 (data / asset).symlink_to(data_home / asset, target_is_directory=True)
 
 
-def copy_sample(sample, run):
+def copy_sample(sample, run, rust_project=False):
     """All editing and saves use a private file for this target and repetition."""
     workspace = run / "workspace"
     workspace.mkdir(parents=True, exist_ok=True)
@@ -483,6 +507,14 @@ def copy_sample(sample, run):
     # measured safely, and a formatter can never write back through a symlink.
     with destination.open("xb") as stream:
         stream.write(sample.read_bytes())
+    if rust_project:
+        # The generated Rust library needs a real, dependency-free crate. A
+        # detached file triggers rustaceanvim notices and cannot model Cargo
+        # analysis. Real --file inputs remain isolated single-file samples.
+        (workspace / "Cargo.toml").write_text(
+            '[package]\nname = "nvim_benchmark"\nversion = "0.0.0"\nedition = "2021"\n'
+            '[lib]\npath = ' + json.dumps(sample.name) + '\n'
+        )
     return destination
 
 
@@ -527,6 +559,7 @@ class Session:
         self.identifier = 0
         self.unpacker = msgpack.Unpacker(raw=False)
         self.rpc = None
+        self.startup_prompts = 0
         prepare_run(target, run, data_home)
         probe = run / "probe.lua"
         probe.write_text(PROBE)
@@ -563,21 +596,37 @@ class Session:
                     end = match.end()
                 self.buffer = self.buffer[end:][-20:]
 
-    def await_file(self, path, timeout=60):
+    def await_file(self, path, timeout=60, startup=False):
         deadline = time.monotonic() + timeout
+        next_prompt_check = time.monotonic() + 0.5
         while not path.exists() and time.monotonic() < deadline:
             self.pump(0.02)
+            if startup and self.socket_path.exists() and time.monotonic() >= next_prompt_check:
+                self.connect()
+                mode = self.request("nvim_get_mode", [], timeout=5)
+                # Only acknowledge the hit-enter message, never a confirmation
+                # dialog. Rust's standalone-file notice can appear before
+                # VimEnter and otherwise prevents the probe from running.
+                if mode["mode"] == "r":
+                    os.write(self.master, b"\r")
+                    self.startup_prompts += 1
+                next_prompt_check = time.monotonic() + 0.5
         if not path.exists():
             raise TimeoutError(f"{self.target}: {path} never appeared")
         return path
 
     def connect(self):
+        if self.rpc:
+            return
         self.rpc = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.rpc.connect(str(self.socket_path))
 
     def command(self, text, timeout=60):
+        return self.request("nvim_command", [text], timeout)
+
+    def request(self, method, parameters, timeout=60):
         self.identifier += 1
-        self.rpc.sendall(msgpack.packb([0, self.identifier, "nvim_command", [text]], use_bin_type=True))
+        self.rpc.sendall(msgpack.packb([0, self.identifier, method, parameters], use_bin_type=True))
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             if select.select([self.rpc], [], [], 0)[0]:
@@ -591,7 +640,7 @@ class Session:
                             raise RuntimeError(f"{self.target}: {message[2]}")
                         return message[3]
             self.pump(0.005)
-        raise TimeoutError(f"{self.target}: control request timed out: {text}")
+        raise TimeoutError(f"{self.target}: control request timed out: {method}")
 
     def close(self):
         if self.rpc:
@@ -637,8 +686,8 @@ def pair_latencies(phase, sent_count):
 
     Both timestamps are taken inside Neovim, so the value is the editor's own
     work and cannot go negative: the frame is recorded after the key it counts.
-    Plugins that feed keys of their own show up as extra samples, which is why
-    the decoded count is reported next to the number of keys actually sent.
+    The probe excludes plugin-fed keys. Reject missing or extra terminal events
+    rather than silently pairing an incomplete input sequence.
     """
     if len(phase["decoded"]) != sent_count:
         raise RuntimeError(f"{phase['phase']}: sent {sent_count} inputs but decoded {len(phase['decoded'])}")
@@ -712,13 +761,14 @@ def measure_startup(target, sample, run, data_home, repetition=0):
     return float(match.group(1))
 
 
-def run_session(target, sample, run, data_home, options, sample_name=None):
-    measured = copy_sample(sample, run)
+def run_session(target, sample, run, data_home, options, sample_name=None, rust_project=False):
+    measured = copy_sample(sample, run, rust_project=rust_project)
     session = Session(target, measured, run, data_home, options.settle_ms)
     record = {"target": target, "sample": sample.name}
     try:
-        ready = json.loads(session.await_file(session.run / "ready.json", timeout=90).read_text())
+        ready = json.loads(session.await_file(session.run / "ready.json", timeout=90, startup=True).read_text())
         record["ready"] = ready
+        record["startup_prompts_acknowledged"] = session.startup_prompts
         # Includes the fixed settle delay: useful only as a relative figure
         # between targets. Startup itself is measured outside the PTY.
         record["settled_ms"] = round((time.monotonic_ns() - session.started_ns) / 1e6, 1)
@@ -800,7 +850,7 @@ def run_session(target, sample, run, data_home, options, sample_name=None):
         record["final"] = json.loads((session.run / "ready.json").read_text())
         record["final_rss_kb"] = resident_kb(session.pid)
         record["new_state_files"] = sorted(disk_files(run / "state") - before)
-        record["disk"] = {name: disk_usage(run / name) for name in ("cache", "state")}
+        record["disk"] = {name: disk_usage(run / name) for name in ("cache", "state", "workspace")}
     finally:
         session.close()
     return record
@@ -844,6 +894,7 @@ def main():
     data_home = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "nvim"
 
     samples = build_fixtures(base / "fixtures")
+    generated_rust = samples["rust"]
     if options.sample:
         samples = {name: path for name, path in samples.items() if name in options.sample}
         if not samples:
@@ -925,7 +976,10 @@ def main():
                 run = base / "session" / name / target / str(run_index)
                 run.mkdir(parents=True)
                 try:
-                    record = run_session(target, sample, run, data_home, options, sample_name=name)
+                    record = run_session(
+                        target, sample, run, data_home, options,
+                        sample_name=name, rust_project=sample == generated_rust,
+                    )
                 except (RuntimeError, TimeoutError, OSError) as error:
                     report["failure"] = {"target": target, "sample": name, "run": run_index, "error": str(error)}
                     (base / "results.json").write_text(json.dumps(report, indent=2) + "\n")

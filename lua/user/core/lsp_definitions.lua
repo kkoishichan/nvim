@@ -22,6 +22,7 @@ M.auxiliary = {
 
 local configured = false
 local original_commands = {}
+local node_commands = {}
 
 local function node_lsp_command(name, args)
 	return function(dispatchers, config)
@@ -272,6 +273,7 @@ function M.configure(opts)
 				command = node_lsp_command(node_name, vim.list_slice(command, 2))
 			end
 			original_commands[server] = vim.deepcopy(command)
+			node_commands[server] = node_name
 			local root = policy.lsp_root(config)
 			if node_name then
 				local guarded_root = root
@@ -308,7 +310,7 @@ end
 ---Point every definition at the executable installed right now and return the
 ---servers that can actually start. The caller decides whether to enable them
 ---automatically or to start one of them on request.
-function M.resolve()
+function M.resolve(opts)
 	M.configure()
 	local ready = {}
 	for _, server in ipairs(M.servers) do
@@ -322,7 +324,12 @@ function M.resolve()
 				table.insert(ready, server)
 			end
 		elseif type(cmd) == "function" then
-			table.insert(ready, server)
+			-- Full mode registers definitions for future project-local tools.
+			-- A manual picker must list only tools available to this buffer now.
+			local executable = node_commands[server]
+			if not (opts and opts.installed_only) or not executable or toolchain.node_executable(executable) then
+				table.insert(ready, server)
+			end
 		end
 	end
 	return ready
