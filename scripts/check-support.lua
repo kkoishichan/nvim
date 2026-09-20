@@ -18,7 +18,10 @@ end
 ---the same way a session does, so the assets it prepares are the assets that
 ---mode will actually load.
 function M.mode()
-	vim.opt.rtp:prepend(vim.env.NVIM_TEST_ROOT or "")
+	local root = vim.env.NVIM_TEST_ROOT
+	if root and root ~= "" then
+		vim.opt.rtp:prepend(root)
+	end
 	return require("user.core.mode").name()
 end
 
