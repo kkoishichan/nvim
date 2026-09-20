@@ -893,6 +893,10 @@ def main():
         help="also measure the first :FastLspStart in fast mode for this sample; repeatable",
     )
     parser.add_argument("--startup-cache", choices=("cold", "warm", "both"), default="both")
+    parser.add_argument(
+        "--keep-going", action="store_true",
+        help="collect the remaining samples after a failed measurement; exit status stays nonzero",
+    )
     options = parser.parse_args()
     if options.runs < 1:
         parser.error("--runs must be at least 1")
@@ -997,8 +1001,11 @@ def main():
                     )
                 except (RuntimeError, TimeoutError, OSError) as error:
                     report["failure"] = {"target": target, "sample": name, "run": run_index, "error": str(error)}
+                    report.setdefault("failures", []).append(report["failure"])
                     (base / "results.json").write_text(json.dumps(report, indent=2) + "\n")
                     print(f"Measurement failed: {error}. Evidence: {run}", file=sys.stderr)
+                    if options.keep_going:
+                        continue
                     return 1
                 record["run"] = run_index
                 report["sessions"].append(record)
@@ -1015,7 +1022,7 @@ def main():
 
     (base / "results.json").write_text(json.dumps(report, indent=2) + "\n")
     print(base / "results.json", flush=True)
-    return 0
+    return 1 if report.get("failures") else 0
 
 
 if __name__ == "__main__":
