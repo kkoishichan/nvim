@@ -14,6 +14,7 @@ local factories = {
 	{ "user.specs.explorer" },
 	{ "user.specs.picker" },
 	{ "user.specs.format" },
+	{ "user.specs.lsp" },
 }
 
 ---The complete fast-mode spec, dependencies included by way of each plugin's

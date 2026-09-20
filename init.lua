@@ -29,4 +29,8 @@ if capabilities.ui_panels then
 	require("user.core.layout").setup()
 end
 require("user.core.diagnostics")
+if not capabilities.lsp_auto then
+	-- No client starts on its own, so the explicit entry has to exist.
+	require("user.core.fast_lsp").setup()
+end
 require("user.lazy")

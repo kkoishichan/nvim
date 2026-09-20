@@ -290,6 +290,17 @@ local function pick_project()
 			return entry and entry_to_root[entry]
 		end
 
+		if not require("user.core.native_search").usable() then
+			-- Without fzf the same list is still a choice, just a native one.
+			vim.ui.select(entries, { prompt = "Projects" }, function(choice)
+				local root = choice and entry_to_root[choice]
+				if root then
+					open_directory(root, "Project")
+				end
+			end)
+			return
+		end
+
 		require("fzf-lua").fzf_exec(entries, {
 			prompt = "Projects> ",
 			winopts = {
@@ -334,8 +345,14 @@ local function path_from_fzf_selection(selected, opts)
 end
 
 local function pick_directory()
-	if vim.fn.executable("fd") == 0 then
-		vim.notify("Missing fd for directory picker", vim.log.levels.ERROR, { title = "Directory" })
+	if vim.fn.executable("fd") == 0 or not require("user.core.native_search").usable() then
+		-- Directory completion is built in, so the entry stays usable on a host
+		-- that never installed the search tools.
+		vim.ui.input({ prompt = "Directory: ", completion = "dir" }, function(answer)
+			if answer and answer ~= "" then
+				open_directory(normalize_path(vim.fn.expand(answer)), "Directory")
+			end
+		end)
 		return
 	end
 

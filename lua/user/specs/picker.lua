@@ -4,7 +4,14 @@
 local float_style = require("user.core.float_style")
 local mode = require("user.core.mode")
 
+-- Every picker entry goes through here, so a host that never installed fzf
+-- falls back to the native open, completion and quickfix search entries instead
+-- of loading a picker whose process cannot start.
 local function fzf()
+	local native = require("user.core.native_search")
+	if not native.usable() then
+		return native
+	end
 	return require("fzf-lua")
 end
 
@@ -23,6 +30,11 @@ return function()
 			-- Route vim.ui.select (code actions, etc.) through fzf-lua, lazily: the
 			-- first select call loads fzf-lua, which then replaces vim.ui.select.
 			init = function()
+				if not require("user.core.native_search").usable() then
+					-- Keep Neovim's own prompt rather than routing selections into
+					-- a picker whose process cannot start on this host.
+					return
+				end
 				local fallback = vim.ui.select
 				local wrapper
 				wrapper = function(...)

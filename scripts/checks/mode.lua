@@ -20,9 +20,11 @@ for _, capability in ipairs(mode.capability_names()) do
   end
 end
 local plugins = {}
+local loaded = {}
 local lazy = package.loaded["lazy.core.config"]
-for name in pairs(lazy and lazy.plugins or {}) do
+for name, plugin in pairs(lazy and lazy.plugins or {}) do
   table.insert(plugins, name)
+  loaded[name] = plugin._.loaded ~= nil
 end
 table.sort(plugins)
 table.sort(disabled)
@@ -41,6 +43,7 @@ local report = {
   storage = mode.storage(),
   disabled = disabled,
   plugins = plugins,
+  loaded = loaded,
   handles = handles,
   statusline = vim.o.statusline,
   undofile = vim.o.undofile,
@@ -206,12 +209,25 @@ report.extra.autocmds = ok_group and #events or 0
 	assert(fast.extra.treesitter, "Fast mode lost Tree-sitter highlighting")
 	assert(fast.extra.indentexpr ~= "", "Fast mode lost Tree-sitter indentation")
 	assert(fast.extra.autocmds == 0, "Fast mode registered events for a disabled feature")
-	local expected = { "conform.nvim", "fzf-lua", "lazy.nvim", "mini.nvim", "nvim-treesitter", "oil.nvim" }
+	local expected = {
+		"conform.nvim",
+		"fzf-lua",
+		"lazy.nvim",
+		"mini.nvim",
+		"nvim-lspconfig",
+		"nvim-treesitter",
+		"oil.nvim",
+	}
 	for _, name in ipairs(expected) do
 		assert(vim.tbl_contains(fast.plugins, name), "The fast plugin set is missing " .. name)
 	end
-	for _, name in ipairs({ "blink.cmp", "gitsigns.nvim", "lualine.nvim", "nvim-lspconfig", "neo-tree.nvim" }) do
+	for _, name in ipairs({ "blink.cmp", "gitsigns.nvim", "lualine.nvim", "neo-tree.nvim", "neoscroll.nvim" }) do
 		assert(not vim.tbl_contains(fast.plugins, name), "The fast plugin set still imported " .. name)
+	end
+	-- The language extension is installed but not started: only an explicit
+	-- request puts it on the runtimepath.
+	for _, name in ipairs({ "nvim-lspconfig", "conform.nvim", "fzf-lua", "mini.nvim", "oil.nvim" }) do
+		assert(not fast.loaded[name], name .. " was loaded during a fast startup")
 	end
 	assert(#fast.plugins < #default.plugins, "Fast mode did not reduce the imported plugin set")
 	assert(fast.commands.ModeInfo, ":ModeInfo is unavailable in fast mode")
@@ -291,11 +307,193 @@ report.extra.saved = vim.uv.fs_stat(file) ~= nil
 	)
 	assert(native.clients == 0, "The native entry started a language server")
 
+	-- 7. Everyday editing in fast mode: the Python colon fix, autopairs, a save
+	--    that does not wait for a formatter, and directory switching.
+	local editing = run("fast_editing", {
+		mode = "fast",
+		code = [[
+local api = vim.api
+local buffer = api.nvim_create_buf(false, false)
+api.nvim_set_current_buf(buffer)
+vim.bo[buffer].filetype = "python"
+local function type_keys(keys)
+  api.nvim_feedkeys(vim.keycode(keys .. "<Esc>"), "xt", false)
+end
+type_keys("idef attention(<CR>query")
+report.extra.parameter_indent = vim.fn.indent(2)
+type_keys("A:")
+report.extra.colon_indent = vim.fn.indent(2)
+type_keys("A Tensor,<CR>key:")
+report.extra.second_parameter_indent = vim.fn.indent(3)
+report.extra.pairs_loaded = package.loaded["mini.pairs"] ~= nil
+
+local file = vim.fs.joinpath(vim.fn.getcwd(), "saved.py")
+vim.cmd.edit(vim.fn.fnameescape(file))
+api.nvim_buf_set_lines(0, 0, -1, false, { "x   =  1" })
+vim.cmd.write()
+report.extra.saved = vim.fn.readfile(file)
+report.extra.conform_loaded = package.loaded["conform"] ~= nil
+
+local target = vim.fs.joinpath(vim.fn.getcwd(), "sub")
+vim.fn.mkdir(target, "p")
+vim.cmd("Cd " .. vim.fn.fnameescape(target))
+report.extra.cwd = vim.fn.getcwd()
+vim.cmd("FileDir")
+vim.wait(5000, function()
+  return vim.bo.filetype == "oil"
+end, 25)
+report.extra.explorer = vim.bo.filetype
+]],
+	})
+	assert(editing.extra.parameter_indent == 4, "A new Python parameter did not start at one indentation level")
+	assert(editing.extra.colon_indent == 4, "Typing a parameter colon added an indentation level in fast mode")
+	assert(editing.extra.second_parameter_indent == 4, "The second Python parameter is misindented in fast mode")
+	assert(editing.extra.pairs_loaded, "Autopairs did not load on the first inserted character")
+	assert(editing.extra.saved[1] == "x   =  1", "Saving reformatted the buffer in a mode without format-on-save")
+	assert(not editing.extra.conform_loaded, "Saving loaded the formatter in a mode without format-on-save")
+	assert(editing.extra.cwd:find("sub", 1, true), "Directory switching did not change the workspace")
+	assert(editing.extra.explorer == "oil", "The directory entry did not open the explorer")
+
+	-- 8. A language server exists only while it is asked for, and stopping it
+	--    releases the client rather than hiding its output.
+	local manual = run("fast_lsp", {
+		mode = "fast",
+		arguments = { vim.fs.joinpath(root, "lua", "user", "core", "mode.lua") },
+		code = [[
+local fast = require("user.core.fast_lsp")
+report.extra.primary = fast.candidates(0)
+report.extra.all = fast.candidates(0, true)
+report.extra.before = #vim.lsp.get_clients()
+vim.cmd("FastLspStart")
+vim.wait(20000, function()
+  return #vim.lsp.get_clients({ bufnr = 0 }) > 0
+end, 50)
+report.extra.attached = #vim.lsp.get_clients({ bufnr = 0 })
+report.extra.summary = fast.summary()
+report.extra.completion = package.loaded["blink.cmp"] ~= nil
+report.extra.lightbulb = package.loaded["nvim-lightbulb"] ~= nil
+report.extra.underline = vim.diagnostic.config().underline
+report.extra.omnifunc = vim.bo.omnifunc
+vim.cmd("FastLspStop")
+vim.wait(20000, function()
+  return #vim.lsp.get_clients() == 0
+end, 50)
+-- A stopped client can linger until its process is reaped; what matters is
+-- that nothing is still attached and nothing is still running.
+report.extra.attached_after = #vim.lsp.get_clients({ bufnr = 0 })
+report.extra.running_after = 0
+for _, client in ipairs(vim.lsp.get_clients()) do
+  if not client:is_stopped() then
+    report.extra.running_after = report.extra.running_after + 1
+  end
+end
+report.extra.summary_after = fast.summary()
+]],
+	})
+	assert(manual.extra.before == 0, "A language server was running before it was asked for")
+	assert(
+		not vim.tbl_contains(manual.extra.primary, "typos_lsp"),
+		"The spelling service was offered as a primary server"
+	)
+	assert(vim.tbl_contains(manual.extra.all, "typos_lsp"), "The spelling service is unreachable even by name")
+	assert(manual.extra.attached == 1, "The explicit request attached " .. manual.extra.attached .. " clients")
+	assert(manual.extra.summary ~= "none", ":ModeInfo would not report the manually started server")
+	assert(
+		not manual.extra.completion and not manual.extra.lightbulb,
+		"Starting a server pulled in the full-mode wiring"
+	)
+	assert(manual.extra.underline == false, "Diagnostics were drawn in a mode that reads them on request")
+	assert(manual.extra.omnifunc:find("lsp", 1, true), "Manual completion was not wired to the started server")
+	assert(manual.extra.attached_after == 0, "Stopping left the client attached to the buffer")
+	assert(manual.extra.running_after == 0, "Stopping left the client running")
+	assert(manual.extra.summary_after == "none", "The stopped client is still reported as managed")
+
+	-- 9. Without a search stack the picker keys still open, complete and search.
+	local bare = vim.fs.joinpath(tmp, "empty-path")
+	vim.fn.mkdir(bare, "p")
+	local search = run("no_search", {
+		mode = "fast",
+		env = { PATH = bare },
+		code = [[
+local native = require("user.core.native_search")
+report.extra.usable = native.usable()
+local file = vim.fs.joinpath(vim.fn.getcwd(), "target.txt")
+vim.fn.writefile({ "needle here" }, file)
+local input = vim.ui.input
+vim.ui.input = function(_, callback)
+  callback("target.txt")
+end
+native.files({ cwd = vim.fn.getcwd() })
+report.extra.opened = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(0), ":t")
+vim.ui.input = function(_, callback)
+  callback("needle")
+end
+native.grep({ cwd = vim.fn.getcwd() })
+vim.ui.input = input
+report.extra.matches = #vim.fn.getqflist()
+report.extra.picker_loaded = package.loaded["fzf-lua"] ~= nil
+]],
+	})
+	assert(not search.extra.usable, "The search fallback did not notice the missing picker dependency")
+	assert(search.extra.opened == "target.txt", "The native open entry did not open the file")
+	assert(search.extra.matches > 0, "The native grep entry produced no quickfix matches")
+	assert(not search.extra.picker_loaded, "A missing picker dependency still loaded the picker")
+
+	-- 10. A mapping for a feature this mode does not run must not exist at all,
+	--     so it cannot become an implicit load entry.
+	for _, lhs in ipairs({
+		"<Leader>aa",
+		"<Leader>ap",
+		"<Leader>k",
+		"<Leader>mo",
+		"<Leader>M",
+		"<Leader>e",
+		"<Leader>ft",
+	}) do
+		assert(not fast.mappings[lhs], "Fast mode kept " .. lhs .. " for a feature it does not load")
+	end
+
+	-- 11. A costly document still drops to reduced features, and recovering it
+	--     restores only what this mode actually runs.
+	local heavy = run("fast_bigfile", {
+		mode = "fast",
+		code = [[
+local file = vim.fs.joinpath(vim.fn.getcwd(), "wide.lua")
+vim.fn.writefile({ "local text = \"" .. string.rep("x", 4000) .. "\"" }, file)
+vim.cmd.edit(vim.fn.fnameescape(file))
+vim.wait(2000, function()
+  return vim.b.bigfile == true
+end, 25)
+report.extra.heavy = vim.b.bigfile
+report.extra.heavy_reason = vim.b.user_buffer_cost
+vim.wait(2000, function()
+  return vim.treesitter.highlighter.active[vim.api.nvim_get_current_buf()] == nil
+end, 25)
+report.extra.heavy_treesitter = vim.treesitter.highlighter.active[vim.api.nvim_get_current_buf()] ~= nil
+vim.api.nvim_buf_set_lines(0, 0, -1, false, { "local text = \"short\"" })
+vim.wait(2000, function()
+  return vim.b.bigfile == false
+end, 25)
+report.extra.recovered = vim.b.bigfile
+vim.wait(2000, function()
+  return vim.treesitter.highlighter.active[vim.api.nvim_get_current_buf()] ~= nil
+end, 25)
+report.extra.recovered_treesitter = vim.treesitter.highlighter.active[vim.api.nvim_get_current_buf()] ~= nil
+report.extra.decorations = package.loaded["ibl"] ~= nil or package.loaded["illuminate"] ~= nil
+]],
+	})
+	assert(heavy.extra.heavy, "A costly document kept full features in fast mode")
+	assert(not heavy.extra.heavy_treesitter, "Tree-sitter kept parsing a costly document")
+	assert(heavy.extra.recovered == false, "An ordinary document did not recover its features")
+	assert(heavy.extra.recovered_treesitter, "Recovery did not restore Tree-sitter highlighting")
+	assert(not heavy.extra.decorations, "Recovery re-enabled a decoration this mode does not run")
+
 	print(
-		("Mode evidence: full by default; NVIM_MODE > preference > default; auto follows SSH; fast imports %d plugins (full %d) with %d disabled capabilities; read-only and relocated state handled; native entry browsed, indented and saved without a plugin manager."):format(
+		("Mode evidence: full by default; NVIM_MODE > preference > default; auto follows SSH; fast imports %d plugins (full %d) with %d disabled capabilities; Python colon indent, autopairs, plain save and directory switching kept; one server on request then released (%s); native search, native entry and read-only state handled."):format(
 			#fast.plugins,
 			#default.plugins,
-			#fast.disabled
+			#fast.disabled,
+			manual.extra.summary
 		)
 	)
 end
