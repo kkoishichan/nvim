@@ -29,6 +29,7 @@ assert(
 		"signature",
 		"lifecycle",
 		"pdf_lifecycle",
+		"image_scroll",
 		"windows",
 		"layout_session",
 		"ui_themes",
