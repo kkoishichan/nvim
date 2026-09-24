@@ -40,7 +40,7 @@ end, {
 
 vim.api.nvim_create_user_command("FastModeToggle", function()
 	mode.toggle()
-end, { desc = "Toggle saved fast mode (restart required)" })
+end, { desc = "Toggle and save fast mode, then restart" })
 
 vim.api.nvim_create_user_command("FastMode", function(command)
 	local names = { on = "fast", off = "full", auto = "auto" }
@@ -56,7 +56,7 @@ end, {
 	complete = function()
 		return { "on", "off", "auto" }
 	end,
-	desc = "Save editor mode for the next launch",
+	desc = "Save editor mode and restart to apply",
 })
 
 -- Everything the mode decided, on demand. Startup prints at most one line and

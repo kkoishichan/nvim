@@ -198,6 +198,8 @@ report.extra.saved = preferences.get()
 report.extra.current = mode.name()
 report.extra.mapping = vim.fn.maparg("<leader>uf", "n")
 vim.cmd("FastModeToggle")
+report.extra.retried = preferences.get("runtime").mode
+vim.cmd("FastMode off")
 report.extra.toggled_back = preferences.get("runtime").mode
 vim.cmd("FastMode on")
 ]],
@@ -210,7 +212,8 @@ vim.cmd("FastMode on")
 		toggled.extra.saved.tools.prefer_mason and toggled.extra.saved.format.timeout_ms == 950,
 		"Toggle lost other preferences"
 	)
-	assert(toggled.extra.toggled_back == "full", "A second toggle did not cancel the pending change")
+	assert(toggled.extra.retried == "fast", "Retrying a blocked restart canceled the pending mode instead")
+	assert(toggled.extra.toggled_back == "full", "An explicit current-mode selection did not cancel the pending change")
 	assert(toggled.extra.mapping:find("FastModeToggle", 1, true), "Fast mode toggle mapping missing")
 	local restarted = run(
 		"persistent_toggle",
@@ -224,6 +227,65 @@ report.extra.current = mode.name()
 		run("persistent_toggle", { keep_preferences = true }).mode == "full",
 		"Saved full mode did not survive restart"
 	)
+	local switch_requests = run("switch_requests", {
+		mode = "fast",
+		preferences = { runtime = { mode = "full" } },
+		code = [[
+local requests = 0
+package.loaded["user.core.mode_restart"] = { restart = function() requests = requests + 1 end }
+vim.cmd("FastModeToggle")
+report.extra.saved = require("user.core.preferences").get("runtime").mode
+report.extra.requests = requests
+vim.cmd("FastMode on")
+report.extra.same_mode_requests = requests
+vim.env.SSH_CONNECTION = ""
+vim.env.SSH_TTY = ""
+vim.cmd("FastMode auto")
+report.extra.auto_requests = requests
+report.extra.current = mode.name()
+]],
+	})
+	assert(switch_requests.extra.saved == "full", "Toggle followed a stale preference instead of the active mode")
+	assert(switch_requests.extra.requests == 1, "Changing mode did not request a restart")
+	assert(switch_requests.extra.same_mode_requests == 1, "Selecting the active mode requested an unnecessary restart")
+	assert(switch_requests.extra.auto_requests == 2, "Auto mode did not restart when its resolved mode changed")
+	assert(switch_requests.extra.current == "fast", "The switch attempted to change capabilities in place")
+	run("canceled_restart", {
+		mode = "full",
+		code = [[
+local native_command, native_uis = vim.cmd, vim.api.nvim_list_uis
+vim.cmd("args first.txt second\\ file.txt third.txt")
+vim.cmd("2argument")
+vim.api.nvim_buf_set_lines(0, 0, -1, false, { "unsaved text" })
+local arguments, index = vim.fn.argv(), vim.fn.argidx()
+local window, buffer = vim.api.nvim_get_current_win(), vim.api.nvim_get_current_buf()
+local options, session = vim.o.sessionoptions, vim.v.this_session
+local panel = vim.api.nvim_create_buf(true, true)
+vim.api.nvim_buf_set_name(panel, "plugin-placeholder")
+local dirty_panel = vim.api.nvim_create_buf(true, true)
+vim.bo[dirty_panel].buftype = "acwrite"
+vim.api.nvim_buf_set_lines(dirty_panel, 0, -1, false, { "unsaved panel" })
+vim.api.nvim_list_uis = function() return { {} } end
+vim.cmd = function(command)
+  if command ~= "confirm restart" then return native_command(command) end
+  assert(vim.env.NVIM_MODE == nil, "Interactive choice kept the old environment override")
+  assert(vim.o.sessionoptions == "buffers,curdir,tabpages,winsize", "Restart would restore old plugin state")
+  assert(not vim.bo[panel].buflisted, "Restart snapshot includes a plugin placeholder")
+  assert(vim.bo[dirty_panel].buflisted, "Unlisting bypassed unsaved plugin-buffer checks")
+  native_command("%argdelete")
+  vim.v.this_session = "temporary-restart-session"
+end
+local ok, err = pcall(mode.set_default, "fast")
+vim.cmd, vim.api.nvim_list_uis = native_command, native_uis
+assert(ok, err)
+assert(vim.deep_equal(arguments, vim.fn.argv()) and vim.fn.argidx() == index, "Cancel lost the argument list or its index")
+assert(vim.o.sessionoptions == options and vim.env.NVIM_MODE == "full", "Cancel lost process settings")
+assert(vim.v.this_session == session, "Cancel left a temporary session selected")
+assert(vim.bo[panel].buflisted and vim.bo[dirty_panel].buflisted, "Cancel lost listed buffers")
+assert(vim.api.nvim_get_current_win() == window and vim.api.nvim_get_current_buf() == buffer)
+assert(vim.bo.modified and vim.api.nvim_get_current_line() == "unsaved text", "Cancel changed unsaved content")
+]],
+	})
 	local failed_toggle = run("failed_toggle", {
 		code = [[
 local path = vim.fn.stdpath("config") .. "/preferences.json"

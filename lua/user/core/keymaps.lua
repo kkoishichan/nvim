@@ -245,7 +245,7 @@ end, { desc = "Theme picker" })
 
 map("n", "<leader>uT", "<cmd>TransparentToggle<cr>", { desc = "Toggle transparent background" })
 map("n", "<leader>up", "<cmd>FloatStyleToggle<cr>", { desc = "Toggle saved popup style (restart)" })
-map("n", "<leader>uf", "<cmd>FastModeToggle<cr>", { desc = "Toggle saved fast mode (restart)" })
+map("n", "<leader>uf", "<cmd>FastModeToggle<cr>", { desc = "Toggle fast mode and restart" })
 
 map("n", "<leader>L", "<cmd>Lazy<cr>", { desc = "Lazy" })
 

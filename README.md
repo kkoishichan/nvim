@@ -328,7 +328,7 @@ Claude 原生 IDE 集成在一个 Neovim 中只有一个终端：首次打开时
 }
 ```
 
-工具偏好修改后运行 `:ToolsRefresh`；运行模式、恢复存储和弹窗样式重启后生效。
+工具偏好修改后运行 `:ToolsRefresh`；直接编辑运行模式、恢复存储和弹窗样式后需重启。
 无效值采用默认设置，并在健康报告中说明。
 项目自身的格式化和检查规则继续放在项目原生配置文件中。
 
@@ -341,10 +341,14 @@ Tree-sitter 语法高亮，默认不启动语言服务、补全、Git 标记、�
 保留 leader 快捷键提示：按空格等待 300 ms 显示当前可用操作，普通和可视模式均可使用；
 快速模式使用纯文本按键标签，不依赖 Nerd Font。
 
-按 `<leader>uf`（空格、u、f）或执行 `:FastModeToggle` 切换并保存默认模式；
+按 `<leader>uf`（空格、u、f）或执行 `:FastModeToggle` 保存选择并自动原地重启，切换 full / fast；
 `:FastMode on` 开启，`:FastMode off` 关闭，`:FastMode auto` 按 SSH 环境选择。
-设置写入 `preferences.json`，重启 Neovim 后生效；连续切换可撤销尚未生效的选择，
-其他个人偏好保持不变。配置目录只读或 JSON 损坏时会明确报告保存失败。
+设置写入 `preferences.json`。有未保存修改时显示原生确认框，可保存、放弃修改或取消重启；
+取消后选择仍已保存，再次切换会重试，也可用 `:FastMode on/off` 改回当前模式。
+重启恢复文件、标签页、分屏和光标位置，插件与显示设置按新模式初始化，终端任务不会自动重放。
+有运行中的终端任务时会先确认是否停止，默认取消；取消后任务继续运行。
+已处于目标模式时只保存选择；无 UI 的 headless 会话只保存并提示手动重启。
+其他个人偏好保持不变，配置目录只读或 JSON 损坏时不重启并报告保存失败。
 
 ```sh
 NVIM_MODE=fast nvim path/to/file.py
@@ -353,7 +357,8 @@ NVIM_MODE=full nvim path/to/file.py
 
 显式环境变量优先，其次是 `preferences.json` 的 `runtime.mode`（`full` / `fast` /
 `auto`），未配置时仍用 `full`。`auto` 只看连接本身：`SSH_CONNECTION` 或 `SSH_TTY`
-非空时选择 `fast`。模式在启动时确定，换模式需要重启；快速模式的原生状态栏显示
+非空时选择 `fast`。模式在启动时确定，交互切换会清除重启子进程继承的 `NVIM_MODE`，
+让已保存的选择生效；父 shell 的环境变量不变。快速模式的原生状态栏显示
 `FAST`，`:ModeInfo` 按需列出选择来源、关闭的能力、降级原因和存储路径。
 功能取舍见[快速模式设计](docs/fast-mode.md)，性能数据与测量边界见
 [运行模式实测](docs/fast-mode-measurements.md)。
