@@ -118,7 +118,7 @@ local function bufferline_highlights()
 	return highlights
 end
 
-local specs = require("user.specs.theme")()
+local specs = vim.list_extend(require("user.specs.theme")(), require("user.specs.which_key")())
 
 return vim.list_extend(specs, {
 	{
@@ -717,57 +717,6 @@ return vim.list_extend(specs, {
 			local lualine = require("lualine")
 			lualine.setup(opts)
 			require("user.core.statusline_refresh").setup()
-		end,
-	},
-	{
-		"folke/which-key.nvim",
-		event = "VeryLazy",
-		opts = function()
-			-- Register every group label for normal AND visual mode, so the leader
-			-- popup shows names in visual mode too (which-key prunes groups that have
-			-- no mappings in the current mode).
-			local groups = {
-				{ "<leader>a", group = "ai" },
-				{ "<leader>b", group = "buffer" },
-				{ "<leader>c", group = "code" },
-				{ "<leader>cp", group = "peek" },
-				{ "<leader>d", group = "debug" },
-				{ "<leader>f", group = "find" },
-				{ "<leader>g", group = "git" },
-				{ "<leader>gh", group = "hunk" },
-				{ "<leader>gx", group = "conflict" },
-				{ "<leader>j", group = "job" },
-				{ "<leader>m", group = "markup" },
-				{ "<leader>r", group = "test" },
-				{ "<leader>s", group = "session" },
-				{ "<leader>t", group = "terminal" },
-				{ "<leader>u", group = "ui" },
-				{ "<leader>v", group = "multicursor" },
-				{ "<leader>x", group = "diagnostics" },
-				{ "gs", group = "surround" },
-			}
-			for _, g in ipairs(groups) do
-				g.mode = { "n", "x" }
-			end
-			return {
-				preset = "modern",
-				delay = 300,
-				spec = groups,
-				win = {
-					border = float_style.border(),
-					padding = { 1, 1 },
-					wo = {
-						winblend = 0,
-						winhighlight = "Normal:Pmenu,NormalFloat:Pmenu,FloatBorder:Pmenu,FloatTitle:Pmenu",
-					},
-				},
-				icons = {
-					-- which-key's default Space icon is "󱁐 " -- a glyph followed by a
-					-- trailing space, which makes the leader popup title read as the
-					-- symbol plus a stray space. Use a plain space symbol, no trailing space.
-					keys = { Space = "␣" },
-				},
-			}
 		end,
 	},
 })

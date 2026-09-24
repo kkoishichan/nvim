@@ -335,6 +335,9 @@ Claude 原生 IDE 集成在一个 Neovim 中只有一个终端：首次打开时
 Tree-sitter 语法高亮，默认不启动语言服务、补全、Git 标记、装饰、折叠提供者和
 附加界面，适合 SSH、容器和资源有限的服务器。
 
+保留 leader 快捷键提示：按空格等待 300 ms 显示当前可用操作，普通和可视模式均可使用；
+快速模式使用纯文本按键标签，不依赖 Nerd Font。
+
 按 `<leader>uf`（空格、u、f）或执行 `:FastModeToggle` 切换并保存默认模式；
 `:FastMode on` 开启，`:FastMode off` 关闭，`:FastMode auto` 按 SSH 环境选择。
 设置写入 `preferences.json`，重启 Neovim 后生效；连续切换可撤销尚未生效的选择，

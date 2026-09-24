@@ -292,6 +292,7 @@ report.extra.mini_after = package.loaded["mini.ai"] ~= nil
 		"nvim-lspconfig",
 		"nvim-treesitter",
 		"oil.nvim",
+		"which-key.nvim",
 	}
 	for _, name in ipairs(expected) do
 		assert(vim.tbl_contains(fast.plugins, name), "The fast plugin set is missing " .. name)

@@ -11,6 +11,7 @@ local factories = {
 	{ "user.specs.theme", { single = true } },
 	{ "user.specs.treesitter" },
 	{ "user.specs.editing" },
+	{ "user.specs.which_key" },
 	{ "user.specs.explorer" },
 	{ "user.specs.picker" },
 	{ "user.specs.format" },
