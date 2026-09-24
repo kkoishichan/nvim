@@ -116,11 +116,32 @@ return function(tmp)
 		end
 		local separator = palette.highlight("WinSeparator")
 		result.separator = contrast(separator.fg, normal.bg)
-		assert(result.separator >= 3, name .. " transparent splits have insufficient contrast")
-		for _, group in ipairs({ "VertSplit", "NeoTreeWinSeparator", "NeoTreeVertSplit", "BufferLineOffsetSeparator" }) do
+		local adjusted = name == "tokyonight" or name == "catppuccin"
+		if adjusted then
+			assert(
+				result.separator > contrast(opaque.WinSeparator.fg, normal.bg),
+				name .. " transparent splits did not become more visible"
+			)
+			assert(
+				luminance(separator.fg) < luminance(palette.blend(normal.fg, normal.bg, 0.55)),
+				name .. " transparent splits retained the overly bright grey"
+			)
+		end
+		for _, group in ipairs({
+			"WinSeparator",
+			"VertSplit",
+			"NeoTreeWinSeparator",
+			"NeoTreeVertSplit",
+			"BufferLineOffsetSeparator",
+		}) do
 			local value = palette.highlight(group)
-			if next(value) then
+			if adjusted and next(value) then
 				assert(value.fg == separator.fg, name .. " " .. group .. " does not match the window separator")
+			elseif not adjusted then
+				assert(
+					value.fg == opaque[group].fg and value.ctermfg == opaque[group].ctermfg,
+					name .. " " .. group .. " did not keep its original foreground"
+				)
 			end
 		end
 		assert(vim.deep_equal(palette.highlight("Directory"), directory), name .. " changed Directory globally")

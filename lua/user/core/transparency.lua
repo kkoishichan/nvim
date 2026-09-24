@@ -89,14 +89,18 @@ function M.apply()
 			vim.api.nvim_set_hl(0, name, value)
 		end
 	end
-	-- Theme borders can be almost as dark as their opaque background. Use a
-	-- brighter theme-derived grey for splits, retaining any underline/style.
+	-- Only these themes need a lift from their near-background separators.
+	-- Keep the other themes' original foregrounds, including terminal colours.
+	local colors_name = vim.g.colors_name or ""
+	if not vim.startswith(colors_name, "tokyonight") and not vim.startswith(colors_name, "catppuccin") then
+		return
+	end
 	local p = palette.get()
-	local foreground = palette.blend(p.fg, p.bg, 0.55)
+	local foreground = palette.blend(p.fg, p.bg, 0.35)
 	for _, name in ipairs(separators) do
 		local value = palette.highlight(name)
 		if next(value) then
-			value.fg, value.ctermfg = foreground, 7 -- ANSI grey for terminals without true colour.
+			value.fg, value.ctermfg = foreground, 8 -- ANSI dark grey without true colour.
 			value.bg, value.ctermbg = nil, nil
 			vim.api.nvim_set_hl(0, name, value)
 		end
