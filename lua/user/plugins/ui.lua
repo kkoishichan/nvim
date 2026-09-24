@@ -115,17 +115,26 @@ local function bufferline_highlights(defaults)
 		highlights[name] = vim.tbl_extend("force", highlights[name] or {}, { italic = false })
 	end
 
+	-- Sidebar offsets use a separate group, outside bufferline's own table.
+	-- Keep Directory's theme colours without changing that group globally.
+	local offset = palette.highlight("Directory")
 	if require("user.core.transparency").is_enabled() then
 		-- Cover every state, separator and filler in the public highlights table.
-		-- Icons created later inherit these backgrounds from their parent state.
+		-- A continuous underline separates the bar without consuming another row;
+		-- icons created later inherit both the background and line from their state.
+		local surface = {
+			bg = "NONE",
+			ctermbg = "NONE",
+			underline = true,
+			sp = p.strong,
+			default = false,
+		}
 		for name in pairs(defaults.highlights) do
-			highlights[name] = vim.tbl_extend("force", highlights[name] or {}, {
-				bg = "NONE",
-				ctermbg = "NONE",
-				default = false,
-			})
+			highlights[name] = vim.tbl_extend("force", highlights[name] or {}, surface)
 		end
+		offset = vim.tbl_extend("force", offset, surface)
 	end
+	vim.api.nvim_set_hl(0, "UserBufferlineOffset", offset)
 
 	return highlights
 end
@@ -618,7 +627,7 @@ return vim.list_extend(specs, {
 					{
 						filetype = "neo-tree",
 						text = "Explorer",
-						highlight = "Directory",
+						highlight = "UserBufferlineOffset",
 						text_align = "left",
 						separator = true,
 					},

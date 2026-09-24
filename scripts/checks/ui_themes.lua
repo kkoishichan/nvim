@@ -2,7 +2,7 @@ return function(tmp)
 	local theme = require("user.core.theme")
 	local palette = require("user.core.palette")
 	local transparency = require("user.core.transparency")
-	require("lazy").load({ plugins = { "bufferline.nvim", "nvim-treesitter-context" } })
+	require("lazy").load({ plugins = { "bufferline.nvim", "nvim-treesitter-context", "neo-tree.nvim" } })
 	local surfaces = {
 		"TreesitterContext",
 		"TreesitterContextBottom",
@@ -15,6 +15,11 @@ return function(tmp)
 		"BufferLineBufferSelected",
 		"BufferLineSeparator",
 		"BufferLineSeparatorSelected",
+		"BufferLineOffsetSeparator",
+		"UserBufferlineOffset",
+		"NeoTreeDimText",
+		"NeoTreeIndentMarker",
+		"NeoTreeExpander",
 	}
 	local reports = {}
 	local function luminance(color)
@@ -37,6 +42,8 @@ return function(tmp)
 		assert(contrast(normal.fg, normal.bg) >= 4.5, name .. " normal text has insufficient contrast")
 		local result = { normal = contrast(normal.fg, normal.bg), popup = {} }
 		local menu_bg = palette.highlight("Pmenu").bg
+		local directory = palette.highlight("Directory")
+		local tree_selection = palette.highlight("NeoTreeCursorLine")
 		local opaque = {}
 		for _, group in ipairs(surfaces) do
 			opaque[group] = palette.highlight(group)
@@ -88,7 +95,18 @@ return function(tmp)
 		for _, group in ipairs(surfaces) do
 			local value = palette.highlight(group)
 			assert(value.bg == nil and value.ctermbg == nil, name .. " " .. group .. " stayed opaque")
+			if group:match("^BufferLine") or group == "UserBufferlineOffset" then
+				assert(
+					value.underline and value.sp == palette.get().strong,
+					name .. " " .. group .. " lost its separator"
+				)
+			end
 		end
+		assert(vim.deep_equal(palette.highlight("Directory"), directory), name .. " changed Directory globally")
+		assert(
+			vim.deep_equal(palette.highlight("NeoTreeCursorLine"), tree_selection),
+			name .. " removed the explorer's selection background"
+		)
 		transparency.toggle()
 		vim.notify = notify
 		assert(palette.highlight("Normal").bg == normal.bg, name .. " opaque editor colour was not restored")
