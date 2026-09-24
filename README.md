@@ -9,9 +9,9 @@ Neovim 打磨成接近 IDE 的日常工作流。
 - `glance.nvim` 提供定义、声明、实现、类型与引用的双栏 Peek 界面。
 - `oil.nvim` 像编辑 buffer 一样管理文件系统；`neo-tree.nvim` 提供侧边文件树。
 - `blink.cmp` 负责补全、snippet 与签名帮助；`Tab` / `Enter` 确认候选，方向键选择，
-	`Alt-Space` 主动唤起（`Ctrl-Space` 留给输入法）；当前重载默认以带函数标记的虚拟文本显示，并在空间允许时借用可见的相邻行，
-	长签名按窗口宽度省略，优先显示正在填写的参数；缩放、滚动和补全菜单出现时重新布局。
-	`Ctrl-K` 切换完整签名浮窗，`Ctrl-B` / `Ctrl-F` 滚动超出屏幕的签名。
+	`Alt-Space` 主动唤起（`Ctrl-Space` 留给输入法）。签名使用 Blink 内置浮窗，自动触发，
+	进入已有调用的插入模式时也会请求；长签名自动换行，最多显示 6 行，保留语法和当前参数高亮。
+	`Ctrl-K` 显示／隐藏签名，`Ctrl-B` / `Ctrl-F` 滚动签名；位置与补全菜单避让由 Blink 处理。
 - `nvim-lspconfig` + Mason 负责语言服务与外部工具安装。
 - `conform.nvim` 格式化，`nvim-lint` 静态检查。
 - `nvim-ufo` + Tree-sitter 折叠。
@@ -79,8 +79,6 @@ Selene、Stylelint、golangci-lint 仅在项目存在对应配置时运行，避
 │       │   ├── backdrop.lua   -- 浮窗背景调暗
 │       │   ├── buffer_policy.lua -- 有界成本判定与各功能准入
 │       │   ├── buffers.lua    -- 保留分屏的文件关闭与保存选择
-│       │   ├── blink_signature.lua -- 签名提示稳定入口
-│       │   ├── signature/     -- 调用解析、参数选择、渲染与 Blink 适配
 │       │   ├── commands.lua   -- 自定义命令
 │       │   ├── conflicts.lua  -- Git conflict 高亮、跳转与选择
 │       │   ├── diagnostics.lua -- 诊断 UI
@@ -482,8 +480,12 @@ Go 汇编仅在 `.s`、Go 项目和 Plan 9 指令特征同时匹配时使用 asm
 - PDF PNG 缓存目录权限设为仅当前用户可访问，保留不超过 30 天且总量限制为 512 MiB。
 - PDF 渲染与缓存扫描按需启动；关闭文件和重载时取消该实例的进程与监听。
   无图形协议或缺少可选工具时显示原因与外部打开入口。
-- 签名提示的解析与 Blink 适配分离，插件内部接口缺失时回退到普通签名提示。
+- 签名提示只使用 Blink 的公开配置和快捷键，重载与当前参数采用 LSP 返回结果，
+  不再维护自定义调用解析、内联渲染和窗口补丁。
   AI 操作也按首次使用加载；主题回调使用具名替换，避免重载时重复注册。
+- 当前锁定的 Blink `1.10.2` 在某些非首位重载中存在参数高亮偏移问题，可能导致签名浮窗不显示。
+  例如 LSP 选择第二个重载，而它的当前参数位置超出第一个重载的长度时会触发。
+  遇到此情况可用 `:lua vim.lsp.buf.signature_help()` 查看 Neovim 原生签名；本配置不再接管 Blink 的渲染来绕过此限制。
 - 修改配置后运行 `./scripts/check.sh`，执行静态、部署故障检查及核心行为回归。
   每个 Neovim 组使用独立进程与临时 config / cache / state / log，复用已安装的插件和工具；
   先核对版本锁与补全二进制，缺少依赖时失败并提示准备，不在检查中安装。

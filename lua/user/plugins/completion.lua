@@ -1,4 +1,3 @@
-local blink_signature = require("user.core.blink_signature")
 local float_style = require("user.core.float_style")
 
 local function dismiss_popups(cmp)
@@ -34,7 +33,7 @@ return {
 				["<M-Space>"] = { "show", "show_documentation", "hide_documentation" },
 				["<CR>"] = { "accept", "fallback" },
 				["<Esc>"] = { dismiss_popups, "fallback" },
-				["<C-k>"] = { blink_signature.toggle, "fallback" },
+				["<C-k>"] = { "show_signature", "hide_signature", "fallback" },
 				["<C-b>"] = { "scroll_signature_up", "scroll_documentation_up", "fallback" },
 				["<C-f>"] = { "scroll_signature_down", "scroll_documentation_down", "fallback" },
 			},
@@ -70,15 +69,14 @@ return {
 			},
 			signature = {
 				enabled = true,
-				-- Show the selected overload as virtual text; C-k toggles the full popup.
+				-- Let Blink own requests, parameter highlights and popup positioning.
 				trigger = {
-					enabled = true,
 					-- Also ask once when Insert mode starts inside an existing call.
 					show_on_insert = true,
 				},
 				window = {
 					border = float_style.is_enabled() and "padded" or nil,
-					max_height = blink_signature.compact_height,
+					max_height = 6,
 				},
 			},
 			cmdline = {
@@ -109,9 +107,5 @@ return {
 			},
 		},
 		opts_extend = { "sources.default" },
-		config = function(_, opts)
-			require("blink.cmp").setup(opts)
-			blink_signature.setup()
-		end,
 	},
 }

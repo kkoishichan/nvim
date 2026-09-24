@@ -1,144 +1,186 @@
 return function(tmp)
-	for _, topic in ipairs({ "signature_parameters", "signature_layout", "signature_compact", "signature_render" }) do
-		local path = vim.fs.joinpath(vim.env.NVIM_TEST_ROOT, "scripts", "checks", topic .. ".lua")
-		assert(loadfile(path))()(tmp)
-	end
 	require("lazy").load({ plugins = { "blink.cmp" } })
-	local signature = require("user.core.blink_signature")
-	local window = require("blink.cmp.signature.window")
-	local trigger = require("blink.cmp.signature.trigger")
-	-- Blink finishes installing its own listeners on the scheduled startup turn.
-	vim.wait(100, function()
-		return false
-	end, 10)
-	signature.teardown()
-	local original_open, original_update = window.open_with_signature_help, window.update_position
-	local original_height = window.win.config.max_height
-	local listeners = #trigger.hide_emitter.listeners
-	local namespace = vim.api.nvim_get_namespaces().user_blink_signature
-	local bufnr = vim.api.nvim_create_buf(false, true)
-	vim.api.nvim_set_current_buf(bufnr)
-	vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "", "call(value)", "" })
-	vim.api.nvim_win_set_cursor(0, { 2, 8 })
-	local context = { id = 501, bufnr = bufnr, cursor = { 2, 8 } }
-	local help = { signatures = { { label = "call(value: string)", parameters = { { label = "value: string" } } } } }
-	local function marks()
-		return vim.api.nvim_buf_get_extmarks(bufnr, namespace, 0, -1, {})
-	end
-	local autocmd_count
-	for _ = 1, 3 do
-		assert(signature.setup(), "Supported Blink internals did not activate")
-		assert(#trigger.hide_emitter.listeners == listeners + 1, "Repeated setup stacked hide listeners")
-		local count = #vim.api.nvim_get_autocmds({ group = "user_blink_signature_virtual" })
-		autocmd_count = autocmd_count or count
-		assert(count == autocmd_count, "Repeated setup stacked refresh callbacks")
-		window.open_with_signature_help(context, help)
-		assert(#marks() == 1, "Compact signature did not produce exactly one card")
-	end
-
-	-- Capture the actual debounce handle; cleanup must close it, and scheduled
-	-- redraw/toggle work must not recreate a card after the owner has gone away.
-	local original_defer = vim.defer_fn
-	local timer
-	vim.defer_fn = function(callback, delay)
-		timer = original_defer(callback, delay)
-		return timer
-	end
-	trigger.context = nil
-	vim.api.nvim_exec_autocmds("CursorMovedI", { group = "user_blink_signature_virtual", buffer = bufnr })
-	vim.defer_fn = original_defer
-	assert(timer and not timer:is_closing(), "Discovery debounce was not scheduled")
-	local requested = 0
-	signature.toggle({
-		is_signature_visible = function()
-			return false
-		end,
-		show_signature = function()
-			requested = requested + 1
-			return true
-		end,
-	})
-	signature.teardown()
-	signature.teardown()
-	assert(timer:is_closing(), "Teardown left the discovery timer alive")
-	vim.wait(100, function()
-		return false
-	end, 10)
-	assert(#marks() == 0 and requested == 0, "Stale callbacks survived signature teardown")
-	assert(window.open_with_signature_help == original_open, "Teardown did not restore the original renderer")
-	assert(window.update_position == original_update, "Teardown did not restore the original positioning")
-	assert(window.win.config.max_height == original_height, "Teardown did not restore Blink's window height")
-	assert(#trigger.hide_emitter.listeners == listeners, "Teardown leaked hide listeners")
-	assert(vim.fn.exists("#user_blink_signature_virtual") == 0, "Teardown leaked its autocmd group")
-
-	-- A complete config-module reload must release callbacks owned by the old
-	-- Lua instance before capturing Blink functions for the new instance.
-	assert(signature.setup(), "Could not set up reload fixture")
-	local mapped_toggle = signature.toggle
-	for _, name in ipairs({ "user.core.blink_signature", "user.core.signature.render", "user.core.signature.adapter" }) do
-		package.loaded[name] = nil
-	end
-	signature = require("user.core.blink_signature")
-	assert(signature.setup(), "Reloaded signature module did not activate")
-	assert(#trigger.hide_emitter.listeners == listeners + 1, "Reload retained the previous owner")
-	window.open_with_signature_help(context, help)
-	assert(#marks() == 1, "Reloaded renderer duplicated the card")
-	mapped_toggle({
-		is_signature_visible = function()
-			return false
-		end,
-	})
+	local cmp = require("blink.cmp")
+	local api = vim.api
+	-- Blink installs its event listeners after checking the fuzzy binary.
 	assert(
-		vim.wait(200, function()
-			return window.win:is_open()
+		vim.wait(2000, function()
+			return package.loaded["blink.cmp.signature"] ~= nil
 		end),
-		"A mapping retained the inactive renderer after module reload"
+		"Blink signature setup did not finish"
 	)
-	signature.teardown()
-	assert(window.open_with_signature_help == original_open, "Reload wrapped an older custom renderer")
-	assert(window.update_position == original_update, "Reload wrapped older custom positioning")
-
-	-- Simulate an upstream internal method disappearing while the public Blink
-	-- API remains usable. This must leave Blink's normal signature path intact.
-	local original_width = rawget(window.win, "get_content_width")
-	window.win.get_content_width = false
-	local enabled, reason = signature.setup()
-	assert(not enabled and type(reason) == "string", "Missing internal capability did not select fallback")
-	assert(window.open_with_signature_help == original_open, "Fallback changed Blink's normal renderer")
-	local blink_fallback = 0
-	signature.toggle({
-		show_signature = function()
-			blink_fallback = blink_fallback + 1
-			return true
+	local buf = api.nvim_create_buf(true, false)
+	api.nvim_buf_set_name(buf, tmp .. "/signature.fixture")
+	api.nvim_set_current_buf(buf)
+	-- Exercise the real LSP -> Blink path with deterministic responses. No
+	-- external server, Blink internals or custom renderer is needed by this check.
+	local response
+	local requests = 0
+	local client_id = assert(vim.lsp.start({
+		name = "signature_fixture",
+		root_dir = tmp,
+		cmd = function(dispatchers)
+			local closing = false
+			local id = 0
+			local function close()
+				if not closing then
+					closing = true
+					vim.schedule(function()
+						dispatchers.on_exit(0, 0)
+					end)
+				end
+			end
+			return {
+				request = function(method, _, callback)
+					id = id + 1
+					local result = vim.NIL
+					if method == "initialize" then
+						result = {
+							capabilities = {
+								textDocumentSync = 1,
+								signatureHelpProvider = { triggerCharacters = { "(", "," } },
+							},
+						}
+					elseif method == "textDocument/signatureHelp" then
+						requests = requests + 1
+						result = vim.deepcopy(response)
+					end
+					vim.schedule(function()
+						callback(nil, result)
+					end)
+					return true, id
+				end,
+				notify = function(method)
+					if method == "exit" then
+						close()
+					end
+					return true
+				end,
+				is_closing = function()
+					return closing
+				end,
+				terminate = close,
+			}
 		end,
-	})
-	assert(blink_fallback == 0, "Fallback touched UI during the expression mapping")
+	}, { bufnr = buf }))
+	local client = assert(vim.lsp.get_client_by_id(client_id))
 	assert(
-		vim.wait(200, function()
-			return blink_fallback == 1
+		vim.wait(2000, function()
+			return client.initialized and vim.lsp.buf_is_attached(buf, client_id)
 		end),
-		"Public Blink signature fallback did not run"
+		"Signature fixture did not attach"
 	)
-	window.win.get_content_width = original_width
 
-	local native_fallback = 0
-	local original_native = vim.lsp.buf.signature_help
-	vim.lsp.buf.signature_help = function()
-		native_fallback = native_fallback + 1
+	local function popup()
+		for _, win in ipairs(api.nvim_list_wins()) do
+			if vim.bo[api.nvim_win_get_buf(win)].filetype == "blink-cmp-signature" then
+				return win
+			end
+		end
 	end
-	signature.toggle({
-		show_signature = function()
-			error("Public Blink signature API unavailable")
-		end,
-	})
-	assert(
-		vim.wait(200, function()
-			return native_fallback == 1
-		end),
-		"Native LSP fallback did not run"
+	local function hide()
+		assert(cmp.hide_signature(), "Public signature hide failed")
+		assert(
+			vim.wait(1000, function()
+				return not cmp.is_signature_visible()
+			end),
+			"Signature popup stayed open"
+		)
+	end
+	local function show(help, line, filetype, automatic)
+		response = help
+		local lines = {}
+		for _ = 1, 12 do
+			lines[#lines + 1] = ""
+		end
+		lines[#lines + 1] = line
+		api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+		-- Avoid starting unrelated real language servers for these fixtures.
+		vim.cmd("noautocmd setlocal filetype=" .. filetype)
+		api.nvim_win_set_cursor(0, { #lines, #line - 1 })
+		vim.cmd.redraw()
+		local cursor = api.nvim_win_get_cursor(0)
+		local leftcol = vim.fn.winsaveview().leftcol
+		if automatic then
+			api.nvim_exec_autocmds("InsertEnter", { buffer = buf, modeline = false })
+		else
+			assert(cmp.show_signature(), "Public signature show failed")
+		end
+		assert(
+			vim.wait(1000, cmp.is_signature_visible),
+			"LSP response did not open a signature popup: " .. vim.v.errmsg
+		)
+		assert(vim.deep_equal(cursor, api.nvim_win_get_cursor(0)), "Signature moved the editing cursor")
+		assert(vim.fn.winsaveview().leftcol == leftcol, "Signature scrolled the editing window horizontally")
+		return assert(popup())
+	end
+	local function highlighted_parameter(win)
+		local popup_buf = api.nvim_win_get_buf(win)
+		for _, mark in ipairs(api.nvim_buf_get_extmarks(popup_buf, -1, 0, -1, { details = true })) do
+			local details = mark[4]
+			if details.hl_group == "BlinkCmpSignatureHelpActiveParameter" then
+				return table.concat(
+					api.nvim_buf_get_text(popup_buf, mark[2], mark[3], details.end_row, details.end_col, {}),
+					"\n"
+				)
+			end
+		end
+	end
+
+	-- Trust the server's keyword-argument index, including Unicode labels.
+	local win = show({
+		activeParameter = 0,
+		signatures = {
+			{
+				label = "调用(值: str, 次数: int)",
+				parameters = { { label = "值: str" }, { label = "次数: int" } },
+			},
+		},
+	}, "调用(次数=2, 值='文字')", "python", true)
+	assert(highlighted_parameter(win) == "值: str", "Server-selected keyword parameter was not highlighted")
+	hide()
+
+	-- Blink 1.10.2 has an upstream non-first-overload highlight bug (README).
+	-- Keep the ordinary server-selected-first case; do not patch its renderer.
+	win = show({
+		activeSignature = 0,
+		activeParameter = 1,
+		signatures = {
+			{
+				label = "int pick(int first, int second)",
+				parameters = { { label = "int first" }, { label = "int second" } },
+			},
+			{ label = "int pick(int first)", parameters = { { label = "int first" } } },
+		},
+	}, "pick(1, 2)", "cpp")
+	assert(highlighted_parameter(win) == "int second", "LSP-selected overload lost its active parameter")
+	assert(api.nvim_buf_line_count(api.nvim_win_get_buf(win)) >= 2, "Alternative overload was discarded")
+	hide()
+
+	local parameters = {}
+	for index = 1, 16 do
+		parameters[index] = "    parameter_" .. index .. ": int,"
+	end
+	win = show(
+		{ signatures = { { label = "long_call(\n" .. table.concat(parameters, "\n") .. "\n)" } } },
+		"long_call()",
+		"python"
 	)
-	vim.lsp.buf.signature_help = original_native
-	assert(signature.setup(), "Custom signatures did not recover when capabilities returned")
-	signature.teardown()
-	vim.api.nvim_buf_delete(bufnr, { force = true })
+	assert(
+		api.nvim_win_get_height(win) > 1 and api.nvim_win_get_height(win) <= 6,
+		"Multiline signature height is wrong"
+	)
+	local initial_row = api.nvim_win_get_cursor(win)[1]
+	assert(cmp.scroll_signature_down(), "Public signature scroll failed")
+	assert(
+		vim.wait(1000, function()
+			return api.nvim_win_get_cursor(win)[1] > initial_row
+		end),
+		"Long signature did not scroll"
+	)
+	assert(cmp.scroll_signature_up(), "Public signature reverse scroll failed")
+	hide()
+	assert(requests == 3, "Manual signature checks made duplicate requests")
+	client:stop(true)
+	api.nvim_buf_delete(buf, { force = true })
 end
