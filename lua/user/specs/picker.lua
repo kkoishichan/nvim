@@ -97,6 +97,14 @@ return function()
 				end)
 			end,
 			opts = {
+				-- The framed picker and its preview need their own solid surface
+				-- when Normal is transparent. fzf paints terminal cells separately.
+				hls = float_style.is_enabled() and {
+					normal = "NormalFloat",
+					preview_normal = "NormalFloat",
+					help_normal = "NormalFloat",
+					fzf = { normal = "NormalFloat", gutter = "NormalFloat", query = "NormalFloat" },
+				} or nil,
 				defaults = {
 					file_icons = extras and "mini" or false,
 					color_icons = extras,

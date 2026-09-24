@@ -1,5 +1,7 @@
 return function(tmp)
 	local theme = require("user.core.theme")
+	local palette = require("user.core.palette")
+	local transparency = require("user.core.transparency")
 	local reports = {}
 	local function luminance(color)
 		local function channel(value)
@@ -33,6 +35,39 @@ return function(tmp)
 				name .. " has an invisible " .. severity .. " diagnostic"
 			)
 		end
+		-- A focused popup can remap Normal to its own colours. Transparency must
+		-- still save/restore the global editor palette, not the popup's surface.
+		local buf = vim.api.nvim_create_buf(false, true)
+		local win = vim.api.nvim_open_win(buf, true, {
+			relative = "editor",
+			row = 1,
+			col = 1,
+			width = 24,
+			height = 3,
+			border = "rounded",
+			style = "minimal",
+		})
+		vim.wo[win].winhighlight = "Normal:Pmenu,NormalFloat:Pmenu"
+		assert(palette.get().bg == normal.bg, name .. " focused popup changed the base palette")
+		local notify = vim.notify
+		vim.notify = function() end
+		transparency.toggle()
+		assert(palette.highlight("Normal").bg == nil, name .. " editor stayed opaque")
+		assert(transparency.background() == normal.bg, name .. " saved the popup's background as the editor colour")
+		local floating = palette.highlight("NormalFloat")
+		assert(floating.bg and floating.bg ~= normal.bg, name .. " float uses the transparent editor's base colour")
+		assert(palette.highlight("FloatBorder").bg == floating.bg, name .. " float border has a different surface")
+		result.transparent_popup = contrast(floating.fg or normal.fg, floating.bg)
+		assert(result.transparent_popup >= 4.5, name .. " transparent-mode float is hard to read")
+		transparency.toggle()
+		vim.notify = notify
+		assert(palette.highlight("Normal").bg == normal.bg, name .. " opaque editor colour was not restored")
+		assert(
+			palette.highlight("NormalFloat").bg == normal.bg,
+			name .. " framed float kept an unnecessary colour lift"
+		)
+		vim.api.nvim_win_close(win, true)
+		vim.api.nvim_buf_delete(buf, { force = true })
 		reports[name] = result
 	end
 	theme.set("vscode", false)

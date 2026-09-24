@@ -9,7 +9,7 @@ local M = {}
 
 local function set_notify_highlights()
 	local p = palette.get()
-	local bg = p.panel
+	local bg = p.float
 	-- Per-level accent pulled from the theme's diagnostic colours.
 	local levels = {
 		ERROR = p.error,
@@ -19,7 +19,8 @@ local function set_notify_highlights()
 		TRACE = p.gray,
 	}
 
-	vim.api.nvim_set_hl(0, "NotifyBackground", { bg = bg })
+	-- nvim-notify uses this as the fade destination, not the window's fill.
+	vim.api.nvim_set_hl(0, "NotifyBackground", { bg = p.bg })
 	vim.api.nvim_set_hl(0, "NotifyLogTime", { fg = p.gray })
 	vim.api.nvim_set_hl(0, "NotifyLogTitle", { fg = p.warn, bold = true })
 
@@ -40,10 +41,10 @@ local function set_float_highlights()
 		return
 	end
 	local p = palette.get()
-	vim.api.nvim_set_hl(0, "NormalFloat", { fg = p.fg, bg = p.bg })
+	vim.api.nvim_set_hl(0, "NormalFloat", { fg = p.fg, bg = p.float })
 	-- FloatBorder remains the source of truth for application-sized panels.
-	vim.api.nvim_set_hl(0, "FloatBorder", { fg = p.accent, bg = p.bg })
-	vim.api.nvim_set_hl(0, "FloatTitle", { fg = p.accent, bg = p.bg, bold = true })
+	vim.api.nvim_set_hl(0, "FloatBorder", { fg = p.accent, bg = p.float })
+	vim.api.nvim_set_hl(0, "FloatTitle", { fg = p.accent, bg = p.float, bold = true })
 	-- Borderless popup blocks use Pmenu for both body and padding, and PmenuSel
 	-- for selected rows. Explicit links cover plugins that reset winhighlight
 	-- after creating their windows.
@@ -54,10 +55,10 @@ local function set_float_highlights()
 	vim.api.nvim_set_hl(0, "BlinkCmpDocBorder", { link = "Pmenu" })
 	-- The detail/docs separator line defaults to NormalFloat (editor bg), so its
 	-- row shows through against the Pmenu doc bg. Match the doc bg, grey line.
-	vim.api.nvim_set_hl(0, "BlinkCmpDocSeparator", { fg = p.gray, bg = vim.api.nvim_get_hl(0, { name = "Pmenu" }).bg })
+	vim.api.nvim_set_hl(0, "BlinkCmpDocSeparator", { fg = p.gray, bg = palette.highlight("Pmenu").bg })
 	vim.api.nvim_set_hl(0, "BlinkCmpSignatureHelp", { link = "Pmenu" })
 	vim.api.nvim_set_hl(0, "BlinkCmpSignatureHelpBorder", { link = "Pmenu" })
-	local popup_bg = vim.api.nvim_get_hl(0, { name = "Pmenu", link = false }).bg or p.panel
+	local popup_bg = palette.highlight("Pmenu").bg or p.panel
 	-- Mark the active parameter with a quiet neutral lift instead of the default
 	-- blue/cyan LspSignatureActiveParameter background. With no foreground here,
 	-- the signature's Tree-sitter colours remain visible.
@@ -97,9 +98,7 @@ local function set_signature_highlights()
 	local p = palette.get()
 	vim.api.nvim_set_hl(0, "BlinkCmpSignatureIndicator", { link = "BlinkCmpKindFunction" })
 	vim.api.nvim_set_hl(0, "BlinkCmpSignatureVirtualIndicator", { fg = p.warn })
-	local popup_bg = vim.api.nvim_get_hl(0, { name = "BlinkCmpSignatureHelp", link = false }).bg
-		or vim.api.nvim_get_hl(0, { name = "Pmenu", link = false }).bg
-		or p.panel
+	local popup_bg = palette.highlight("BlinkCmpSignatureHelp").bg or palette.highlight("Pmenu").bg or p.panel
 	vim.api.nvim_set_hl(0, "BlinkCmpSignatureVirtual", { bg = popup_bg })
 end
 
@@ -109,7 +108,7 @@ end
 local function set_scrollview_highlights()
 	local p = palette.get()
 	local function foreground(name, fallback)
-		return vim.api.nvim_get_hl(0, { name = name, link = false }).fg or fallback
+		return palette.highlight(name).fg or fallback
 	end
 	local search = foreground("Special", p.warn)
 	local mark = foreground("Identifier", p.accent)

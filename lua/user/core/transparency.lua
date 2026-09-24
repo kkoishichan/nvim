@@ -1,4 +1,4 @@
--- Clear editor surfaces without changing syntax colours or popup backgrounds.
+-- Clear editor surfaces while retaining opaque, theme-derived popup surfaces.
 -- Keep the original definitions so toggling off restores links as well as RGB
 -- and terminal colours, without reloading the theme or any plugins.
 local M = {}
@@ -32,22 +32,6 @@ local groups = {
 	"EdgyWinBarNC",
 }
 
--- link=false also follows the current window's winhighlight. Resolve global
--- links ourselves so toggling from a dock cannot replace Normal's saved colour
--- with the dock's colour or overwrite its saved definition with a cleared one.
-local function global_highlight(name)
-	local seen = {}
-	while not seen[name] do
-		seen[name] = true
-		local value = vim.api.nvim_get_hl(0, { name = name, link = true, create = false })
-		if not value.link then
-			return value
-		end
-		name = value.link
-	end
-	return {}
-end
-
 function M.is_enabled()
 	return enabled
 end
@@ -61,8 +45,9 @@ function M.apply()
 	if not enabled then
 		return
 	end
+	local palette = require("user.core.palette")
 	for _, name in ipairs(groups) do
-		local value = global_highlight(name)
+		local value = palette.highlight(name)
 		if value.bg or value.ctermbg then
 			originals[name] = vim.api.nvim_get_hl(0, { name = name, link = true, create = false })
 			if name == "Normal" then
@@ -84,6 +69,9 @@ function M.toggle()
 		end
 		originals, background = {}, nil
 	end
+	-- Framed floats use the editor colour when opaque and a solid panel colour
+	-- when transparent. Refresh their groups without reloading the colorscheme.
+	require("user.core.ui_highlights").apply()
 
 	local saved, err = pcall(function()
 		vim.fn.mkdir(vim.fn.fnamemodify(file, ":h"), "p")

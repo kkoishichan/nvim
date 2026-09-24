@@ -5,9 +5,24 @@
 
 local M = {}
 
+-- Resolve global links explicitly: get_hl(link=false) also follows the current
+-- window's winhighlight. Opening a Pmenu-backed float must not turn its colours
+-- into the base palette when a theme or transparency setting is changed there.
+function M.highlight(name)
+	local seen = {}
+	while not seen[name] do
+		seen[name] = true
+		local value = vim.api.nvim_get_hl(0, { name = name, link = true, create = false })
+		if not value.link then
+			return value
+		end
+		name = value.link
+	end
+	return {}
+end
+
 local function attr(name, key)
-	local h = vim.api.nvim_get_hl(0, { name = name, link = false })
-	return h[key]
+	return M.highlight(name)[key]
 end
 
 ---Mix two 0xRRGGBB colours; `alpha` is the weight of `a` (1 = all a, 0 = all b).
@@ -30,8 +45,10 @@ end
 ---Snapshot of theme colours. Cheap; call it fresh each time the highlights are
 ---applied (startup + every ColorScheme) so it always reflects the live theme.
 function M.get()
+	local transparency = require("user.core.transparency")
 	local fg = attr("Normal", "fg") or 0xebdbb2
-	local bg = attr("Normal", "bg") or require("user.core.transparency").background() or 0x1d2021
+	local bg = attr("Normal", "bg") or transparency.background() or 0x1d2021
+	local panel = M.blend(fg, bg, 0.05)
 	return {
 		fg = fg,
 		bg = bg,
@@ -40,7 +57,10 @@ function M.get()
 		-- themes (gruvbox aqua, tokyonight/catppuccin/vscode blue), unlike Function/Title
 		-- which go green in gruvbox.
 		accent = attr("DiagnosticInfo", "fg") or 0x83a598,
-		panel = M.blend(fg, bg, 0.05), -- barely-lifted panel bg (notifications)
+		panel = panel,
+		-- A visible frame is enough separation on an opaque editor. With a
+		-- transparent editor retain a solid, subtly distinct popup surface.
+		float = transparency.is_enabled() and panel or bg,
 		subtle = M.blend(fg, bg, 0.15), -- soft highlight bg (word under cursor, folds)
 		strong = M.blend(fg, bg, 0.25), -- heavier highlight bg (write refs, matchparen)
 		error = attr("DiagnosticError", "fg") or 0xfb4934,

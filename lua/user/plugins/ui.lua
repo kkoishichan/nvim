@@ -236,11 +236,12 @@ return vim.list_extend(specs, {
 				},
 				scratch = {
 					-- Scratch is an application-sized panel, so it keeps the shared
-					-- accent FloatBorder and editor background.
+					-- accent FloatBorder and the opaque NormalFloat surface, even
+					-- when the editor's Normal background is transparent.
 					-- Size tracks the shared float_scale so it matches lazygit/terminal.
 					width = layout.float_scale,
 					height = layout.float_scale,
-					wo = { winhighlight = "NormalFloat:Normal" },
+					wo = { winhighlight = "Normal:NormalFloat,NormalNC:NormalFloat" },
 				},
 			},
 		},
@@ -510,7 +511,9 @@ return vim.list_extend(specs, {
 				return math.min(math.max(math.floor(vim.o.lines * 0.5), 10), 20)
 			end,
 			minimum_width = 44,
-			render = "default",
+			render = function(...)
+				return require("user.core.notify_style").render(...)
+			end,
 			stages = "fade",
 			timeout = 3000,
 			top_down = true,

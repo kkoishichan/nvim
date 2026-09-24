@@ -13,9 +13,8 @@ return function()
 	assert(plugins["lsp_signature.nvim"] == nil, "lsp_signature.nvim is still configured")
 	assert(opts("nvim-notify").stages == "fade", "nvim-notify animation or frame was changed")
 	assert(
-		vim.api.nvim_get_hl(0, { name = "NotifyBackground", link = false }).bg
-			== require("user.core.palette").get().panel,
-		"nvim-notify background was changed"
+		vim.api.nvim_get_hl(0, { name = "NotifyBackground", link = false }).bg == require("user.core.palette").get().bg,
+		"nvim-notify does not fade toward the opaque editor background"
 	)
 
 	-- Other application-sized overlays deliberately keep their framed layouts.
