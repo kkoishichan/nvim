@@ -4,6 +4,10 @@ local map = vim.keymap.set
 map({ "n", "v" }, "<Space>", "<Nop>", { silent = true })
 
 map("n", "<leader>w", "<cmd>write<cr>", { desc = "Write file" })
+map("n", "<leader>W", "<cmd>wall<cr>", { desc = "Write all files" })
+map("n", "<leader>R", function()
+	require("user.core.mode_restart").restart()
+end, { desc = "Restart Neovim" })
 map("n", "<leader>q", "<cmd>quit<cr>", { desc = "Quit window" })
 map("n", "<leader>Q", "<cmd>qa<cr>", { desc = "Quit all" })
 map("n", "<Esc>", function()

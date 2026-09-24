@@ -1,10 +1,13 @@
--- An explicit mode change restarts the process; plugin state is never unloaded
--- in place. Keep only the editor workspace in the native restart session.
+-- Keep only the editor workspace in the native restart session, so startup
+-- settings (including a changed editor mode) can take effect in the new process.
 local M = {}
 
-function M.restart()
+---@param opts? { apply_mode?: boolean }
+function M.restart(opts)
+	local apply_mode = opts and opts.apply_mode
+	local notice = apply_mode and "Editor mode saved. " or ""
 	if #vim.api.nvim_list_uis() == 0 then
-		vim.notify("Editor mode saved. Restart Neovim to apply (no attached UI).", vim.log.levels.INFO)
+		vim.notify(notice .. "Restart Neovim manually (no attached UI).", vim.log.levels.INFO)
 		return false
 	end
 	-- :qall may silently stop hidden terminal jobs. Ask before touching the
@@ -26,7 +29,7 @@ function M.restart()
 			)
 			~= 1
 	then
-		vim.notify("Editor mode saved; restart canceled. Terminal tasks are still running.", vim.log.levels.INFO)
+		vim.notify(notice .. "Restart canceled. Terminal tasks are still running.", vim.log.levels.INFO)
 		return false
 	end
 	local options, environment = vim.o.sessionoptions, vim.env.NVIM_MODE
@@ -46,9 +49,11 @@ function M.restart()
 	-- Old options, mappings and fold providers must not override the new mode.
 	-- Terminal commands are not replayed automatically after the restart.
 	vim.opt.sessionoptions = { "buffers", "curdir", "tabpages", "winsize" }
-	-- The interactive choice applies to the restarted child even if this editor
-	-- was launched with NVIM_MODE. The parent shell's environment is untouched.
-	vim.env.NVIM_MODE = nil
+	-- A mode switch applies the saved choice even if launched with NVIM_MODE;
+	-- an ordinary restart preserves that launch override.
+	if apply_mode then
+		vim.env.NVIM_MODE = nil
+	end
 	local ok, err = pcall(vim.cmd, "confirm restart")
 	-- A successful restart exits this process. On refusal/cancellation leave its
 	-- options and buffers exactly as they were; the saved choice remains pending.
@@ -77,10 +82,11 @@ function M.restart()
 			end
 		end)
 	end
+	local retry = apply_mode and "Run :FastModeToggle to retry." or "Press <leader>R to retry."
 	vim.notify(
-		"Editor mode saved; restart was not completed. " .. (ok and "Run :FastModeToggle to retry." or tostring(err)),
+		notice .. "Restart was not completed. " .. (ok and retry or tostring(err)),
 		vim.log.levels.WARN,
-		{ title = "Editor mode" }
+		{ title = "Neovim restart" }
 	)
 	return false
 end

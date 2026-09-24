@@ -237,7 +237,7 @@ function M.set_default(name)
 			{ title = "Editor mode" }
 		)
 	else
-		require("user.core.mode_restart").restart()
+		require("user.core.mode_restart").restart({ apply_mode = true })
 	end
 	return true
 end
