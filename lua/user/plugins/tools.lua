@@ -10,7 +10,7 @@ return {
 			preview = {
 				auto_preview = true,
 				border = float_style.border(),
-				winblend = 0,
+				winblend = float_style.is_enabled() and 0 or nil,
 			},
 		},
 	},

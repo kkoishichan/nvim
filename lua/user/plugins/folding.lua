@@ -25,8 +25,10 @@ return {
 			},
 			preview = {
 				win_config = float_style.padded({
-					winblend = 0,
-					winhighlight = "Normal:Pmenu,NormalFloat:Pmenu,FloatBorder:Pmenu,CursorLine:PmenuSel",
+					winblend = float_style.is_enabled() and 0 or nil,
+					winhighlight = float_style.is_enabled()
+							and "Normal:Pmenu,NormalFloat:Pmenu,FloatBorder:Pmenu,CursorLine:PmenuSel"
+						or nil,
 					maxheight = 20,
 				}),
 				mappings = {

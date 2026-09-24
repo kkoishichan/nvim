@@ -4,6 +4,7 @@
 -- ships just the selected theme, because an absent plugin would otherwise be
 -- reported as missing on every launch.
 local theme = require("user.core.theme")
+local float_style = require("user.core.float_style")
 
 local function specs()
 	return {
@@ -57,7 +58,7 @@ local function specs()
 				transparent = false,
 				-- The stock popup is #202020 against a #1F1F1F editor. Our small
 				-- borderless floats use Pmenu, so lift it enough to remain legible.
-				color_overrides = { vscPopupBack = "#2D2D30" },
+				color_overrides = float_style.is_enabled() and { vscPopupBack = "#2D2D30" } or nil,
 				italic_comments = true,
 				underline_links = true,
 				terminal_colors = true,

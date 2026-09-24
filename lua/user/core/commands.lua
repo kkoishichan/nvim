@@ -6,6 +6,38 @@ vim.api.nvim_create_user_command("TransparentToggle", function()
 	require("user.core.transparency").toggle()
 end, { desc = "Toggle and save transparent background" })
 
+vim.api.nvim_create_user_command("FloatStyleToggle", function()
+	require("user.core.float_style").toggle()
+end, { desc = "Toggle saved popup style (restart required)" })
+
+vim.api.nvim_create_user_command("FloatStyle", function(command)
+	local style = require("user.core.float_style")
+	if command.args == "on" or command.args == "off" then
+		style.set_default(command.args == "on")
+	elseif command.args == "" then
+		local function label(value)
+			return value and "unified" or "plugin defaults"
+		end
+		vim.notify(
+			"Popup style: "
+				.. label(style.is_enabled())
+				.. "; saved: "
+				.. label(require("user.core.preferences").get("ui").float_style)
+				.. " (restart to apply).",
+			vim.log.levels.INFO,
+			{ title = "Popup style" }
+		)
+	else
+		vim.notify("Use :FloatStyle on|off", vim.log.levels.ERROR)
+	end
+end, {
+	nargs = "?",
+	complete = function()
+		return { "on", "off" }
+	end,
+	desc = "Show popup style or save it for the next launch",
+})
+
 vim.api.nvim_create_user_command("FastModeToggle", function()
 	mode.toggle()
 end, { desc = "Toggle saved fast mode (restart required)" })

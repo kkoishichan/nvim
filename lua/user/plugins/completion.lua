@@ -1,4 +1,5 @@
 local blink_signature = require("user.core.blink_signature")
+local float_style = require("user.core.float_style")
 
 local function dismiss_popups(cmp)
 	require("user.core.popups").close({ blink = cmp })
@@ -48,7 +49,7 @@ return {
 						-- "padded" = inner padding, no border lines. Paired with a
 						-- lifted Pmenu background (see ui_highlights) this reads as a
 						-- clean background block instead of a framed float.
-						border = "padded",
+						border = float_style.is_enabled() and "padded" or nil,
 					},
 				},
 				ghost_text = {
@@ -60,11 +61,11 @@ return {
 					},
 				},
 				menu = {
-					border = "padded",
+					border = float_style.is_enabled() and "padded" or nil,
 					-- Blink places the scrollbar in the padded border column, where it
 					-- can collide with the documentation window. Its public switch is
 					-- preferable to patching private geometry modules.
-					scrollbar = false,
+					scrollbar = not float_style.is_enabled(),
 				},
 			},
 			signature = {
@@ -76,7 +77,7 @@ return {
 					show_on_insert = true,
 				},
 				window = {
-					border = "padded",
+					border = float_style.is_enabled() and "padded" or nil,
 					max_height = blink_signature.compact_height,
 				},
 			},
@@ -87,7 +88,7 @@ return {
 				},
 				completion = {
 					-- Pop the candidate menu automatically while typing `:`, like
-					-- wildmenu. Border comes from the global completion.menu ("padded").
+					-- wildmenu. Border follows the global completion.menu style.
 					menu = { auto_show = true },
 				},
 			},

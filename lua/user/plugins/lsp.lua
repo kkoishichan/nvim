@@ -87,9 +87,7 @@ return {
 				detached = function(winid)
 					return vim.api.nvim_win_get_width(winid) < 110
 				end,
-				border = {
-					enable = false,
-				},
+				border = float_style.is_enabled() and { enable = false } or nil,
 				list = {
 					position = "right",
 					width = 0.34,
@@ -132,6 +130,9 @@ return {
 			})
 			glance.setup(opts)
 
+			if not float_style.is_enabled() then
+				return
+			end
 			-- Make the peek panels use the completion menu's Pmenu block colours.
 			-- glance sets its groups with default = true, so these explicit
 			-- overrides win; re-applied on every colorscheme switch.

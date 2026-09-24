@@ -120,7 +120,7 @@ return {
 		opts = {
 			popup = {
 				border = float_style.border(),
-				padding = 0,
+				padding = float_style.is_enabled() and 0 or nil,
 			},
 			completion = {
 				crates = { enabled = true },

@@ -160,8 +160,10 @@ return vim.list_extend(require("user.specs.explorer")(), {
 			preview_window = {
 				auto_preview = false,
 				border = float_style.border(),
-				winhl = "Normal:Pmenu,NormalFloat:Pmenu,FloatBorder:Pmenu,FloatTitle:Pmenu,EndOfBuffer:Pmenu",
-				winblend = 0,
+				winhl = float_style.is_enabled()
+						and "Normal:Pmenu,NormalFloat:Pmenu,FloatBorder:Pmenu,FloatTitle:Pmenu,EndOfBuffer:Pmenu"
+					or nil,
+				winblend = float_style.is_enabled() and 0 or nil,
 			},
 			providers = {
 				priority = { "lsp", "markdown", "norg", "treesitter" },

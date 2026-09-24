@@ -223,10 +223,10 @@ return vim.list_extend(specs, {
 						-- first press only to leave Insert mode.
 						i_esc = { "<Esc>", { "cmp_close", "cancel" }, mode = "i", expr = true },
 					},
-					wo = {
+					wo = float_style.is_enabled() and {
 						winblend = 0,
 						winhighlight = "Normal:Pmenu,NormalFloat:Pmenu,FloatBorder:Pmenu,FloatTitle:Pmenu",
-					},
+					} or nil,
 				},
 				notification = {
 					border = "rounded",

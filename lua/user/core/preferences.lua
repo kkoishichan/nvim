@@ -1,7 +1,7 @@
 local M = {}
 local defaults = {
 	tools = { prefer_mason = false },
-	ui = { min_editor_width = 40, min_editor_height = 8 },
+	ui = { min_editor_width = 40, min_editor_height = 8, float_style = true },
 	format = { timeout_ms = 800 },
 	-- An empty state_dir means "use the standard state path"; a server pointing
 	-- at local disk avoids writing recovery data to a network home.

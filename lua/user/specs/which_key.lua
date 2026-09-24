@@ -87,11 +87,11 @@ return function()
 					spec = groups,
 					win = {
 						border = float_style.border(),
-						padding = { 1, 1 },
-						wo = {
+						padding = float_style.is_enabled() and { 1, 1 } or nil,
+						wo = float_style.is_enabled() and {
 							winblend = 0,
 							winhighlight = "Normal:Pmenu,NormalFloat:Pmenu,FloatBorder:Pmenu,FloatTitle:Pmenu",
-						},
+						} or nil,
 					},
 					icons = {
 						-- which-key's default Space icon is "󱁐 " -- a glyph followed by a

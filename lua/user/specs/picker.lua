@@ -77,7 +77,7 @@ return function()
 							border = float_style.border(),
 							backdrop = 60,
 						},
-						hls = {
+						hls = float_style.is_enabled() and {
 							normal = "Pmenu",
 							border = "Pmenu",
 							title = "Pmenu",
@@ -92,7 +92,7 @@ return function()
 								gutter = "Pmenu",
 								query = "Pmenu",
 							},
-						},
+						} or nil,
 					}
 				end)
 			end,

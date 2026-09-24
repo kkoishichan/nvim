@@ -1,4 +1,8 @@
 local M = {}
+local preferences = require("user.core.preferences")
+-- Plugins cache their window options at different points in startup. Keep one
+-- style for the whole process; the saved choice takes effect on the next launch.
+local enabled = preferences.get("ui").float_style
 
 local padded_border = { " ", "", "", " ", "", "", " ", " " }
 
@@ -12,6 +16,29 @@ local styled_window_highlights = {
 	FloatTitle = "Pmenu",
 	EndOfBuffer = "Pmenu",
 }
+
+function M.is_enabled()
+	return enabled
+end
+
+function M.set_default(value)
+	local ok, err = preferences.set("ui", "float_style", value)
+	if not ok then
+		vim.notify(err, vim.log.levels.ERROR, { title = "Popup style" })
+		return false
+	end
+	vim.notify(
+		"Saved popup style: " .. (value and "unified" or "plugin defaults") .. ". Restart Neovim to apply.",
+		vim.log.levels.INFO,
+		{ title = "Popup style" }
+	)
+	return true
+end
+
+function M.toggle()
+	-- Toggle the saved value so pressing twice cancels a pending change.
+	return M.set_default(not preferences.get("ui").float_style)
+end
 
 local function border_character(item)
 	return type(item) == "table" and item[1] or item
@@ -31,13 +58,13 @@ local function merge_winhighlight(current)
 	return table.concat(entries, ",")
 end
 
----Return a fresh copy suitable for plugin options that accept an 8-part border.
+---Return a fresh border, or nil to leave the plugin/global default in control.
 function M.border()
-	return vim.deepcopy(padded_border)
+	return enabled and vim.deepcopy(padded_border) or nil
 end
 
 ---Build a borderless floating-window config with one cell of horizontal
----padding. The padding and body share Pmenu, so no frame is visible.
+---padding when enabled. Otherwise keep a minimal window with its default border.
 function M.padded(config)
 	return vim.tbl_deep_extend("force", {
 		border = M.border(),
@@ -74,7 +101,7 @@ end
 
 ---Apply the shared border and Pmenu background after a popup is created.
 function M.apply_padded(winid)
-	if not winid or not vim.api.nvim_win_is_valid(winid) then
+	if not enabled or not winid or not vim.api.nvim_win_is_valid(winid) then
 		return false
 	end
 	local config = vim.api.nvim_win_get_config(winid)
@@ -102,6 +129,9 @@ end
 ---Catch plugin popups that do not expose a border option. Explicit plugin
 ---settings still use border()/padded(); this is only the constrained fallback.
 function M.setup()
+	if not enabled then
+		return
+	end
 	local group = vim.api.nvim_create_augroup("user_small_float_style", { clear = true })
 	vim.api.nvim_create_autocmd("WinNew", {
 		group = group,

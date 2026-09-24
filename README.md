@@ -19,7 +19,8 @@ Neovim 打磨成接近 IDE 的日常工作流。
 - `overseer.nvim` 任务运行，`neotest` 测试，`nvim-dap` + `dap-ui` 调试。
 - `snacks.nvim` 提供 dashboard、scratch、input 与 zen；通知由 `nvim-notify` 提供。
 - LSP 任务持续至少 500 ms 才显示进度，短检查静默完成；长任务按 250 ms 刷新，完成后提示保留 1.2 秒。
-- 除通知外，小型临时弹窗统一使用 Pmenu 背景的无边框 padding 设计；`Esc` 一次收起当前
+- 除通知外，小型临时弹窗默认统一使用 Pmenu 背景的无边框 padding 设计，可通过 `<leader>up`
+  持久切换为插件和主题样式（重启生效）；`Esc` 一次收起当前
   标签页内重叠的补全、签名、文档、提示与预览。通知按超时自动消失（`<leader>un` 可立即
   清空），Glance、Fzf、Lazy、Mason、Oil 等界面走各自关闭接口；终端、scratch、zen 等
   编辑工作区不会被误关。
@@ -321,12 +322,14 @@ Claude 原生 IDE 集成在一个 Neovim 中只有一个终端：首次打开时
 ```json
 {
   "tools": { "prefer_mason": false },
+  "ui": { "float_style": true },
   "format": { "timeout_ms": 800 },
   "runtime": { "mode": "auto", "state_dir": "", "persistent_undo": false }
 }
 ```
 
-修改后运行 `:ToolsRefresh`；无效值采用默认设置，并在健康报告中说明。
+工具偏好修改后运行 `:ToolsRefresh`；运行模式、恢复存储和弹窗样式重启后生效。
+无效值采用默认设置，并在健康报告中说明。
 项目自身的格式化和检查规则继续放在项目原生配置文件中。
 
 ## 运行模式
@@ -430,6 +433,7 @@ Go 汇编仅在 `.s`、Go 项目和 Plan 9 指令特征同时匹配时使用 asm
 - `<C-/>` ：切换底部终端（兼容传统终端的 `<C-_>` 编码）
 - `<leader>k` ：离线词典；`<leader>ut` ：选择并持久保存主题
 - `<leader>uT` / `:TransparentToggle` ：切换并持久保存透明背景，切换主题后仍生效。编辑区、行号栏及文件树透明，弹窗和选中行保留底色；透明程度由终端设置决定。状态保存在 `stdpath("state")/transparent.txt`，默认关闭。
+- `<leader>up` / `:FloatStyleToggle` ：切换并持久保存统一弹窗样式，默认开启。`:FloatStyle on` 开启，`:FloatStyle off` 恢复插件和主题提供的边框、背景及标题颜色；`:FloatStyle` 查看当前和已保存的选择。设置写入 `preferences.json` 的 `ui.float_style`，重启后统一生效，连续切换可撤销待生效的选择。普通和 fast 模式均支持；通知样式、弹窗功能、快捷键和透明背景开关独立保留。
 - `<leader>ghB` ：切换当前行 Git blame
 - `zR` / `zM` / `zr` / `zm` / `zK` ：折叠开关与预览
 

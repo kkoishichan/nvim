@@ -3,6 +3,7 @@
 -- M.setup() registers a ColorScheme autocmd that re-derives them on every switch.
 
 local palette = require("user.core.palette")
+local float_style = require("user.core.float_style")
 
 local M = {}
 
@@ -35,6 +36,9 @@ end
 -- their window-local Normal/FloatBorder to Pmenu through float_style.lua;
 -- nvim-notify deliberately keeps the independent groups defined above.
 local function set_float_highlights()
+	if not float_style.is_enabled() then
+		return
+	end
 	local p = palette.get()
 	vim.api.nvim_set_hl(0, "NormalFloat", { fg = p.fg, bg = p.bg })
 	-- FloatBorder remains the source of truth for application-sized panels.
@@ -53,16 +57,7 @@ local function set_float_highlights()
 	vim.api.nvim_set_hl(0, "BlinkCmpDocSeparator", { fg = p.gray, bg = vim.api.nvim_get_hl(0, { name = "Pmenu" }).bg })
 	vim.api.nvim_set_hl(0, "BlinkCmpSignatureHelp", { link = "Pmenu" })
 	vim.api.nvim_set_hl(0, "BlinkCmpSignatureHelpBorder", { link = "Pmenu" })
-	-- The full signature popup matches Blink's purple function-kind marker;
-	-- its compact virtual line uses a distinct yellow directional marker.
-	vim.api.nvim_set_hl(0, "BlinkCmpSignatureIndicator", { link = "BlinkCmpKindFunction" })
-	vim.api.nvim_set_hl(0, "BlinkCmpSignatureVirtualIndicator", { fg = p.warn })
-	-- Virtual signatures keep Tree-sitter foregrounds but sit on the same raised
-	-- surface as Blink's popup, so they remain distinct from source text.
 	local popup_bg = vim.api.nvim_get_hl(0, { name = "Pmenu", link = false }).bg or p.panel
-	vim.api.nvim_set_hl(0, "BlinkCmpSignatureVirtual", {
-		bg = popup_bg,
-	})
 	-- Mark the active parameter with a quiet neutral lift instead of the default
 	-- blue/cyan LspSignatureActiveParameter background. With no foreground here,
 	-- the signature's Tree-sitter colours remain visible.
@@ -94,6 +89,18 @@ local function set_float_highlights()
 	-- lazygit (sets its groups with default = true, so these win).
 	vim.api.nvim_set_hl(0, "LazyGitBorder", { link = "FloatBorder" })
 	vim.api.nvim_set_hl(0, "LazyGitFloat", { link = "NormalFloat" })
+end
+
+-- These groups belong to our signature renderer, not a plugin's popup skin.
+-- Keep the compact signature readable with either choice of floating styles.
+local function set_signature_highlights()
+	local p = palette.get()
+	vim.api.nvim_set_hl(0, "BlinkCmpSignatureIndicator", { link = "BlinkCmpKindFunction" })
+	vim.api.nvim_set_hl(0, "BlinkCmpSignatureVirtualIndicator", { fg = p.warn })
+	local popup_bg = vim.api.nvim_get_hl(0, { name = "BlinkCmpSignatureHelp", link = false }).bg
+		or vim.api.nvim_get_hl(0, { name = "Pmenu", link = false }).bg
+		or p.panel
+	vim.api.nvim_set_hl(0, "BlinkCmpSignatureVirtual", { bg = popup_bg })
 end
 
 -- Keep the scrollbar quieter than editor selections and encode overview-ruler
@@ -139,6 +146,7 @@ end
 function M.apply()
 	set_notify_highlights()
 	set_float_highlights()
+	set_signature_highlights()
 	set_scrollview_highlights()
 	set_snippet_highlights()
 	local p = palette.get()
