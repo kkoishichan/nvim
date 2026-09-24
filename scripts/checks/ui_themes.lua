@@ -36,11 +36,18 @@ return function(tmp)
 		return (math.max(light, dark) + 0.05) / (math.min(light, dark) + 0.05)
 	end
 	for _, name in ipairs(vim.tbl_keys(theme.themes)) do
+		-- Load the theme first, then capture its own float colour without our
+		-- ColorScheme customisations. The normal path must preserve that surface.
+		theme.set(name, false)
+		vim.cmd.colorscheme({ theme.themes[name].colorscheme, mods = { noautocmd = true } })
+		local float_bg = palette.highlight("NormalFloat").bg or palette.highlight("Normal").bg
 		theme.set(name, false)
 		local normal = vim.api.nvim_get_hl(0, { name = "Normal", link = false })
 		assert(normal.fg and normal.bg, name .. " has no resolved normal text colors")
 		assert(contrast(normal.fg, normal.bg) >= 4.5, name .. " normal text has insufficient contrast")
 		local result = { normal = contrast(normal.fg, normal.bg), popup = {} }
+		assert(palette.highlight("NormalFloat").bg == float_bg, name .. " replaced the theme's float background")
+		assert(palette.highlight("TreesitterContext").bg == normal.bg, name .. " context adopted the popup background")
 		local menu_bg = palette.highlight("Pmenu").bg
 		local directory = palette.highlight("Directory")
 		local tree_selection = palette.highlight("NeoTreeCursorLine")
@@ -75,6 +82,7 @@ return function(tmp)
 		})
 		vim.wo[win].winhighlight = "Normal:Pmenu,NormalFloat:Pmenu"
 		assert(palette.get().bg == normal.bg, name .. " focused popup changed the base palette")
+		assert(palette.get().float == float_bg, name .. " focused popup changed the float palette")
 		local notify = vim.notify
 		vim.notify = function() end
 		transparency.toggle()
@@ -111,8 +119,8 @@ return function(tmp)
 		vim.notify = notify
 		assert(palette.highlight("Normal").bg == normal.bg, name .. " opaque editor colour was not restored")
 		assert(
-			palette.highlight("NormalFloat").bg == normal.bg,
-			name .. " framed float kept an unnecessary colour lift"
+			palette.highlight("NormalFloat").bg == float_bg,
+			name .. " framed float did not recover its theme background"
 		)
 		for _, group in ipairs(surfaces) do
 			local value = palette.highlight(group)

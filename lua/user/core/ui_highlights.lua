@@ -53,7 +53,7 @@ local function set_float_highlights()
 	vim.api.nvim_set_hl(0, "BlinkCmpMenuSelection", { link = "PmenuSel" })
 	vim.api.nvim_set_hl(0, "BlinkCmpDoc", { link = "Pmenu" })
 	vim.api.nvim_set_hl(0, "BlinkCmpDocBorder", { link = "Pmenu" })
-	-- The detail/docs separator line defaults to NormalFloat (editor bg), so its
+	-- The detail/docs separator line defaults to NormalFloat (framed popup bg), so its
 	-- row shows through against the Pmenu doc bg. Match the doc bg, grey line.
 	vim.api.nvim_set_hl(0, "BlinkCmpDocSeparator", { fg = p.gray, bg = palette.highlight("Pmenu").bg })
 	vim.api.nvim_set_hl(0, "BlinkCmpSignatureHelp", { link = "Pmenu" })
