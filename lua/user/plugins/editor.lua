@@ -243,6 +243,7 @@ return vim.list_extend(require("user.specs.editing")(), {
 			end,
 		},
 		config = function(_, opts)
+			require("user.core.sticky_context").setup()
 			require("treesitter-context").setup(opts)
 			require("user.core.highlights").on_colorscheme("treesitter-context", function()
 				local p = require("user.core.palette").get()

@@ -67,21 +67,9 @@ return {
 			},
 			max_width_window_percentage = 80,
 			max_height_window_percentage = 60,
-			window_overlap_clear_enabled = true,
-			window_overlap_clear_ft_ignore = {
-				-- Scrollbar floats are decorations. Clearing inline images for
-				-- them removes virtual padding and pulls the document backward.
-				"scrollview",
-				"scrollview_sign",
-				"cmp_menu",
-				"cmp_docs",
-				"fzf",
-				"fzflua_backdrop",
-				"neo-tree",
-				"snacks_notif",
-				"snacks_picker_input",
-				"which-key",
-			},
+			-- Per-image clipping below preserves layout and leaves images
+			-- outside a popup alone. The native window-wide clear removes it.
+			window_overlap_clear_enabled = false,
 			hijack_file_patterns = {
 				"*.png",
 				"*.jpg",
@@ -93,6 +81,10 @@ return {
 				"*.svg",
 			},
 		},
+		config = function(_, opts)
+			require("image").setup(opts)
+			require("user.core.image_ui").setup()
+		end,
 		keys = {
 			{
 				"<leader>mI",
