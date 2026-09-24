@@ -94,10 +94,10 @@ function M.apply()
 	local colors_name = vim.g.colors_name or ""
 	local foreground
 	if vim.startswith(colors_name, "tokyonight") then
-		-- NonText already contains the active style's native dark3 colour.
-		foreground = palette.highlight("NonText").fg
+		-- LineNr already contains the active style's native fg_gutter colour.
+		foreground = palette.highlight("LineNr").fg
 	elseif vim.startswith(colors_name, "catppuccin") then
-		foreground = require("catppuccin.palettes").get_palette().surface2
+		foreground = require("catppuccin.palettes").get_palette().surface1
 	end
 	if not foreground then
 		return

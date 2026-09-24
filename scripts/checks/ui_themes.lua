@@ -118,8 +118,10 @@ return function(tmp)
 		result.separator = contrast(separator.fg, normal.bg)
 		local adjusted = name == "tokyonight" or name == "catppuccin"
 		if adjusted then
-			local native_color = name == "tokyonight" and require("tokyonight.colors").setup().dark3
-				or require("catppuccin.palettes").get_palette().surface2
+			local colors = name == "tokyonight" and require("tokyonight.colors").setup()
+				or require("catppuccin.palettes").get_palette()
+			local native_color = name == "tokyonight" and colors.fg_gutter or colors.surface1
+			local previous_color = name == "tokyonight" and colors.dark3 or colors.surface2
 			assert(
 				separator.fg == tonumber(native_color:sub(2), 16),
 				name .. " transparent splits did not use the native palette colour"
@@ -129,8 +131,8 @@ return function(tmp)
 				name .. " transparent splits did not become more visible"
 			)
 			assert(
-				luminance(separator.fg) < luminance(palette.blend(normal.fg, normal.bg, 0.55)),
-				name .. " transparent splits retained the overly bright grey"
+				luminance(separator.fg) < luminance(tonumber(previous_color:sub(2), 16)),
+				name .. " transparent splits did not use a darker theme grey"
 			)
 		end
 		for _, group in ipairs({
