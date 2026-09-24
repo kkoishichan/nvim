@@ -3,6 +3,13 @@ local capabilities = mode.capabilities()
 local bootstrap = require("user.core.lazy_bootstrap")
 local layout = require("user.core.layout")
 
+-- A built-in colorscheme has no plugin config callback to restore the saved
+-- choice. Apply it here, including on hosts where lazy.nvim is unavailable.
+local theme = require("user.core.theme")
+if not theme.themes[theme.saved()].plugin then
+	theme.bootstrap()
+end
+
 -- A mode without plugin-manager automation never downloads anything at launch.
 -- Without lazy.nvim there is still an editor: fall back to the native entry and
 -- say so once, leaving the detail to :ModeInfo.

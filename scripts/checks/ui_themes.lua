@@ -37,5 +37,5 @@ return function(tmp)
 	end
 	theme.set("vscode", false)
 	vim.fn.writefile({ vim.json.encode(reports) }, tmp .. "/theme-contrast.json")
-	print("All four themes retain readable main and popup text")
+	print("All configured themes retain readable main and popup text")
 end

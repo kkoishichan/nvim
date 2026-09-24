@@ -75,6 +75,9 @@ return function(opts)
 	local active = theme.saved()
 	local available = specs()
 	if opts and opts.single then
+		if not theme.themes[active].plugin then
+			return {}
+		end
 		local selected = available[active] or available[theme.default]
 		selected.lazy = false
 		return { selected }

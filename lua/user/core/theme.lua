@@ -4,8 +4,9 @@
 
 local M = {}
 
--- name -> { plugin = <lazy plugin name>, colorscheme = <:colorscheme arg> }
+-- name -> { plugin? = <lazy plugin name>, colorscheme = <:colorscheme arg> }
 M.themes = {
+	default = { colorscheme = "default" },
 	-- `plugin` is the lazy.nvim plugin name (its `name`, or the repo basename
 	-- when no name is set), used for lazy.load.
 	gruvbox = { plugin = "gruvbox", colorscheme = "gruvbox" },
@@ -26,16 +27,14 @@ function M.names()
 	return names
 end
 
----Themes whose plugin is part of this installation. A fast installation ships
----only the active theme, so the picker must not offer the rest.
+---Built-in themes and themes whose plugin is part of this installation. A fast
+---installation ships only the active plugin theme.
 function M.installed()
 	local ok, config = pcall(require, "lazy.core.config")
-	if not ok then
-		return {}
-	end
 	local names = {}
 	for _, name in ipairs(M.names()) do
-		if config.plugins[M.themes[name].plugin] then
+		local plugin = M.themes[name].plugin
+		if not plugin or (ok and config.plugins[plugin]) then
 			table.insert(names, name)
 		end
 	end
@@ -66,12 +65,14 @@ function M.set(name, persist)
 		vim.notify("Unknown theme: " .. tostring(name), vim.log.levels.WARN)
 		return
 	end
-	local ok_load = pcall(function()
-		require("lazy").load({ plugins = { theme.plugin } })
-	end)
-	if not ok_load then
-		vim.notify("Theme " .. name .. " is not installed in this mode", vim.log.levels.WARN)
-		return
+	if theme.plugin then
+		local ok_load = pcall(function()
+			require("lazy").load({ plugins = { theme.plugin } })
+		end)
+		if not ok_load then
+			vim.notify("Theme " .. name .. " is not installed in this mode", vim.log.levels.WARN)
+			return
+		end
 	end
 	local ok, err = pcall(vim.cmd.colorscheme, theme.colorscheme)
 	if not ok then
@@ -90,7 +91,7 @@ function M.apply_saved()
 end
 
 ---Set up theme-following highlights and apply the startup theme exactly once.
----Called by whichever colorscheme plugin is selected for eager loading.
+---Called before plugin setup for built-ins, or by the active theme's plugin.
 function M.bootstrap()
 	if bootstrapped then
 		return
