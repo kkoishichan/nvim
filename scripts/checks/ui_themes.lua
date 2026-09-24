@@ -20,6 +20,10 @@ return function(tmp)
 		"NeoTreeDimText",
 		"NeoTreeIndentMarker",
 		"NeoTreeExpander",
+		"WinSeparator",
+		"VertSplit",
+		"NeoTreeWinSeparator",
+		"NeoTreeVertSplit",
 	}
 	local reports = {}
 	local function luminance(color)
@@ -108,6 +112,15 @@ return function(tmp)
 					value.underline and value.sp == palette.get().strong,
 					name .. " " .. group .. " lost its separator"
 				)
+			end
+		end
+		local separator = palette.highlight("WinSeparator")
+		result.separator = contrast(separator.fg, normal.bg)
+		assert(result.separator >= 3, name .. " transparent splits have insufficient contrast")
+		for _, group in ipairs({ "VertSplit", "NeoTreeWinSeparator", "NeoTreeVertSplit", "BufferLineOffsetSeparator" }) do
+			local value = palette.highlight(group)
+			if next(value) then
+				assert(value.fg == separator.fg, name .. " " .. group .. " does not match the window separator")
 			end
 		end
 		assert(vim.deep_equal(palette.highlight("Directory"), directory), name .. " changed Directory globally")

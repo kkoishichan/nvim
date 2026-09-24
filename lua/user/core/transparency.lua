@@ -57,6 +57,13 @@ local groups = {
 	"FzfLuaFzfGutter",
 	"FzfLuaFzfQuery",
 }
+local separators = {
+	"WinSeparator",
+	"VertSplit",
+	"NeoTreeWinSeparator",
+	"NeoTreeVertSplit",
+	"BufferLineOffsetSeparator",
+}
 
 function M.is_enabled()
 	return enabled
@@ -78,6 +85,18 @@ function M.apply()
 			if name == "Normal" then
 				background = value.bg
 			end
+			value.bg, value.ctermbg = nil, nil
+			vim.api.nvim_set_hl(0, name, value)
+		end
+	end
+	-- Theme borders can be almost as dark as their opaque background. Use a
+	-- brighter theme-derived grey for splits, retaining any underline/style.
+	local p = palette.get()
+	local foreground = palette.blend(p.fg, p.bg, 0.55)
+	for _, name in ipairs(separators) do
+		local value = palette.highlight(name)
+		if next(value) then
+			value.fg, value.ctermfg = foreground, 7 -- ANSI grey for terminals without true colour.
 			value.bg, value.ctermbg = nil, nil
 			vim.api.nvim_set_hl(0, name, value)
 		end
