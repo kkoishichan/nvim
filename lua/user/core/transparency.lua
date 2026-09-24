@@ -92,11 +92,16 @@ function M.apply()
 	-- Only these themes need a lift from their near-background separators.
 	-- Keep the other themes' original foregrounds, including terminal colours.
 	local colors_name = vim.g.colors_name or ""
-	if not vim.startswith(colors_name, "tokyonight") and not vim.startswith(colors_name, "catppuccin") then
+	local foreground
+	if vim.startswith(colors_name, "tokyonight") then
+		-- NonText already contains the active style's native dark3 colour.
+		foreground = palette.highlight("NonText").fg
+	elseif vim.startswith(colors_name, "catppuccin") then
+		foreground = require("catppuccin.palettes").get_palette().surface2
+	end
+	if not foreground then
 		return
 	end
-	local p = palette.get()
-	local foreground = palette.blend(p.fg, p.bg, 0.35)
 	for _, name in ipairs(separators) do
 		local value = palette.highlight(name)
 		if next(value) then

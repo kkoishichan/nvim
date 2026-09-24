@@ -118,6 +118,12 @@ return function(tmp)
 		result.separator = contrast(separator.fg, normal.bg)
 		local adjusted = name == "tokyonight" or name == "catppuccin"
 		if adjusted then
+			local native_color = name == "tokyonight" and require("tokyonight.colors").setup().dark3
+				or require("catppuccin.palettes").get_palette().surface2
+			assert(
+				separator.fg == tonumber(native_color:sub(2), 16),
+				name .. " transparent splits did not use the native palette colour"
+			)
 			assert(
 				result.separator > contrast(opaque.WinSeparator.fg, normal.bg),
 				name .. " transparent splits did not become more visible"
