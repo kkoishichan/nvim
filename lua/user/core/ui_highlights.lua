@@ -26,7 +26,7 @@ local function set_notify_highlights()
 
 	for level, accent in pairs(levels) do
 		-- Border is a dimmed-toward-bg version of the accent so it reads quieter.
-		vim.api.nvim_set_hl(0, "Notify" .. level .. "Border", { fg = palette.blend(accent, bg, 0.7), bg = bg })
+		vim.api.nvim_set_hl(0, "Notify" .. level .. "Border", { fg = palette.blend(accent, p.bg, 0.7), bg = bg })
 		vim.api.nvim_set_hl(0, "Notify" .. level .. "Icon", { fg = accent, bg = bg, bold = true })
 		vim.api.nvim_set_hl(0, "Notify" .. level .. "Title", { fg = accent, bg = bg, bold = true })
 		vim.api.nvim_set_hl(0, "Notify" .. level .. "Body", { fg = p.fg, bg = bg })

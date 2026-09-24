@@ -58,9 +58,9 @@ function M.get()
 		-- which go green in gruvbox.
 		accent = attr("DiagnosticInfo", "fg") or 0x83a598,
 		panel = panel,
-		-- A visible frame is enough separation on an opaque editor. With a
-		-- transparent editor retain a solid, subtly distinct popup surface.
-		float = transparency.is_enabled() and panel or bg,
+		-- A visible frame supplies the boundary; follow the editor's background
+		-- setting. Borderless menus keep their separate Pmenu surface.
+		float = not transparency.is_enabled() and bg or nil,
 		subtle = M.blend(fg, bg, 0.15), -- soft highlight bg (word under cursor, folds)
 		strong = M.blend(fg, bg, 0.25), -- heavier highlight bg (write refs, matchparen)
 		error = attr("DiagnosticError", "fg") or 0xfb4934,

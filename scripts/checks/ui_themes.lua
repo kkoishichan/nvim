@@ -22,6 +22,7 @@ return function(tmp)
 		assert(normal.fg and normal.bg, name .. " has no resolved normal text colors")
 		assert(contrast(normal.fg, normal.bg) >= 4.5, name .. " normal text has insufficient contrast")
 		local result = { normal = contrast(normal.fg, normal.bg), popup = {} }
+		local menu_bg = palette.highlight("Pmenu").bg
 		for _, group in ipairs({ "Pmenu", "NormalFloat", "BlinkCmpMenu", "BlinkCmpSignatureHelp" }) do
 			local value = vim.api.nvim_get_hl(0, { name = group, link = false })
 			local ratio = contrast(value.fg or normal.fg, value.bg or normal.bg)
@@ -54,11 +55,18 @@ return function(tmp)
 		transparency.toggle()
 		assert(palette.highlight("Normal").bg == nil, name .. " editor stayed opaque")
 		assert(transparency.background() == normal.bg, name .. " saved the popup's background as the editor colour")
-		local floating = palette.highlight("NormalFloat")
-		assert(floating.bg and floating.bg ~= normal.bg, name .. " float uses the transparent editor's base colour")
-		assert(palette.highlight("FloatBorder").bg == floating.bg, name .. " float border has a different surface")
-		result.transparent_popup = contrast(floating.fg or normal.fg, floating.bg)
-		assert(result.transparent_popup >= 4.5, name .. " transparent-mode float is hard to read")
+		for _, group in ipairs({
+			"NormalFloat",
+			"FloatBorder",
+			"FloatTitle",
+			"NotifyINFOBody",
+			"NotifyINFOTitle",
+			"NotifyINFOBorder",
+		}) do
+			local floating = palette.highlight(group)
+			assert(floating.bg == nil and floating.ctermbg == nil, name .. " " .. group .. " stayed opaque")
+		end
+		assert(palette.highlight("Pmenu").bg == menu_bg, name .. " borderless menu lost its background")
 		transparency.toggle()
 		vim.notify = notify
 		assert(palette.highlight("Normal").bg == normal.bg, name .. " opaque editor colour was not restored")

@@ -97,8 +97,8 @@ return function()
 				end)
 			end,
 			opts = {
-				-- The framed picker and its preview need their own solid surface
-				-- when Normal is transparent. fzf paints terminal cells separately.
+				-- The framed picker, preview and terminal cells share NormalFloat
+				-- so the entire surface follows the transparency setting.
 				hls = float_style.is_enabled() and {
 					normal = "NormalFloat",
 					preview_normal = "NormalFloat",

@@ -1,4 +1,4 @@
--- Clear editor surfaces while retaining opaque, theme-derived popup surfaces.
+-- Clear editor and framed float surfaces; borderless menus keep their fill.
 -- Keep the original definitions so toggling off restores links as well as RGB
 -- and terminal colours, without reloading the theme or any plugins.
 local M = {}
@@ -10,6 +10,9 @@ local background
 local groups = {
 	"Normal",
 	"NormalNC",
+	"NormalFloat",
+	"FloatBorder",
+	"FloatTitle",
 	"EndOfBuffer",
 	"SignColumn",
 	"FoldColumn",
@@ -30,6 +33,19 @@ local groups = {
 	"EdgyNormal",
 	"EdgyWinBar",
 	"EdgyWinBarNC",
+	-- Fzf can supply its own theme groups when the unified popup style is off.
+	-- Its terminal palette must also inherit the transparent background.
+	"FzfLuaNormal",
+	"FzfLuaPreviewNormal",
+	"FzfLuaHelpNormal",
+	"FzfLuaBorder",
+	"FzfLuaPreviewBorder",
+	"FzfLuaHelpBorder",
+	"FzfLuaTitle",
+	"FzfLuaPreviewTitle",
+	"FzfLuaFzfNormal",
+	"FzfLuaFzfGutter",
+	"FzfLuaFzfQuery",
 }
 
 function M.is_enabled()
@@ -69,8 +85,8 @@ function M.toggle()
 		end
 		originals, background = {}, nil
 	end
-	-- Framed floats use the editor colour when opaque and a solid panel colour
-	-- when transparent. Refresh their groups without reloading the colorscheme.
+	-- Refresh theme-derived float/notification groups without reloading the
+	-- colorscheme. Their fill follows the new transparency setting.
 	require("user.core.ui_highlights").apply()
 
 	local saved, err = pcall(function()
