@@ -247,7 +247,7 @@ return vim.list_extend(require("user.specs.editing")(), {
 			require("treesitter-context").setup(opts)
 			require("user.core.highlights").on_colorscheme("treesitter-context", function()
 				local p = require("user.core.palette").get()
-				vim.api.nvim_set_hl(0, "TreesitterContext", { bg = p.bg })
+				vim.api.nvim_set_hl(0, "TreesitterContext", { bg = p.float })
 				vim.api.nvim_set_hl(0, "TreesitterContextBottom", { underline = true, sp = p.strong })
 			end)
 		end,

@@ -1,11 +1,10 @@
 -- Clear editor and framed float surfaces; borderless menus keep their fill.
--- Keep the original definitions so toggling off restores links as well as RGB
--- and terminal colours, without reloading the theme or any plugins.
+-- Reload the active colorscheme on toggles so plugins can rebuild their cached
+-- UI colours, including bufferline's dynamically created file icons.
 local M = {}
 local file = vim.fn.stdpath("state") .. "/transparent.txt"
 local ok, lines = pcall(vim.fn.readfile, file)
 local enabled = ok and lines[1] == "1"
-local originals = {}
 local background
 local groups = {
 	"Normal",
@@ -23,6 +22,14 @@ local groups = {
 	"VertSplit",
 	"WinBar",
 	"WinBarNC",
+	"TabLine",
+	"TabLineFill",
+	"TabLineSel",
+	"TreesitterContext",
+	"TreesitterContextLineNumber",
+	"TreesitterContextBottom",
+	"TreesitterContextLineNumberBottom",
+	"TreesitterContextSeparator",
 	"NormalSB",
 	"SignColumnSB",
 	"NeoTreeNormal",
@@ -65,7 +72,6 @@ function M.apply()
 	for _, name in ipairs(groups) do
 		local value = palette.highlight(name)
 		if value.bg or value.ctermbg then
-			originals[name] = vim.api.nvim_get_hl(0, { name = name, link = true, create = false })
 			if name == "Normal" then
 				background = value.bg
 			end
@@ -77,17 +83,10 @@ end
 
 function M.toggle()
 	enabled = not enabled
-	if enabled then
-		M.apply()
-	else
-		for name, value in pairs(originals) do
-			vim.api.nvim_set_hl(0, name, value)
-		end
-		originals, background = {}, nil
-	end
-	-- Refresh theme-derived float/notification groups without reloading the
-	-- colorscheme. Their fill follows the new transparency setting.
-	require("user.core.ui_highlights").apply()
+	-- A normal theme refresh restores opaque colours and invalidates plugin
+	-- colour caches through their own ColorScheme handlers. No per-frame work.
+	vim.cmd.colorscheme(vim.g.colors_name or "default")
+	M.apply()
 
 	local saved, err = pcall(function()
 		vim.fn.mkdir(vim.fn.fnamemodify(file, ":h"), "p")
@@ -108,7 +107,7 @@ function M.setup()
 	vim.api.nvim_create_autocmd("ColorScheme", {
 		group = group,
 		callback = function()
-			originals, background = {}, nil
+			background = nil
 			if enabled then
 				-- Direct :colorscheme calls also run after every plugin's callback.
 				vim.schedule(M.apply)

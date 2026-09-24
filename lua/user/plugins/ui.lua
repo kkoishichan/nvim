@@ -64,7 +64,7 @@ local function pdf_zoom()
 	return require("user.core.pdf").zoom()
 end
 
-local function bufferline_highlights()
+local function bufferline_highlights(defaults)
 	local p = palette.get()
 	local inactive = palette.blend(p.fg, p.bg, 0.60)
 	local visible = palette.blend(p.fg, p.bg, 0.72)
@@ -113,6 +113,18 @@ local function bufferline_highlights()
 		"error_diagnostic_selected",
 	}) do
 		highlights[name] = vim.tbl_extend("force", highlights[name] or {}, { italic = false })
+	end
+
+	if require("user.core.transparency").is_enabled() then
+		-- Cover every state, separator and filler in the public highlights table.
+		-- Icons created later inherit these backgrounds from their parent state.
+		for name in pairs(defaults.highlights) do
+			highlights[name] = vim.tbl_extend("force", highlights[name] or {}, {
+				bg = "NONE",
+				ctermbg = "NONE",
+				default = false,
+			})
+		end
 	end
 
 	return highlights

@@ -2,6 +2,20 @@ return function(tmp)
 	local theme = require("user.core.theme")
 	local palette = require("user.core.palette")
 	local transparency = require("user.core.transparency")
+	require("lazy").load({ plugins = { "bufferline.nvim", "nvim-treesitter-context" } })
+	local surfaces = {
+		"TreesitterContext",
+		"TreesitterContextBottom",
+		"TabLine",
+		"TabLineFill",
+		"TabLineSel",
+		"BufferLineFill",
+		"BufferLineBackground",
+		"BufferLineBufferVisible",
+		"BufferLineBufferSelected",
+		"BufferLineSeparator",
+		"BufferLineSeparatorSelected",
+	}
 	local reports = {}
 	local function luminance(color)
 		local function channel(value)
@@ -23,6 +37,10 @@ return function(tmp)
 		assert(contrast(normal.fg, normal.bg) >= 4.5, name .. " normal text has insufficient contrast")
 		local result = { normal = contrast(normal.fg, normal.bg), popup = {} }
 		local menu_bg = palette.highlight("Pmenu").bg
+		local opaque = {}
+		for _, group in ipairs(surfaces) do
+			opaque[group] = palette.highlight(group)
+		end
 		for _, group in ipairs({ "Pmenu", "NormalFloat", "BlinkCmpMenu", "BlinkCmpSignatureHelp" }) do
 			local value = vim.api.nvim_get_hl(0, { name = group, link = false })
 			local ratio = contrast(value.fg or normal.fg, value.bg or normal.bg)
@@ -67,6 +85,10 @@ return function(tmp)
 			assert(floating.bg == nil and floating.ctermbg == nil, name .. " " .. group .. " stayed opaque")
 		end
 		assert(palette.highlight("Pmenu").bg == menu_bg, name .. " borderless menu lost its background")
+		for _, group in ipairs(surfaces) do
+			local value = palette.highlight(group)
+			assert(value.bg == nil and value.ctermbg == nil, name .. " " .. group .. " stayed opaque")
+		end
 		transparency.toggle()
 		vim.notify = notify
 		assert(palette.highlight("Normal").bg == normal.bg, name .. " opaque editor colour was not restored")
@@ -74,6 +96,10 @@ return function(tmp)
 			palette.highlight("NormalFloat").bg == normal.bg,
 			name .. " framed float kept an unnecessary colour lift"
 		)
+		for _, group in ipairs(surfaces) do
+			local value = palette.highlight(group)
+			assert(vim.deep_equal(value, opaque[group]), name .. " " .. group .. " did not recover its theme colours")
+		end
 		vim.api.nvim_win_close(win, true)
 		vim.api.nvim_buf_delete(buf, { force = true })
 		reports[name] = result
