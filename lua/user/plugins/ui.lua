@@ -132,6 +132,16 @@ local function bufferline_highlights(defaults)
 		for name in pairs(defaults.highlights) do
 			highlights[name] = vim.tbl_extend("force", highlights[name] or {}, surface)
 		end
+		-- Match tab dividers to the underline; sidebar offsets follow window splits.
+		for _, name in ipairs({
+			"separator",
+			"separator_visible",
+			"separator_selected",
+			"tab_separator",
+			"tab_separator_selected",
+		}) do
+			highlights[name].fg = surface.sp
+		end
 		offset = vim.tbl_extend("force", offset, surface)
 	end
 	vim.api.nvim_set_hl(0, "UserBufferlineOffset", offset)
