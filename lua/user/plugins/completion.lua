@@ -45,8 +45,8 @@ return {
 					auto_show = true,
 					auto_show_delay_ms = 300,
 					window = {
-						-- "padded" keeps inner spacing without border lines. The menu
-						-- surface follows the persistent transparency setting.
+						-- "padded" keeps inner spacing without border lines. Its solid
+						-- Pmenu surface separates it from a transparent editor.
 						border = float_style.is_enabled() and "padded" or nil,
 					},
 				},

@@ -1,4 +1,4 @@
--- Clear editor, popup and panel surfaces while retaining selection highlights.
+-- Clear editor, framed popup and panel surfaces, keeping borderless popups solid.
 -- Reload the active colorscheme on toggles so plugins can rebuild their cached
 -- UI colours, including bufferline's dynamically created file icons.
 local M = {}
@@ -12,53 +12,8 @@ local groups = {
 	"NormalFloat",
 	"FloatBorder",
 	"FloatTitle",
-	"Pmenu",
-	"PmenuBorder",
-	"PmenuKind",
-	"PmenuExtra",
-	"PmenuMatch",
-	"PmenuSbar",
-	-- Themes can define plugin surfaces independently of NormalFloat/Pmenu.
-	-- Preserve selection, active-parameter and scrollbar-thumb backgrounds.
-	"BlinkCmpMenu",
-	"BlinkCmpMenuBorder",
-	"BlinkCmpLabel",
-	"BlinkCmpLabelDeprecated",
-	"BlinkCmpLabelDetail",
-	"BlinkCmpLabelDescription",
-	"BlinkCmpLabelMatch",
-	"BlinkCmpKind",
-	"BlinkCmpSource",
-	"BlinkCmpScrollBarGutter",
-	"BlinkCmpDoc",
-	"BlinkCmpDocBorder",
-	"BlinkCmpDocSeparator",
-	"BlinkCmpSignatureHelp",
-	"BlinkCmpSignatureHelpBorder",
-	"WhichKeyNormal",
-	"WhichKeyBorder",
-	"WhichKeyTitle",
-	"SnacksInputNormal",
-	"SnacksInputBorder",
-	"SnacksInputTitle",
-	"BqfPreviewFloat",
-	"BqfPreviewBorder",
-	"BqfPreviewTitle",
-	"DapUIFloatNormal",
-	"DapUIFloatBorder",
-	"UfoPreviewWinBar",
 	"TroubleNormal",
 	"TroubleNormalNC",
-	"GlanceListNormal",
-	"GlancePreviewNormal",
-	"GlanceListEndOfBuffer",
-	"GlancePreviewEndOfBuffer",
-	"GlanceWinBarFilename",
-	"GlanceWinBarFilepath",
-	"GlanceWinBarTitle",
-	"GlanceBorderTop",
-	"GlanceListBorderBottom",
-	"GlancePreviewBorderBottom",
 	"EndOfBuffer",
 	"SignColumn",
 	"FoldColumn",
@@ -111,6 +66,51 @@ local groups = {
 	"FzfLuaFzfQuery",
 	"FzfLuaScrollFloatEmpty",
 }
+-- The unified style uses solid Pmenu-backed blocks instead of visible frames.
+-- Only clear these plugin surfaces when using their native framed style.
+-- Pmenu itself stays solid, including Neovim's built-in borderless menus.
+-- float_style is fixed for the process; no per-window or per-frame checks.
+if not require("user.core.float_style").is_enabled() then
+	vim.list_extend(groups, {
+		"BlinkCmpMenu",
+		"BlinkCmpMenuBorder",
+		"BlinkCmpLabel",
+		"BlinkCmpLabelDeprecated",
+		"BlinkCmpLabelDetail",
+		"BlinkCmpLabelDescription",
+		"BlinkCmpLabelMatch",
+		"BlinkCmpKind",
+		"BlinkCmpSource",
+		"BlinkCmpScrollBarGutter",
+		"BlinkCmpDoc",
+		"BlinkCmpDocBorder",
+		"BlinkCmpDocSeparator",
+		"BlinkCmpSignatureHelp",
+		"BlinkCmpSignatureHelpBorder",
+		"WhichKeyNormal",
+		"WhichKeyBorder",
+		"WhichKeyTitle",
+		"SnacksInputNormal",
+		"SnacksInputBorder",
+		"SnacksInputTitle",
+		"BqfPreviewFloat",
+		"BqfPreviewBorder",
+		"BqfPreviewTitle",
+		"DapUIFloatNormal",
+		"DapUIFloatBorder",
+		"UfoPreviewWinBar",
+		"GlanceListNormal",
+		"GlancePreviewNormal",
+		"GlanceListEndOfBuffer",
+		"GlancePreviewEndOfBuffer",
+		"GlanceWinBarFilename",
+		"GlanceWinBarFilepath",
+		"GlanceWinBarTitle",
+		"GlanceBorderTop",
+		"GlanceListBorderBottom",
+		"GlancePreviewBorderBottom",
+	})
+end
 local separators = {
 	"WinSeparator",
 	"VertSplit",
@@ -144,7 +144,7 @@ function M.apply()
 				value.fg = palette.highlight("FloatTitle").fg or palette.highlight("Normal").fg
 			end
 			value.bg, value.ctermbg = nil, nil
-			-- Inverse video also paints a background, notably in default's TTY menu.
+			-- Inverse video can also paint a background in terminal themes.
 			value.reverse = nil
 			if value.cterm then
 				value.cterm.reverse = nil

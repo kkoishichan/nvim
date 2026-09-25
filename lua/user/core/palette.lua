@@ -59,7 +59,7 @@ function M.get()
 		accent = attr("DiagnosticInfo", "fg") or 0x83a598,
 		panel = panel,
 		-- Framed floats retain the theme's own popup surface when opaque.
-		-- Transparent floats and menus have no fill.
+		-- Transparent framed floats have no fill; borderless popups use Pmenu.
 		float = not transparency.is_enabled() and (attr("NormalFloat", "bg") or bg) or nil,
 		subtle = M.blend(fg, bg, 0.15), -- soft highlight bg (word under cursor, folds)
 		strong = M.blend(fg, bg, 0.25), -- heavier highlight bg (write refs, matchparen)

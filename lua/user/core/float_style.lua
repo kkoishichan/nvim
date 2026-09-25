@@ -120,8 +120,8 @@ function M.style_if_small(winid)
 	if not winid or not vim.api.nvim_win_is_valid(winid) then
 		return false
 	end
-	-- Blink configures its own padding and colours. A generic Pmenu mapping
-	-- would bypass its transparent surfaces, including on later WinNew events.
+	-- Blink owns its configured border and highlights, including selection and
+	-- active-parameter colours. Keep those mappings on later WinNew events too.
 	if vim.wo[winid].winhighlight:find("BlinkCmp", 1, true) then
 		return false
 	end

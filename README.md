@@ -19,7 +19,7 @@ Neovim 打磨成接近 IDE 的日常工作流。
 - `overseer.nvim` 任务运行，`neotest` 测试，`nvim-dap` + `dap-ui` 调试。
 - `snacks.nvim` 提供 dashboard、scratch、input 与 zen；通知由 `nvim-notify` 提供。
 - LSP 任务持续至少 500 ms 才显示进度，短检查静默完成；长任务按 250 ms 刷新，完成后提示保留 1.2 秒。
-- 除通知外，小型临时弹窗默认统一使用 Pmenu 配色的无边框 padding 设计，底色跟随透明开关，可通过 `<leader>up`
+- 除通知外，小型临时弹窗默认统一使用 Pmenu 配色的无边框 padding 设计，透明模式下也保留底色，可通过 `<leader>up`
   持久切换为插件和主题样式（重启生效）；`Esc` 一次收起当前
   标签页内重叠的补全、签名、文档、提示与预览。通知按超时自动消失（`<leader>un` 可立即
   清空），Glance、Fzf、Lazy、Mason、Oil 等界面走各自关闭接口；终端、scratch、zen 等
@@ -437,9 +437,9 @@ Go 汇编仅在 `.s`、Go 项目和 Plan 9 指令特征同时匹配时使用 asm
 - `<M-1>` … `<M-9>` ：跳到第 N 个 buffer，`<M-0>` 跳到最后一个
 - `<C-/>` ：切换底部终端（兼容传统终端的 `<C-_>` 编码）
 - `<leader>k` ：离线词典；`<leader>ut` ：选择并持久保存主题
-- `<leader>uT` / `:TransparentToggle` ：切换并持久保存透明背景，切换主题后仍生效。编辑区、行号栏、文件树、sticky context、buffer 标签栏、有无边框的弹窗，以及 Glance / Trouble 面板都跟随开关；包括补全、签名、leader 菜单、悬停文档、诊断、输入框和各类预览。候选选中行、当前参数、搜索匹配及编辑区选中行保留高亮；透明程度由终端设置决定。透明模式下，仅 TokyoNight（fg_gutter）和 Catppuccin（surface1）的窗口分隔线改用主题色板中的原生暗灰色，其他主题保留原色；buffer 标签栏（含 Explorer 标题）底部用连续细线分隔，不额外占一行，标签间竖线与底部横线同色。切换时刷新当前主题及插件颜色缓存，关闭后恢复主题原色。状态保存在 `stdpath("state")/transparent.txt`，默认关闭。
+- `<leader>uT` / `:TransparentToggle` ：切换并持久保存透明背景，切换主题后仍生效。编辑区、行号栏、文件树、sticky context、buffer 标签栏、有边框的弹窗和 Trouble 面板跟随开关；统一无框样式的补全、签名、leader 菜单、悬停文档、诊断、输入框和预览（含 Glance）保留底色。候选选中行、当前参数、搜索匹配及编辑区选中行保留高亮；透明程度由终端设置决定。透明模式下，仅 TokyoNight（fg_gutter）和 Catppuccin（surface1）的窗口分隔线改用主题色板中的原生暗灰色，其他主题保留原色；buffer 标签栏（含 Explorer 标题）底部用连续细线分隔，不额外占一行，标签间竖线与底部横线同色。切换时刷新当前主题及插件颜色缓存，关闭后恢复主题原色。状态保存在 `stdpath("state")/transparent.txt`，默认关闭。
 - `<leader>up` / `:FloatStyleToggle` ：切换并持久保存统一弹窗样式，默认开启。`:FloatStyle on` 开启，`:FloatStyle off` 恢复插件和主题提供的边框、背景及标题颜色；`:FloatStyle` 查看当前和已保存的选择。设置写入 `preferences.json` 的 `ui.float_style`，重启后统一生效，连续切换可撤销待生效的选择。普通和 fast 模式均支持；通知样式、弹窗功能、快捷键和透明背景开关独立保留。
-- 统一样式下，非透明模式的无边框小弹窗使用菜单底色，有边框浮窗使用当前主题原本的弹窗底色（NormalFloat）；透明模式均不设置底色，关闭统一样式后也遵循透明开关。通知的正文、空行、标题留白和行尾一起切换，避免只有文字带背景；淡入淡出及内容更新保持一致，通知修复不受弹窗样式开关影响。
+- 无边框小弹窗始终保留菜单底色；有边框浮窗在非透明模式使用当前主题原本的弹窗底色（NormalFloat），透明模式不设置底色。关闭统一样式后，插件的有框弹窗同样遵循透明开关。通知的正文、空行、标题留白和行尾一起切换，避免只有文字带背景；淡入淡出及内容更新保持一致，通知修复不受弹窗样式开关影响。
 - `<leader>ghB` ：切换当前行 Git blame
 - `zR` / `zM` / `zr` / `zm` / `zK` ：折叠开关与预览
 

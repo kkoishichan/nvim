@@ -14,13 +14,22 @@ return function(tmp)
 			"trouble.nvim",
 		},
 	})
-	local surfaces = {
+	local solid_surfaces = {
 		"Pmenu",
 		"PmenuBorder",
 		"PmenuKind",
 		"PmenuExtra",
 		"PmenuMatch",
 		"PmenuSbar",
+	}
+	local popup_surfaces = {
+		"BlinkCmpMenu",
+		"BlinkCmpMenuBorder",
+		"BlinkCmpDoc",
+		"BlinkCmpDocBorder",
+		"BlinkCmpDocSeparator",
+		"BlinkCmpSignatureHelp",
+		"BlinkCmpSignatureHelpBorder",
 		"WhichKeyNormal",
 		"WhichKeyBorder",
 		"WhichKeyTitle",
@@ -32,8 +41,6 @@ return function(tmp)
 		"DapUIFloatNormal",
 		"DapUIFloatBorder",
 		"UfoPreviewWinBar",
-		"TroubleNormal",
-		"TroubleNormalNC",
 		"GlanceListNormal",
 		"GlancePreviewNormal",
 		"GlanceListEndOfBuffer",
@@ -41,9 +48,10 @@ return function(tmp)
 		"GlanceWinBarFilename",
 		"GlanceWinBarFilepath",
 		"GlanceWinBarTitle",
-		"GlanceBorderTop",
-		"GlanceListBorderBottom",
-		"GlancePreviewBorderBottom",
+	}
+	local surfaces = {
+		"TroubleNormal",
+		"TroubleNormalNC",
 		"TreesitterContext",
 		"TreesitterContextBottom",
 		"TabLine",
@@ -68,6 +76,14 @@ return function(tmp)
 		"NeoTreeWinSeparator",
 		"NeoTreeVertSplit",
 	}
+	-- Borderless popups retain their complete theme surface. Native framed
+	-- popups and editor panels still follow the transparency switch.
+	if require("user.core.float_style").is_enabled() then
+		vim.list_extend(solid_surfaces, popup_surfaces)
+	else
+		vim.list_extend(surfaces, popup_surfaces)
+	end
+	local all_surfaces = vim.list_extend(vim.deepcopy(surfaces), solid_surfaces)
 	local reports = {}
 	local function luminance(color)
 		local function channel(value)
@@ -99,7 +115,7 @@ return function(tmp)
 		local directory = palette.highlight("Directory")
 		local tree_selection = palette.highlight("NeoTreeCursorLine")
 		local opaque = {}
-		for _, group in ipairs(surfaces) do
+		for _, group in ipairs(all_surfaces) do
 			opaque[group] = palette.highlight(group)
 		end
 		for _, group in ipairs({ "Pmenu", "NormalFloat", "BlinkCmpMenu", "BlinkCmpSignatureHelp" }) do
@@ -150,6 +166,12 @@ return function(tmp)
 			vim.deep_equal(palette.highlight("PmenuSel"), menu_selection),
 			name .. " removed the popup menu's selection highlight"
 		)
+		for _, group in ipairs(solid_surfaces) do
+			assert(
+				vim.deep_equal(palette.highlight(group), opaque[group]),
+				name .. " " .. group .. " changed the borderless popup surface"
+			)
+		end
 		for _, group in ipairs(surfaces) do
 			local value = palette.highlight(group)
 			assert(value.bg == nil and value.ctermbg == nil, name .. " " .. group .. " stayed opaque")
@@ -214,7 +236,7 @@ return function(tmp)
 			palette.highlight("NormalFloat").bg == float_bg,
 			name .. " framed float did not recover its theme background"
 		)
-		for _, group in ipairs(surfaces) do
+		for _, group in ipairs(all_surfaces) do
 			local value = palette.highlight(group)
 			assert(vim.deep_equal(value, opaque[group]), name .. " " .. group .. " did not recover its theme colours")
 		end

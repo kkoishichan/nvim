@@ -133,7 +133,7 @@ return {
 			if not float_style.is_enabled() then
 				return
 			end
-			-- Opaque peek panels use two shades derived from the Pmenu surface.
+			-- Borderless peek panels keep two solid shades of the Pmenu surface.
 			-- glance sets its groups with default = true, so these explicit
 			-- overrides win; re-applied on every colorscheme switch.
 			require("user.core.highlights").on_colorscheme("glance", function()
@@ -150,14 +150,11 @@ return {
 						+ 0.587 * (math.floor(c / 256) % 256)
 						+ 0.114 * (c % 256)
 				end
-				local list_bg, preview_bg
-				if not require("user.core.transparency").is_enabled() then
-					local a = palette.highlight("Pmenu").bg or p.panel
-					local b = palette.blend(a, p.bg, 0.5)
-					list_bg, preview_bg = a, b
-					if lum(a) < lum(b) then
-						list_bg, preview_bg = b, a
-					end
+				local a = palette.highlight("Pmenu").bg or p.panel
+				local b = palette.blend(a, p.bg, 0.5)
+				local list_bg, preview_bg = a, b
+				if lum(a) < lum(b) then
+					list_bg, preview_bg = b, a
 				end
 				vim.api.nvim_set_hl(0, "GlanceListNormal", { fg = fg, bg = list_bg })
 				vim.api.nvim_set_hl(0, "GlancePreviewNormal", { fg = fg, bg = preview_bg })
