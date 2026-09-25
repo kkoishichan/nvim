@@ -1,4 +1,4 @@
--- Clear editor, framed float and completion surfaces; other menus keep their fill.
+-- Clear editor, popup and panel surfaces while retaining selection highlights.
 -- Reload the active colorscheme on toggles so plugins can rebuild their cached
 -- UI colours, including bufferline's dynamically created file icons.
 local M = {}
@@ -12,7 +12,13 @@ local groups = {
 	"NormalFloat",
 	"FloatBorder",
 	"FloatTitle",
-	-- Blink has its own surfaces, so other Pmenu-backed popups keep their fill.
+	"Pmenu",
+	"PmenuBorder",
+	"PmenuKind",
+	"PmenuExtra",
+	"PmenuMatch",
+	"PmenuSbar",
+	-- Themes can define plugin surfaces independently of NormalFloat/Pmenu.
 	-- Preserve selection, active-parameter and scrollbar-thumb backgrounds.
 	"BlinkCmpMenu",
 	"BlinkCmpMenuBorder",
@@ -29,6 +35,30 @@ local groups = {
 	"BlinkCmpDocSeparator",
 	"BlinkCmpSignatureHelp",
 	"BlinkCmpSignatureHelpBorder",
+	"WhichKeyNormal",
+	"WhichKeyBorder",
+	"WhichKeyTitle",
+	"SnacksInputNormal",
+	"SnacksInputBorder",
+	"SnacksInputTitle",
+	"BqfPreviewFloat",
+	"BqfPreviewBorder",
+	"BqfPreviewTitle",
+	"DapUIFloatNormal",
+	"DapUIFloatBorder",
+	"UfoPreviewWinBar",
+	"TroubleNormal",
+	"TroubleNormalNC",
+	"GlanceListNormal",
+	"GlancePreviewNormal",
+	"GlanceListEndOfBuffer",
+	"GlancePreviewEndOfBuffer",
+	"GlanceWinBarFilename",
+	"GlanceWinBarFilepath",
+	"GlanceWinBarTitle",
+	"GlanceBorderTop",
+	"GlanceListBorderBottom",
+	"GlancePreviewBorderBottom",
 	"EndOfBuffer",
 	"SignColumn",
 	"FoldColumn",
@@ -51,6 +81,12 @@ local groups = {
 	"SignColumnSB",
 	"NeoTreeNormal",
 	"NeoTreeNormalNC",
+	"NeoTreeFloatNormal",
+	"NeoTreeFloatBorder",
+	"NeoTreeFloatTitle",
+	"NeoTreeTitleBar",
+	"NeoTreeTabInactive",
+	"NeoTreeTabSeparatorInactive",
 	"NeoTreeEndOfBuffer",
 	"NeoTreeSignColumn",
 	"NeoTreeWinSeparator",
@@ -73,6 +109,7 @@ local groups = {
 	"FzfLuaFzfNormal",
 	"FzfLuaFzfGutter",
 	"FzfLuaFzfQuery",
+	"FzfLuaScrollFloatEmpty",
 }
 local separators = {
 	"WinSeparator",
@@ -98,11 +135,20 @@ function M.apply()
 	local palette = require("user.core.palette")
 	for _, name in ipairs(groups) do
 		local value = palette.highlight(name)
-		if value.bg or value.ctermbg then
+		if value.bg or value.ctermbg or value.reverse or (value.cterm and value.cterm.reverse) then
 			if name == "Normal" then
 				background = value.bg
+			elseif name == "NeoTreeTitleBar" then
+				-- Some themes put dark title text on an accent-coloured block.
+				-- Use the ordinary float title foreground when removing that block.
+				value.fg = palette.highlight("FloatTitle").fg or palette.highlight("Normal").fg
 			end
 			value.bg, value.ctermbg = nil, nil
+			-- Inverse video also paints a background, notably in default's TTY menu.
+			value.reverse = nil
+			if value.cterm then
+				value.cterm.reverse = nil
+			end
 			vim.api.nvim_set_hl(0, name, value)
 		end
 	end

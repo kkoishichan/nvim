@@ -133,15 +133,13 @@ return {
 			if not float_style.is_enabled() then
 				return
 			end
-			-- Make the peek panels use the completion menu's Pmenu block colours.
+			-- Opaque peek panels use two shades derived from the Pmenu surface.
 			-- glance sets its groups with default = true, so these explicit
 			-- overrides win; re-applied on every colorscheme switch.
 			require("user.core.highlights").on_colorscheme("glance", function()
 				local palette = require("user.core.palette")
-				local normal = vim.api.nvim_get_hl(0, { name = "Normal" })
-				local pmenu_bg = vim.api.nvim_get_hl(0, { name = "Pmenu" }).bg
-				local fg = normal.fg
-				local dim = vim.api.nvim_get_hl(0, { name = "Comment" }).fg
+				local p = palette.get()
+				local fg, dim = p.fg, p.gray
 				-- Two shades: the Pmenu block and a step toward the editor bg. Assign
 				-- the darker to the preview and the lighter to the list, so the preview
 				-- is reliably the darker panel whichever way the theme's Pmenu leans
@@ -152,10 +150,14 @@ return {
 						+ 0.587 * (math.floor(c / 256) % 256)
 						+ 0.114 * (c % 256)
 				end
-				local a, b = pmenu_bg, palette.blend(pmenu_bg, normal.bg, 0.5)
-				local list_bg, preview_bg = a, b
-				if lum(a) < lum(b) then
-					list_bg, preview_bg = b, a
+				local list_bg, preview_bg
+				if not require("user.core.transparency").is_enabled() then
+					local a = palette.highlight("Pmenu").bg or p.panel
+					local b = palette.blend(a, p.bg, 0.5)
+					list_bg, preview_bg = a, b
+					if lum(a) < lum(b) then
+						list_bg, preview_bg = b, a
+					end
 				end
 				vim.api.nvim_set_hl(0, "GlanceListNormal", { fg = fg, bg = list_bg })
 				vim.api.nvim_set_hl(0, "GlancePreviewNormal", { fg = fg, bg = preview_bg })

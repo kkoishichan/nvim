@@ -45,9 +45,8 @@ return {
 					auto_show = true,
 					auto_show_delay_ms = 300,
 					window = {
-						-- "padded" = inner padding, no border lines. Paired with a
-						-- lifted Pmenu background (see ui_highlights) this reads as a
-						-- clean background block instead of a framed float.
+						-- "padded" keeps inner spacing without border lines. The menu
+						-- surface follows the persistent transparency setting.
 						border = float_style.is_enabled() and "padded" or nil,
 					},
 				},

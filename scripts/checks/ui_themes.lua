@@ -2,8 +2,48 @@ return function(tmp)
 	local theme = require("user.core.theme")
 	local palette = require("user.core.palette")
 	local transparency = require("user.core.transparency")
-	require("lazy").load({ plugins = { "bufferline.nvim", "nvim-treesitter-context", "neo-tree.nvim" } })
+	require("lazy").load({
+		plugins = {
+			"bufferline.nvim",
+			"nvim-treesitter-context",
+			"neo-tree.nvim",
+			"which-key.nvim",
+			"nvim-bqf",
+			"nvim-ufo",
+			"glance.nvim",
+			"trouble.nvim",
+		},
+	})
 	local surfaces = {
+		"Pmenu",
+		"PmenuBorder",
+		"PmenuKind",
+		"PmenuExtra",
+		"PmenuMatch",
+		"PmenuSbar",
+		"WhichKeyNormal",
+		"WhichKeyBorder",
+		"WhichKeyTitle",
+		"SnacksInputNormal",
+		"SnacksInputBorder",
+		"BqfPreviewFloat",
+		"BqfPreviewBorder",
+		"BqfPreviewTitle",
+		"DapUIFloatNormal",
+		"DapUIFloatBorder",
+		"UfoPreviewWinBar",
+		"TroubleNormal",
+		"TroubleNormalNC",
+		"GlanceListNormal",
+		"GlancePreviewNormal",
+		"GlanceListEndOfBuffer",
+		"GlancePreviewEndOfBuffer",
+		"GlanceWinBarFilename",
+		"GlanceWinBarFilepath",
+		"GlanceWinBarTitle",
+		"GlanceBorderTop",
+		"GlanceListBorderBottom",
+		"GlancePreviewBorderBottom",
 		"TreesitterContext",
 		"TreesitterContextBottom",
 		"TabLine",
@@ -20,6 +60,9 @@ return function(tmp)
 		"NeoTreeDimText",
 		"NeoTreeIndentMarker",
 		"NeoTreeExpander",
+		"NeoTreeTitleBar",
+		"NeoTreeTabInactive",
+		"NeoTreeTabSeparatorInactive",
 		"WinSeparator",
 		"VertSplit",
 		"NeoTreeWinSeparator",
@@ -52,7 +95,7 @@ return function(tmp)
 		local result = { normal = contrast(normal.fg, normal.bg), popup = {} }
 		assert(palette.highlight("NormalFloat").bg == float_bg, name .. " replaced the theme's float background")
 		assert(palette.highlight("TreesitterContext").bg == normal.bg, name .. " context adopted the popup background")
-		local menu_bg = palette.highlight("Pmenu").bg
+		local menu_selection = palette.highlight("PmenuSel")
 		local directory = palette.highlight("Directory")
 		local tree_selection = palette.highlight("NeoTreeCursorLine")
 		local opaque = {}
@@ -103,10 +146,17 @@ return function(tmp)
 			local floating = palette.highlight(group)
 			assert(floating.bg == nil and floating.ctermbg == nil, name .. " " .. group .. " stayed opaque")
 		end
-		assert(palette.highlight("Pmenu").bg == menu_bg, name .. " borderless menu lost its background")
+		assert(
+			vim.deep_equal(palette.highlight("PmenuSel"), menu_selection),
+			name .. " removed the popup menu's selection highlight"
+		)
 		for _, group in ipairs(surfaces) do
 			local value = palette.highlight(group)
 			assert(value.bg == nil and value.ctermbg == nil, name .. " " .. group .. " stayed opaque")
+			assert(
+				not value.reverse and not (value.cterm and value.cterm.reverse),
+				name .. " " .. group .. " retained an inverse-video background"
+			)
 			if group:match("^BufferLine") or group == "UserBufferlineOffset" then
 				assert(
 					value.underline and value.sp == palette.get().strong,
