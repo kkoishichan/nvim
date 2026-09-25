@@ -1,4 +1,4 @@
--- Clear editor and framed float surfaces; borderless menus keep their fill.
+-- Clear editor, framed float and completion surfaces; other menus keep their fill.
 -- Reload the active colorscheme on toggles so plugins can rebuild their cached
 -- UI colours, including bufferline's dynamically created file icons.
 local M = {}
@@ -12,6 +12,23 @@ local groups = {
 	"NormalFloat",
 	"FloatBorder",
 	"FloatTitle",
+	-- Blink has its own surfaces, so other Pmenu-backed popups keep their fill.
+	-- Preserve selection, active-parameter and scrollbar-thumb backgrounds.
+	"BlinkCmpMenu",
+	"BlinkCmpMenuBorder",
+	"BlinkCmpLabel",
+	"BlinkCmpLabelDeprecated",
+	"BlinkCmpLabelDetail",
+	"BlinkCmpLabelDescription",
+	"BlinkCmpLabelMatch",
+	"BlinkCmpKind",
+	"BlinkCmpSource",
+	"BlinkCmpScrollBarGutter",
+	"BlinkCmpDoc",
+	"BlinkCmpDocBorder",
+	"BlinkCmpDocSeparator",
+	"BlinkCmpSignatureHelp",
+	"BlinkCmpSignatureHelpBorder",
 	"EndOfBuffer",
 	"SignColumn",
 	"FoldColumn",
