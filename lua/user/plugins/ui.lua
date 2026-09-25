@@ -66,6 +66,10 @@ end
 
 local function bufferline_highlights(defaults)
 	local p = palette.get()
+	local transparent = require("user.core.transparency").is_enabled()
+	-- Bufferline rebuilds these defaults on ColorScheme, including transparency
+	-- toggles. Use blank separators so the underline remains continuous.
+	defaults.options.separator_style = transparent and { " ", " " } or "thin"
 	local inactive = palette.blend(p.fg, p.bg, 0.60)
 	local visible = palette.blend(p.fg, p.bg, 0.72)
 	local highlights = {}
@@ -118,7 +122,7 @@ local function bufferline_highlights(defaults)
 	-- Sidebar offsets use a separate group, outside bufferline's own table.
 	-- Keep Directory's theme colours without changing that group globally.
 	local offset = palette.highlight("Directory")
-	if require("user.core.transparency").is_enabled() then
+	if transparent then
 		-- Cover every state, separator and filler in the public highlights table.
 		-- A continuous underline separates the bar without consuming another row;
 		-- icons created later inherit both the background and line from their state.
@@ -131,16 +135,6 @@ local function bufferline_highlights(defaults)
 		}
 		for name in pairs(defaults.highlights) do
 			highlights[name] = vim.tbl_extend("force", highlights[name] or {}, surface)
-		end
-		-- Match tab dividers to the underline; sidebar offsets follow window splits.
-		for _, name in ipairs({
-			"separator",
-			"separator_visible",
-			"separator_selected",
-			"tab_separator",
-			"tab_separator_selected",
-		}) do
-			highlights[name].fg = surface.sp
 		end
 		offset = vim.tbl_extend("force", offset, surface)
 	end
@@ -613,7 +607,6 @@ return vim.list_extend(specs, {
 				max_name_length = 24,
 				max_prefix_length = 16,
 				truncate_names = true,
-				separator_style = "thin",
 				diagnostics = "nvim_lsp",
 				diagnostics_update_in_insert = false,
 				diagnostics_indicator = function(_, _, diagnostics_dict)
