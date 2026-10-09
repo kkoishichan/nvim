@@ -26,8 +26,8 @@
 
 ## 启动与切换
 
-持久化开关为 `<leader>uf`（空格、u、f）或 `:FastModeToggle`。也可使用
-`:FastMode on`、`:FastMode off`（standard）、`:FastMode auto` 明确选择；不带参数的 `:FastMode`
+按 `<leader>um`（空格、u、m）打开与主题选择相同样式的模式弹窗，或用 `:EditorMode fast` 选择快速模式。
+兼容命令 `:FastModeToggle` 以及 `:FastMode on`、`:FastMode off`（standard）、`:FastMode auto` 仍可使用；不带参数的 `:FastMode`
 等同切换。设置写入 `preferences.json` 后自动原地重启；切换以当前运行模式为准。
 有未保存修改时显示原生确认框，取消会保留当前进程和已保存的选择，再次切换可重试。
 重启恢复文件、标签页、分屏和光标位置；不恢复旧模式的选项、插件映射及终端任务。

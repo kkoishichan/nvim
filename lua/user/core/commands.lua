@@ -67,9 +67,9 @@ vim.api.nvim_create_user_command("EditorMode", function(command)
 	end
 	if command.args == "" then
 		vim.ui.select({ "fast", "standard", "extra", "auto" }, {
-			prompt = "Editor mode (saved; restart to apply)",
+			prompt = "Editor mode",
 			format_item = function(name)
-				return name .. (name == mode.name() and " (active)" or "")
+				return name == mode.name() and (name .. "  (current)") or name
 			end,
 		}, apply)
 	elseif vim.tbl_contains({ "fast", "standard", "extra", "full", "auto" }, command.args) then

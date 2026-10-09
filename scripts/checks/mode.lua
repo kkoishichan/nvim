@@ -223,7 +223,8 @@ local preferences = require("user.core.preferences")
 vim.cmd("FastModeToggle")
 report.extra.saved = preferences.get()
 report.extra.current = mode.name()
-report.extra.mapping = vim.fn.maparg("<leader>uf", "n")
+report.extra.mapping = vim.fn.maparg("<leader>um", "n")
+report.extra.removed_mapping = vim.fn.maparg("<leader>uf", "n")
 vim.cmd("FastModeToggle")
 report.extra.retried = preferences.get("runtime").mode
 vim.cmd("FastMode off")
@@ -244,7 +245,8 @@ vim.cmd("FastMode on")
 		toggled.extra.toggled_back == "standard",
 		"An explicit current-mode selection did not cancel the pending change"
 	)
-	assert(toggled.extra.mapping:find("FastModeToggle", 1, true), "Fast mode toggle mapping missing")
+	assert(toggled.extra.mapping:find("EditorMode", 1, true), "Editor mode picker mapping missing")
+	assert(toggled.extra.removed_mapping == "", "Removed fast mode toggle mapping is still present")
 	local restarted = run(
 		"persistent_toggle",
 		{ keep_preferences = true, code = [[

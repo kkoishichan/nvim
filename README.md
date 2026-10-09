@@ -344,7 +344,6 @@ Claude 原生 IDE 集成在一个 Neovim 中只有一个终端：首次打开时
 | 操作 | 入口 |
 | --- | --- |
 | 选择三档模式并持久保存、自动重启 | `<leader>um` / `:EditorMode [fast\|standard\|extra\|auto]` |
-| 快速模式开关 | `<leader>uf` / `:FastModeToggle`；fast → standard，其他 → fast |
 | 明确开启、关闭 fast | `:FastMode on` / `:FastMode off`（关闭后为 standard） |
 | 查看实际模式、来源、关闭功能和降级 | `:ModeInfo` |
 | standard 手动独立 lint | `<leader>cl` / `:Lint`；SQL 的 Sqruff 诊断也需手动触发 |

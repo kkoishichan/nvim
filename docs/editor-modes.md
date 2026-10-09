@@ -32,9 +32,9 @@
 
 ## 切换与兼容
 
-- `<leader>um` 或 `:EditorMode` 打开选择菜单；也可执行 `:EditorMode fast|standard|extra|auto`。
+- `<leader>um` 或 `:EditorMode` 打开和主题选择相同样式的弹窗，标记当前模式；也可执行 `:EditorMode fast|standard|extra|auto`。
 - 选择写入 `preferences.json` 的 `runtime.mode`，随后通过原生重启应用。
-- `<leader>uf` / `:FastModeToggle`：standard 或 extra → fast，fast → standard；`:FastMode off` 明确选择 standard，`on` 选择 fast，`auto` 选择自动规则。
+- 兼容命令 `:FastModeToggle`：standard 或 extra → fast，fast → standard；`:FastMode off` 明确选择 standard，`on` 选择 fast，`auto` 选择自动规则。
 - `NVIM_MODE` 优先于主机偏好，其次才是默认 standard。`auto` 在 SSH 环境选择 fast，本地选择 standard。
 - 旧的 `full` 在环境变量、偏好、命令及部署参数中都是 extra 的别名。已有 `runtime.mode=full` 不会自动改写，继续获得完整功能；显式 `:EditorMode full` 保存为 extra。
 - `:ModeInfo` 显示实际模式、选择来源、保存值、关闭功能、资源降级与恢复数据位置。
