@@ -99,6 +99,13 @@ function M.candidates(bufnr, include_auxiliary)
 end
 
 local function launch(name, bufnr, request)
+	for _, client in ipairs(vim.lsp.get_clients({ bufnr = bufnr })) do
+		if client.name == name and not managed[client.id] then
+			pending[bufnr] = nil
+			notify(name .. " is already attached; its existing owner keeps control")
+			return
+		end
+	end
 	definitions()
 	local config = vim.tbl_deep_extend(
 		"force",

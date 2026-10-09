@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare full mode, fast mode and plain Neovim on real input in a PTY.
+"""Compare fast, standard, extra and plain Neovim on real input in a PTY.
 
 Every target uses the same Neovim binary, independent copies of the same files,
 the same 120x36 grid
@@ -46,7 +46,7 @@ except ImportError:
 
 ROOT = Path(__file__).resolve().parent.parent
 GRID = (120, 36)
-TARGETS = ("full", "fast", "native")
+TARGETS = ("fast", "standard", "extra", "native")
 
 # Terminal replies Neovim asks for at startup. Answering them keeps the session
 # from waiting on a real terminal emulator.
@@ -271,9 +271,19 @@ def revision():
     }
 
 
+def initialize_project(directory):
+    """Bound discovery so servers never index unrelated files above a sample."""
+    subprocess.run(
+        ["git", "-c", "init.templateDir=", "-c", "init.defaultBranch=main", "init", "--quiet", str(directory)],
+        check=True, capture_output=True,
+        env=os.environ | {"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull},
+    )
+
+
 def build_fixtures(directory):
     """Deterministic samples covering the languages and shapes under test."""
     directory.mkdir(parents=True, exist_ok=True)
+    initialize_project(directory)
     files = {}
 
     lua = ["-- Sample module for latency measurement.", "local M = {}", ""]
@@ -507,6 +517,7 @@ def copy_sample(sample, run, rust_project=False):
     """All editing and saves use a private file for this target and repetition."""
     workspace = run / "workspace"
     workspace.mkdir(parents=True, exist_ok=True)
+    initialize_project(workspace)
     destination = workspace / sample.name
     # Copy bytes, not links or source permissions: even a read-only input can be
     # measured safely, and a formatter can never write back through a symlink.
@@ -875,7 +886,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--output", type=Path, help="new output directory")
     parser.add_argument("--runs", type=int, default=3, help="interleaved runs per target and sample")
-    parser.add_argument("--target", choices=TARGETS, action="append", help="repeatable; default: all three")
+    parser.add_argument("--target", choices=(*TARGETS, "full"), action="append", help="repeatable; default: all four; full aliases extra")
     parser.add_argument("--file", type=Path, action="append", default=[], help="extra real file to measure; repeatable")
     parser.add_argument("--sample", action="append", help="limit generated samples by name")
     parser.add_argument("--settle-ms", type=int, default=2000)
@@ -904,7 +915,7 @@ def main():
         parser.error("--typing-chars must be positive and --paging-events at least 2")
     if min(options.saves, options.wheel_bursts, options.settle_ms, options.typing_interval_ms, options.paging_interval_ms) < 0:
         parser.error("counts and intervals cannot be negative")
-    targets = options.target or list(TARGETS)
+    targets = list(dict.fromkeys("extra" if name == "full" else name for name in (options.target or TARGETS)))
 
     base = options.output or Path(tempfile.mkdtemp(prefix="nvim-mode-benchmark-"))
     if options.output:

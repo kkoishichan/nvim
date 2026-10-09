@@ -121,6 +121,7 @@ function M.verify_blink(data, commit)
 	assert(loaded, "Prepared Blink native matcher cannot load: " .. tostring(err))
 end
 
-M.tools = { "stylua", "selene", "ruff", "shellcheck" }
+-- The mode lifecycle check starts a real Lua server and offers typos by name.
+M.tools = { "stylua", "selene", "ruff", "shellcheck", "lua-language-server", "typos-lsp" }
 
 return M

@@ -26,7 +26,7 @@ CI 使用 Ubuntu 24.04、Neovim 0.12.5、tree-sitter CLI 0.26.9。下载后分�
 首次准备允许下载和编译，目标必须是绝对路径：
 
 ```sh
-./scripts/prepare-checks.sh /tmp/nvim-check-env
+NVIM_MODE=extra ./scripts/prepare-checks.sh /tmp/nvim-check-env
 source /tmp/nvim-check-env/environment.sh
 ./scripts/check.sh
 ```
@@ -36,7 +36,7 @@ source /tmp/nvim-check-env/environment.sh
 复用可信的本机下载缓存：
 
 ```sh
-./scripts/prepare-checks.sh /tmp/nvim-check-env \
+NVIM_MODE=extra ./scripts/prepare-checks.sh /tmp/nvim-check-env \
   --cache-data "$HOME/.local/share/nvim"
 ```
 
@@ -45,7 +45,7 @@ source /tmp/nvim-check-env/environment.sh
 已准备好的目标可以离线复核：
 
 ```sh
-./scripts/prepare-checks.sh /tmp/nvim-check-env --offline
+NVIM_MODE=extra ./scripts/prepare-checks.sh /tmp/nvim-check-env --offline
 source /tmp/nvim-check-env/environment.sh
 ./scripts/check.sh
 ```
@@ -80,3 +80,11 @@ nvim --headless -u NONE -i NONE -l scripts/verify-lock.lua
 CI 缓存键包含宿主平台、架构、Neovim 和 CLI 版本、插件锁、parser 清单、工具目录以及准备/核验代码。缓存命中后仍完整核验，不能替代通过证据。插件的未跟踪构建产物允许存在，但已跟踪源码改动会导致失败。
 
 随后实际下载了 CI 指定的两个官方 Linux 压缩包，SHA256 均与表中一致，按 CI 目录布局解压后版本命令均退出 0。再使用该官方 Neovim 0.12.5 与独立依赖环境运行最终默认 **18 组**，全部通过。资源记录为 `/tmp/nvim-ci-assets-on507o/results.json`，完整检查日志为同目录 `check.log`。这进一步覆盖了本机发行版 Neovim 与官方发布构建的差异，仍不等同于在 GitHub 的 Ubuntu runner 上执行。
+
+## 2026-10-10 三档模式回归
+
+新增 standard 行为组：验证插件与快捷键隔离、手动 lint/会话、辅助 LSP、Java/Rust 配置保护及部署集合一致。检查入口显式运行 extra 功能组和 standard 组；CI 在 extra 模式下准备完整插件，以免默认 standard 的子集缺少回归所需功能。检查工具清单补充 Lua language server 和 typos-lsp，用于真实手动 LSP 生命周期；上文的四项清单和历史组数保留原记录。新结果只代表本机验收，未推送或声称远端 CI 已运行。
+
+本机默认 **31 组**回归全部通过；最终手动 LSP 保护与检查依赖调整后，`static integration standard mode deployment` 再次通过。基准脚本的三项 Python 检查通过，覆盖样本副本隔离、独立 Git 项目边界和缺少重绘时拒绝成功结果。五轮交错测量另行执行，数据及其边界见[三档性能测量](editor-mode-measurements.md)。
+
+交付前再次运行 `static standard deployment` 和基准脚本三项检查，均通过。最终测量包含 120 个有效会话、每档每样本五轮；Rust/Markdown 的 standard/extra 以最终配置另行补测，前后 104 份运行源码哈希一致，其他样本保留原记录。

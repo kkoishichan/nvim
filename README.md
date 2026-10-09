@@ -3,7 +3,7 @@
 一份现代化的个人 Neovim 配置，目标是在保留 Vim 编辑模型的前提下，把
 Neovim 打磨成接近 IDE 的日常工作流。
 
-- `lazy.nvim` 管理插件，首次启动自动 bootstrap。
+- 默认 standard，另有 fast 和 extra；`lazy.nvim` 管理插件，资源通过部署或显式维护准备。
 - 默认 `vscode` Dark+ 主题（可持久切换，主题选择器也提供内置 `default`），`<Space>` 作为 leader，`\` 作为 localleader。
 - `fzf-lua` 负责查找、搜索、符号 / 调用关系与 Git 列表，并接管 `vim.ui.select`。
 - `glance.nvim` 提供定义、声明、实现、类型与引用的双栏 Peek 界面。
@@ -16,8 +16,8 @@ Neovim 打磨成接近 IDE 的日常工作流。
 - `conform.nvim` 格式化，`nvim-lint` 静态检查。
 - `nvim-ufo` + Tree-sitter 折叠。
 - `toggleterm.nvim` 提供 VSCode 风格的多终端管理。
-- `overseer.nvim` 任务运行，`neotest` 测试，`nvim-dap` + `dap-ui` 调试。
-- `snacks.nvim` 提供 dashboard、scratch、input 与 zen；通知由 `nvim-notify` 提供。
+- extra 提供 `overseer.nvim` 任务运行、`neotest` 测试、`nvim-dap` + `dap-ui` 调试。
+- `snacks.nvim` 提供 input 与 zen；extra 另有 dashboard、scratch；通知由 `nvim-notify` 提供。
 - LSP 任务持续至少 500 ms 才显示进度，短检查静默完成；长任务按 250 ms 刷新，完成后提示保留 1.2 秒。
 - 除通知外，小型临时弹窗默认统一使用 Pmenu 配色的无边框 padding 设计，透明模式下也保留底色，可通过 `<leader>up`
   持久切换为插件和主题样式（重启生效）；`Esc` 一次收起当前
@@ -190,7 +190,10 @@ Selene、Stylelint、golangci-lint 仅在项目存在对应配置时运行，避
 nvim
 ```
 
-首次启动会自动安装 `lazy.nvim` 与全部插件。之后可在 Neovim 内：
+部署会先准备所选模式的插件、parser 和补全资源；standard / fast 的普通启动不下载插件。
+仅克隆配置时可显式运行 `NVIM_MODE=extra nvim +Lazy` 准备完整插件，
+或按[部署文档](docs/deployment.md)准备选定模式；缺少资源时 `:ModeInfo` 会说明降级。
+会更改共享插件资产的管理操作统一在 extra 中执行。
 
 ```vim
 :Lazy                 " 插件管理
@@ -203,13 +206,13 @@ nvim
 
 ## 性能策略
 
-面向日常轻量编辑和服务器环境的[快速模式](docs/fast-mode.md)已实现，功能取舍、缓存策略与精简部署范围见设计文档；启用方式见下方「运行模式」。
+日常默认 standard，完整功能用 extra，服务器用[快速模式](docs/fast-mode.md)，功能取舍、缓存策略与精简部署范围见设计文档；启用方式见下方「运行模式」。
 
 共享 buffer 策略会在读取和编辑时识别超过 1.5 MiB、10,000 行、单行超过 2,000 字节，
 或平均行长过高的文件，按 buffer 关闭 Tree-sitter、LSP、颜色扫描和 indent guide 等高成本功能。
 保留文件类型和撤销；语言服务仅脱离该文件，不关闭其他文件共享的服务。
 `:BufferFeatures` 查看原因，`:BufferFeatures on|off|auto` 手动启用、停用或恢复自动判断。
-`faster.nvim` 继续负责宏执行优化。普通文件保留完整语言功能；lint 调度会按 buffer 去重、防抖并缓存
+extra 中 `faster.nvim` 继续负责宏执行优化。普通文件保留完整语言功能；lint 调度会按 buffer 去重、防抖并缓存
 工具和配置查找结果。聚焦 Neovim 时先检查可见文件，隐藏 buffer 按批次检查，避免长会话
 一次性 `stat` 所有文件。可按机器调整：
 
@@ -332,34 +335,41 @@ Claude 原生 IDE 集成在一个 Neovim 中只有一个终端：首次打开时
 
 ## 运行模式
 
-`full` 是默认模式，保留本文描述的全部功能。`fast` 保留熟悉的编辑方式、主题和
-Tree-sitter 语法高亮，默认不启动语言服务、补全、Git 标记、装饰、折叠提供者和
-附加界面，适合 SSH、容器和资源有限的服务器。
+`standard` 是未配置主机的默认模式：保留自动补全、主 LSP、保存格式化、Git、文件树、
+搜索预览、折叠、sticky context、buffer 标签栏、状态栏、通知和键盘滚动动画。
+独立 lint 和会话改为手动；调试、测试、AI、媒体/文档预览、额外装饰与侧栏由 `extra` 提供。
+`extra` 保留原完整功能，`fast` 面向 SSH、容器与资源有限的服务器。
+旧 `full` 环境变量和偏好继续作为 extra 别名，不自动改写已有偏好。
 
-保留 leader 快捷键提示：按空格等待 300 ms 显示当前可用操作，普通和可视模式均可使用；
-快速模式使用纯文本按键标签，不依赖 Nerd Font。
+| 操作 | 入口 |
+| --- | --- |
+| 选择三档模式并持久保存、自动重启 | `<leader>um` / `:EditorMode [fast\|standard\|extra\|auto]` |
+| 快速模式开关 | `<leader>uf` / `:FastModeToggle`；fast → standard，其他 → fast |
+| 明确开启、关闭 fast | `:FastMode on` / `:FastMode off`（关闭后为 standard） |
+| 查看实际模式、来源、关闭功能和降级 | `:ModeInfo` |
+| standard 手动独立 lint | `<leader>cl` / `:Lint`；SQL 的 Sqruff 诊断也需手动触发 |
+| standard / extra 手动会话 | `<leader>sw` 保存，`ss` 恢复，`sS` 选择，`sl` 恢复最近会话（均带 leader） |
 
-按 `<leader>uf`（空格、u、f）或执行 `:FastModeToggle` 保存选择并自动原地重启，切换 full / fast；
-`:FastMode on` 开启，`:FastMode off` 关闭，`:FastMode auto` 按 SSH 环境选择。
-设置写入 `preferences.json`。有未保存修改时显示原生确认框，可保存、放弃修改或取消重启；
-取消后选择仍已保存，再次切换会重试，也可用 `:FastMode on/off` 改回当前模式。
-重启恢复文件、标签页、分屏和光标位置，插件与显示设置按新模式初始化，终端任务不会自动重放。
-有运行中的终端任务时会先确认是否停止，默认取消；取消后任务继续运行。
-已处于目标模式时只保存选择；无 UI 的 headless 会话只保存并提示手动重启。
-其他个人偏好保持不变，配置目录只读或 JSON 损坏时不重启并报告保存失败。
+三档都有 leader 快捷键提示，按空格等待 300 ms 显示当前可用操作；fast 使用纯文本标签。
+切换写入 `preferences.json` 的 `runtime.mode`，保留其他偏好，然后原地重启。
+有未保存修改或运行中的终端任务时会确认，可取消；取消后当前会话不变，选择仍已保存。
+重启恢复文件、标签页、分屏和光标位置，终端任务不会自动重放；无 UI 时提示手动重启。
+配置只读或 JSON 损坏时报告保存失败且不重启。
 
 ```sh
+NVIM_MODE=standard nvim path/to/file.py
+NVIM_MODE=extra nvim path/to/file.py
 NVIM_MODE=fast nvim path/to/file.py
-NVIM_MODE=full nvim path/to/file.py
 ```
 
-显式环境变量优先，其次是 `preferences.json` 的 `runtime.mode`（`full` / `fast` /
-`auto`），未配置时仍用 `full`。`auto` 只看连接本身：`SSH_CONNECTION` 或 `SSH_TTY`
-非空时选择 `fast`。模式在启动时确定，交互切换会清除重启子进程继承的 `NVIM_MODE`，
-让已保存的选择生效；父 shell 的环境变量不变。快速模式的原生状态栏显示
-`FAST`，`:ModeInfo` 按需列出选择来源、关闭的能力、降级原因和存储路径。
-功能取舍见[快速模式设计](docs/fast-mode.md)，性能数据与测量边界见
-[运行模式实测](docs/fast-mode-measurements.md)。
+优先级为 `NVIM_MODE` > 主机偏好 > standard。`auto` 在 SSH 环境选择 fast，本地选择 standard。
+模式切换清除重启子进程的 `NVIM_MODE`，应用刚保存的选择；父 shell 不变。
+standard 默认显示诊断下划线和标记，消息按需通过 `<leader>cd` 查看，`<leader>ud` 循环消息样式。
+Biome / Tailwind 需项目配置或依赖，typos-lsp / Emmet 只通过 `:ManualLspStart <server>` 手动开启。
+Java / Rust 保留原有分析，调试和测试接入仅在 extra 中启用。
+
+详细取舍、兼容及安装边界见[三档模式](docs/editor-modes.md)，服务器细节见
+[快速模式文档](docs/fast-mode.md)，性能数据见[三档实测](docs/editor-mode-measurements.md)。
 
 `runtime.state_dir` 可把 swap、undo、view 和 ShaDa 指向本机磁盘，目录由当前用户拥有
 且权限为 `0700`。目录不可用时仍可编辑，但磁盘恢复关闭并在 `:ModeInfo` 与
@@ -368,13 +378,14 @@ NVIM_MODE=full nvim path/to/file.py
 缺少 lazy.nvim 或所选插件时进入不依赖插件管理器的原生入口：原生目录浏览、保存、
 文件类型缩进和退出仍然可用，缺失项留给 `:ModeInfo`。
 
-快速模式需要语言服务时用 `:FastLspStart [server]`：只为当前缓冲区选择并启动一个
+三档都可用 `:ManualLspStart [server]` / `:ManualLspStop`，旧 `FastLspStart/Stop` 继续可用。
+快速模式需要语言服务时用 `:ManualLspStart [server]`：只为当前缓冲区选择并启动一个
 已安装的主要语言服务，复用现有工具路径和项目根规则；拼写服务和辅助检查器只在显式
 点名时出现。之后使用原生 hover、跳转、重命名、手动补全（`omnifunc`）和签名浮窗，
 诊断通过 `<leader>cd` 浮窗或 `<leader>cD` 位置列表查看，默认不画下划线和虚拟行。
 `:FastLspStop` 只撤销本模式建立的附着，最后一个受管缓冲区退出后停止该客户端。
 缺少可执行文件时只提示安装要求，不启动 Mason、不下载 SDK。
-Java / Rust 也可用 `:FastLspStart jdtls` / `:FastLspStart rust_analyzer`，不加载
+在 fast 中，Java / Rust 也可用 `:FastLspStart jdtls` / `:FastLspStart rust_analyzer`，不加载
 完整集成与调试插件。Java 仍需可用的 JDK 21+；Rust 默认关闭保存时检查、构建脚本和过程宏。
 
 快速模式关闭自动 `unnamedplus` 同步，普通寄存器始终可用；`<leader>y` / `<leader>Y` / `<leader>p`
@@ -396,7 +407,7 @@ Java / Rust 也可用 `:FastLspStart jdtls` / `:FastLspStart rust_analyzer`，�
 继续兼容旧 Persistence 会话；恢复前检查未保存内容。行为边界及终端验收见
 [窗口与会话验收](docs/ui-validation.md)。
 
-`:TaskBuild`、`:TaskRun`、`:TaskTest`（`<leader>jb` / `jx` / `jT`）根据当前项目发现常用入口，
+extra 中的 `:TaskBuild`、`:TaskRun`、`:TaskTest`（`<leader>jb` / `jx` / `jT`）根据当前项目发现常用入口，
 在 Overseer 中保留输出和结果，构建错误可从 quickfix 跳转。
 支持 package scripts、Cargo、Go、Maven/Gradle、CMake/Make、pytest，以及当前 Python/Shell 文件与 TeX/Typst 构建。
 CMake 初次执行先生成 `build/`，再次构建；自定义任务继续使用 `:OverseerRun` 或 `:OverseerShell`。
@@ -428,7 +439,7 @@ Go 汇编仅在 `.s`、Go 项目和 Plan 9 指令特征同时匹配时使用 asm
 常用单键 / 其他：
 
 - `<leader>w` / `<leader>W` ：保存当前文件 / 保存全部已修改文件（`:wall`）
-- `<leader>R` ：原地重启，恢复文件、分屏和光标位置；未保存修改或运行中的终端任务会先确认，可取消。普通和 fast 模式均支持。
+- `<leader>R` ：原地重启，恢复文件、分屏和光标位置；未保存修改或运行中的终端任务会先确认，可取消。三档均支持。
 - `<Esc>` ：关闭当前标签页内的临时弹窗；没有弹窗时清除搜索高亮
 - `-` ：oil 编辑当前目录
 - `s` / `S` ：flash 跳转 / treesitter 跳转
@@ -438,7 +449,7 @@ Go 汇编仅在 `.s`、Go 项目和 Plan 9 指令特征同时匹配时使用 asm
 - `<C-/>` ：切换底部终端（兼容传统终端的 `<C-_>` 编码）
 - `<leader>k` ：离线词典；`<leader>ut` ：选择并持久保存主题
 - `<leader>uT` / `:TransparentToggle` ：切换并持久保存透明背景，切换主题后仍生效。编辑区、行号栏、文件树、sticky context、buffer 标签栏、有边框的弹窗和 Trouble 面板跟随开关；统一无框样式的补全、签名、leader 菜单、悬停文档、诊断、输入框和预览（含 Glance）保留底色。候选选中行、当前参数、搜索匹配及编辑区选中行保留高亮；透明程度由终端设置决定。透明模式下，仅 TokyoNight（fg_gutter）和 Catppuccin（surface1）的窗口分隔线改用主题色板中的原生暗灰色，其他主题保留原色；buffer 标签栏（含 Explorer 标题）底部用连续细线分隔，不额外占一行，标签之间不显示竖分割线。切换时刷新当前主题及插件颜色缓存，关闭后恢复主题原色。状态保存在 `stdpath("state")/transparent.txt`，默认关闭。
-- `<leader>up` / `:FloatStyleToggle` ：切换并持久保存统一弹窗样式，默认开启。`:FloatStyle on` 开启，`:FloatStyle off` 恢复插件和主题提供的边框、背景及标题颜色；`:FloatStyle` 查看当前和已保存的选择。设置写入 `preferences.json` 的 `ui.float_style`，重启后统一生效，连续切换可撤销待生效的选择。普通和 fast 模式均支持；通知样式、弹窗功能、快捷键和透明背景开关独立保留。
+- `<leader>up` / `:FloatStyleToggle` ：切换并持久保存统一弹窗样式，默认开启。`:FloatStyle on` 开启，`:FloatStyle off` 恢复插件和主题提供的边框、背景及标题颜色；`:FloatStyle` 查看当前和已保存的选择。设置写入 `preferences.json` 的 `ui.float_style`，重启后统一生效，连续切换可撤销待生效的选择。三档均支持；通知样式、弹窗功能、快捷键和透明背景开关独立保留。
 - 无边框小弹窗始终保留菜单底色；有边框浮窗在非透明模式使用当前主题原本的弹窗底色（NormalFloat），透明模式不设置底色。关闭统一样式后，插件的有框弹窗同样遵循透明开关。通知的正文、空行、标题留白和行尾一起切换，避免只有文字带背景；淡入淡出及内容更新保持一致，通知修复不受弹窗样式开关影响。
 - `<leader>ghB` ：切换当前行 Git blame
 - `zR` / `zM` / `zr` / `zm` / `zK` ：折叠开关与预览

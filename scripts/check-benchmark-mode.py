@@ -15,6 +15,15 @@ BENCH = runpy.run_path(str(Path(__file__).with_name("benchmark-mode.py")))
 
 
 class Samples(unittest.TestCase):
+    def test_profile_targets_and_isolation(self):
+        self.assertEqual(BENCH["TARGETS"], ("fast", "standard", "extra", "native"))
+        for target in BENCH["TARGETS"][:-1]:
+            env = BENCH["environment"](target, Path("/tmp/benchmark-profile-check"))
+            self.assertEqual(env["NVIM_MODE"], target)
+            self.assertEqual(env["NVIM_CHECK_ONLY"], "1")
+            self.assertEqual(env["npm_config_offline"], "true")
+            self.assertEqual(env["CARGO_NET_OFFLINE"], "true")
+
     def test_missing_or_extra_input_is_not_reported_as_success(self):
         phase = {"phase": "wheel", "decoded": [10, 20], "frames": []}
         with self.assertRaisesRegex(RuntimeError, "no changed frame"):
@@ -39,6 +48,11 @@ class Samples(unittest.TestCase):
             alias.symlink_to(source)
             first = BENCH["copy_sample"](alias, root / "first")
             second = BENCH["copy_sample"](alias, root / "second")
+            for copy in (first, second):
+                resolved = subprocess.check_output(
+                    ["git", "-C", str(copy.parent), "rev-parse", "--show-toplevel"], text=True,
+                ).strip()
+                self.assertEqual(Path(resolved), copy.parent)
             self.assertFalse(first.is_symlink())
             first.write_text("invalid first run\n")
             self.assertEqual(source.read_bytes(), original)

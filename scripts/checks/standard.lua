@@ -97,7 +97,8 @@ return function(tmp)
 	require("lazy").load({ plugins = { "nvim-lint" } })
 	local lint = require("lint")
 	local calls, original = 0, lint.try_lint
-	lint.try_lint = function()
+	lint.try_lint = function(names)
+		assert(vim.deep_equal(names, { "sqruff" }), "Manual SQL check selected the wrong provider")
 		calls = calls + 1
 	end
 	require("lazy").load({ plugins = { "nvim-lspconfig" } })
@@ -112,7 +113,13 @@ return function(tmp)
 	for _, event in ipairs({ "BufReadPost", "BufWritePost", "InsertLeave" }) do
 		assert(#api.nvim_get_autocmds({ group = "user_lint", event = event }) == 0, "Manual lint registered " .. event)
 	end
+	local toolchain = require("user.toolchain")
+	local executable = toolchain.executable
+	toolchain.executable = function(name, ...)
+		return name == "sqruff" and "/fixture/sqruff" or executable(name, ...)
+	end
 	vim.cmd.Lint()
+	toolchain.executable = executable
 	assert(calls == 1, "Manual SQL lint did not run Sqruff")
 	lint.try_lint = original
 	assert(require("user.core.session").save(tmp .. "/manual.vim"), "Manual session save failed")
@@ -151,6 +158,21 @@ return function(tmp)
 		vim.lsp.config.jdtls.init_options.bundles[1] == "keep-this-bundle",
 		"Manual discovery overwrote Java bundles"
 	)
+	local clients, start, detach = vim.lsp.get_clients, vim.lsp.start, vim.lsp.buf_detach_client
+	local starts, detached = 0, 0
+	vim.lsp.get_clients = function()
+		return { { id = 900123, name = "lua_ls" } }
+	end
+	vim.lsp.start = function()
+		starts = starts + 1
+	end
+	vim.lsp.buf_detach_client = function()
+		detached = detached + 1
+	end
+	vim.cmd("ManualLspStart lua_ls")
+	vim.cmd.ManualLspStop()
+	vim.lsp.get_clients, vim.lsp.start, vim.lsp.buf_detach_client = clients, start, detach
+	assert(starts == 0 and detached == 0, "Manual LSP interfered with an already attached automatic client")
 	local rust = require("user.specs.languages")()[1]
 	rust.init()
 	assert(

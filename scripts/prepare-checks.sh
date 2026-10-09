@@ -44,6 +44,7 @@ NVIM_CHECK_ONLY=1 nvim --headless -u NONE -i NONE -l "$root/scripts/verify-lock.
 	printf 'export NVIM_TEST_ROOT=%q\n' "$root"
 	printf 'export NVIM_APPNAME=nvim\n'
 	printf 'export NVIM_CHECK_ONLY=1\n'
+	if [ -n "${NVIM_MODE:-}" ]; then printf 'export NVIM_MODE=%q\n' "$NVIM_MODE"; fi
 	# shellcheck disable=SC2016 # Expand PATH when the generated file is sourced.
 	printf 'export PATH=%q:"$PATH"\n' "$XDG_DATA_HOME/nvim/mason/bin"
 } > "$destination/environment.sh"

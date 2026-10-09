@@ -1,6 +1,6 @@
 # 部署、配置组与恢复
 
-默认部署选择 `minimal`，固定使用 Neovim `v0.12.5` 和 tree-sitter CLI `0.26.9`。配置默认取 `main`；需要重现同一次部署时，传入明确的提交 SHA。脚本会输出实际提交，并把仓库、请求引用、提交、Neovim 版本、运行模式、配置组和追加的 parser 写入保留的 release 目录下 `deployment.txt`。
+默认部署使用 standard 运行模式和 `minimal` 工具组，固定使用 Neovim `v0.12.5` 和 tree-sitter CLI `0.26.9`。配置默认取 `main`；需要重现同一次部署时，传入明确的提交 SHA。脚本会输出实际提交，并把仓库、请求引用、提交、Neovim 版本、运行模式、配置组和追加的 parser 写入保留的 release 目录下 `deployment.txt`。
 
 ```bash
 ./scripts/deploy.sh --dry-run --ref main --profile python --profile web
@@ -14,8 +14,8 @@
 | --- | --- |
 | `--ref REF` | 克隆后单独 fetch 并验证分支、tag 或提交，使用 detached checkout；默认 `main`。 |
 | `--nvim-version vX.Y.Z` | 精确匹配版本，最低为 0.12；找不到时从该官方 release 安装到 `~/.local/opt`，不使用 `latest`。 |
-| `--profile NAME` | 选择需要恢复的 Mason 工具及相应系统依赖；可重复，工具去重。完整模式默认 `minimal`，快速模式默认不选。 |
-| `--editor-mode NAME` | `full`（默认）或 `fast`：这台主机启动时使用的运行模式。两种选择都会更新 `preferences.json` 中的 `runtime.mode`；`fast` 只安装精简插件集和基础 parser。 |
+| `--profile NAME` | 选择需要恢复的 Mason 工具及相应系统依赖；可重复，工具去重。standard/extra 默认 `minimal`，fast 默认不选。 |
+| `--editor-mode NAME` | `fast`、`standard`（默认）或 `extra`，旧 `full` 是 extra 别名。选择会更新 `preferences.json` 中的 `runtime.mode`；`fast` 只安装精简插件集和基础 parser。 |
 | `--parsers a,b,c` | 在快速模式的基础 parser 之外追加语言；可重复，只接受目录中已有的 parser 名。 |
 | `--mason` | 等同 `--profile full`，恢复全部锁定工具。 |
 | `--repo URL` / `--ssh` | 更换配置仓库地址或使用预设 SSH 地址。 |
@@ -27,6 +27,13 @@
 
 所有配置组均包含 `minimal`。组只决定这次显式恢复哪些工具，不禁用其他语言配置，也不会卸载已有工具。正常启动与打开文件不会触发 Mason 安装；编辑器中的 `:MasonToolsInstall` 仍表示完整目录恢复。`--editor-mode fast` 未显式选择工具组时不恢复任何 Mason 工具，输出中会说明。
 
+standard 选中 47 个插件并保留完整 parser 目录，extra 选中 83 个插件，fast 默认 9 个插件和 13 个 parser（默认 VS Code 主题）。模式切换不卸载其他模式的已有资产。工具组独立于运行模式，`--editor-mode standard --profile full` 仍安装完整 Mason 工具清单。运行时 standard/fast 不下载插件；新主机先完成显式资源准备。完整取舍见[三档模式](editor-modes.md)。
+
+```sh
+./scripts/deploy.sh --dry-run --editor-mode standard --profile python
+./scripts/deploy.sh --editor-mode extra --profile full
+```
+
 ## 精简部署
 
 `--editor-mode fast` 面向 SSH、容器和资源有限的服务器：
@@ -37,13 +44,13 @@
 ./scripts/deploy.sh --ref <commit-sha> --editor-mode fast --parsers rust --profile native
 ```
 
-准备、恢复和校验三步都按所选模式运行，因此装到磁盘上的资产就是该模式会加载的资产：Lazy、当前主题、nvim-treesitter、mini.nvim、Oil、fzf-lua、Conform，以及作为显式语言能力扩展的 nvim-lspconfig；其余主题、Blink、预览二进制和整套 Mason 工具都不安装。默认 parser 为 Bash、Lua、Python、JSON、YAML、TOML、Markdown（含 `markdown_inline` 注入）、Vim、Vimdoc、query、comment 和 luadoc，其他语言通过 `--parsers` 显式加入；名称不在目录中时直接失败，不会静默少装。
+准备、恢复和校验三步共用运行时的模式选择规则。fast 的资产为：Lazy、当前主题、nvim-treesitter、mini.nvim、which-key、Oil、fzf-lua、Conform，以及作为显式语言能力扩展的 nvim-lspconfig；其余主题、Blink、预览二进制和整套 Mason 工具都不安装。默认 parser 为 Bash、Lua、Python、JSON、YAML、TOML、Markdown（含 `markdown_inline` 注入）、Vim、Vimdoc、query、comment 和 luadoc，其他语言通过 `--parsers` 显式加入；名称不在目录中时直接失败，不会静默少装。
 
-完整锁文件仍是唯一版本来源：精简安装只决定放多少东西到磁盘上，不会删除锁条目，也不会清理完整模式已安装的资产。因此快速模式不提供会按当前子集执行 `clean/sync/update` 的入口，`:Lazy` 会说明管理操作应在完整模式下运行。
+完整锁文件仍是唯一版本来源：精简安装只决定放多少东西到磁盘上，不会删除锁条目，也不会清理完整模式已安装的资产。因此 standard 和 fast 不提供会按当前子集执行 `clean/sync/update` 的入口，`:Lazy` 会说明管理操作应在 `NVIM_MODE=extra nvim +Lazy` 下运行。
 
 显式追加 `--profile` 时，还会准备并校验锁定的 Mason 安装器。工具安装运行在独立进程，
-不依赖完整模式，也不会把 Mason 加入快速模式的日常插件集。从 fast 重新部署为 full
-会同步修改保存的默认模式。日常可用 `<leader>uf` 或 `:FastMode on|off|auto` 保存选择，重启生效。
+不依赖完整模式，也不会把 Mason 加入快速模式的日常插件集。从 fast 重新部署为 standard/extra
+会同步修改保存的默认模式。日常可用 `<leader>um` / `:EditorMode` 选择并保存三档模式、自动重启；`FastMode off` 选择 standard。
 
 搜索依赖（fzf、ripgrep、fd）在快速模式下是可选的：缺少时给出警告并继续，编辑器使用原生打开、补全和 quickfix 搜索入口。构建 parser 仍需要 C 编译器和固定版本的 tree-sitter CLI。
 
@@ -57,7 +64,7 @@
 | `docs` | Markdown、Typst、LaTeX 服务器、排版和拼写工具 | Node/npm、Perl、Typst、基础 TeX/latexmk、Poppler、ImageMagick；macOS 使用 BasicTeX。 |
 | `full` | `lua/user/toolchain.lua` 中全部固定版本，包括未归入某个语言组的工具 | 上述配置组依赖的合并。 |
 
-所有正常部署都会从锁定的 Tree-sitter 插件目录构建配置中明确启用的 parser，并准备、验证锁定 Blink 补全所需资产。它们不随 Mason 配置组减少。tree-sitter CLI 使用官方 `0.26.9` 平台二进制，不要求为了安装 CLI 再安装 Rust。Neovim 和 tree-sitter 的发行资产来源分别为 [Neovim v0.12.5](https://github.com/neovim/neovim/releases/tag/v0.12.5) 与 [tree-sitter v0.26.9](https://github.com/tree-sitter/tree-sitter/releases/tag/v0.26.9)。改变 Neovim 版本会同时传给准备步骤；其他版本不因默认准备版本硬编码而被拒绝，实际兼容性仍由检查结果决定。
+所有正常部署从锁定的 Tree-sitter 插件目录构建所选 parser；standard/extra 另准备、验证锁定 Blink 补全所需资产，fast 不需要 Blink。它们不随 Mason 配置组减少。tree-sitter CLI 使用官方 `0.26.9` 平台二进制，不要求为了安装 CLI 再安装 Rust。Neovim 和 tree-sitter 的发行资产来源分别为 [Neovim v0.12.5](https://github.com/neovim/neovim/releases/tag/v0.12.5) 与 [tree-sitter v0.26.9](https://github.com/tree-sitter/tree-sitter/releases/tag/v0.26.9)。改变 Neovim 版本会同时传给准备步骤；其他版本不因默认准备版本硬编码而被拒绝，实际兼容性仍由检查结果决定。
 
 ## 切换与失败恢复
 

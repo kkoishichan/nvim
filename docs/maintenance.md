@@ -11,15 +11,15 @@
 | 真实语言 | `./scripts/check-workflows.sh` | 真实 LSP、格式化、通过与失败测试、实际调试断点，需要矩阵中列出的 SDK 和样例依赖 |
 | 真实终端 | `python3 scripts/ui-smoke.py` | 三个 PTY 尺寸的键盘、模式与实际补全菜单；保存日志，不连接真实 SSH 主机 |
 | 启动比较 | `python3 scripts/benchmark.py` | 保留输入、逐次启动日志、版本信息与 JSON，默认丢弃首次并取其余中位数 |
-| 模式比较 | `python3 scripts/benchmark-mode.py` | PTY 中比较完整模式、快速模式与原生 Neovim 的启动、输入、保存、滚轮和翻页延迟，以及空闲客户端、定时器、监听、子进程、内存和新增状态文件 |
+| 模式比较 | `python3 scripts/benchmark-mode.py` | PTY 中比较 fast、standard、extra 与原生 Neovim 的启动、输入、保存、滚轮和翻页延迟，以及空闲客户端、定时器、监听、子进程、内存和新增状态文件 |
 | 测量安全检查 | `python3 scripts/check-benchmark-mode.py` | 验证输入文件副本隔离、保存内容有效，以及缺少输入或重绘时拒绝生成成功结果；需要 Python msgpack |
 
 模式比较的每轮输入和保存都在独立临时副本上完成，`--file` 不会改写原文件。
 `--keep-going` 在单项采样失败后继续其余样本，但最终仍返回失败状态并保留失败证据。
-`--runs 2 --startup-cache both --file /path/to/code.py --fast-lsp-sample diagnostics`
+`--runs 5 --startup-cache both --file /path/to/code.py --fast-lsp-sample diagnostics`
 可同时测冷/热编译缓存、真实代码和首次手动语言服务。生成的 Rust 样例带独立 Cargo 清单；
 真实文件仅复制自身，不复制整个项目。基准禁止 npm/Cargo 联网，避免后台下载干扰结果。
-指标定义、固定版本数据和尚未覆盖的远程环境见[运行模式实测](fast-mode-measurements.md)。
+当前三档数据和测量边界见[三档模式实测](editor-mode-measurements.md)，历史 fast/full 数据见[早期实测](fast-mode-measurements.md)。
 
 原集成入口 `scripts/check.lua` 仅负责顺序运行 `scripts/checks/integration/` 下的主题模块；保持同进程插件加载互操作验证。其它行为组分别运行于独立进程，避免上一组的替身或缓存污染下一组。主题检查关注实际文字可读性；原集成中大量逐项复制调色常量的断言已移除。
 
@@ -32,7 +32,7 @@
 3. 显式准备匹配的依赖，再运行快速检查。改动 Blink、PDF、项目或终端时必须通过相应行为组；改动语言工具还需运行对应真实工作流。
 4. 核对 `:checkhealth user` 的实际工具路径、来源、版本及项目根，使用日常项目验证后提交配置和锁文件。
 
-插件与 parser 的版本来源始终是完整的 `lazy-lock.json`。快速模式只是少装一部分资产，不是清理依据：它不提供会按当前子集执行 `clean/sync/update` 的入口，`:Lazy` 会提示管理操作在完整模式下运行。升级插件锁时请在完整模式下操作，再按需要用 `--editor-mode fast` 重新部署服务器。
+插件与 parser 的版本来源始终是完整的 `lazy-lock.json`。快速模式只是少装一部分资产，不是清理依据：它不提供会按当前子集执行 `clean/sync/update` 的入口，`:Lazy` 会提示管理操作在 `NVIM_MODE=extra nvim +Lazy` 下运行。升级插件锁时请在 extra 模式下操作，再按需要用 `--editor-mode fast` 重新部署服务器。
 
 `lua/user/toolchain.lua` 中的版本是期望值；Mason 包目录中的 `mason-receipt.json` 记录安装来源，工具的版本输出才反映实际执行程序。项目本地工具或系统 PATH 可以优先于 Mason，修改 pin 不会自动替换正在运行的 LSP。显式恢复工具后使用 `:ToolsRefresh`，并重启受影响的客户端或 Neovim。
 
@@ -47,3 +47,5 @@
 ## 本轮验收位置
 
 完整六阶段记录见 [实施记录](improvement-progress.md)。本轮默认 Neovim 为 0.12.5，CI 固定官方 Tree-sitter CLI 0.26.9；本地语言样例、真实 PTY 和独立依赖环境分别记录证据。远端 CI 只有在提交到远端并实际运行后才有结果，当前本地记录不将其算作已运行。
+
+三档模式以[当前说明](editor-modes.md)为准。CI 和全量回归必须用 `NVIM_MODE=extra ./scripts/prepare-checks.sh /absolute/environment` 准备完整依赖；仅 standard 安装可运行 `./scripts/check.sh standard`。准备工具包括真实手动 LSP 生命周期检查需要的 Lua language server 和 typos-lsp，共六项；普通启动不会安装它们。

@@ -1089,6 +1089,13 @@ report.extra.colorscheme = vim.g.colors_name
 	local sample_file = vim.fs.joinpath(root, "lua", "user", "core", "buffer_policy.lua")
 	local highlight_full = run("highlight_full", { mode = "full", arguments = { sample_file }, code = highlight_probe })
 	local highlight_fast = run("highlight_fast", { mode = "fast", arguments = { sample_file }, code = highlight_probe })
+	local highlight_standard =
+		run("highlight_standard", { mode = "standard", arguments = { sample_file }, code = highlight_probe })
+	assert(
+		highlight_full.extra.colorscheme == highlight_standard.extra.colorscheme
+			and vim.deep_equal(highlight_full.extra.captures, highlight_standard.extra.captures),
+		"Standard changed the theme or Tree-sitter capture colours"
+	)
 	assert(#highlight_fast.extra.captures > 200, "The slim session produced almost no Tree-sitter captures")
 	assert(
 		highlight_full.extra.colorscheme == highlight_fast.extra.colorscheme,

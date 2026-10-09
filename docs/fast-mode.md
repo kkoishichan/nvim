@@ -1,8 +1,10 @@
 # 快速模式设计
 
+2026-10-10 更新：已加入默认 standard 和完整 extra，完整取舍及当前切换规则见[三档模式](editor-modes.md)。旧 full 是 extra 别名；旧测量记录保持当时的模式名称。
+
 状态：已实现并完成验收修补，2026-09-20。初始设计基于 `main` 的 `37000af`；修补包括持久化开关、手动语言服务生命周期、精简工具安装、原生搜索和基准数据完整性。本文记录运行模式、功能取舍、服务器部署和验收边界；实测结果及限制见[运行模式实测](fast-mode-measurements.md)，用法见 README 的「运行模式」和[部署文档](deployment.md)的「精简部署」。
 
-独立的 `fast` 启动模式保留熟悉的编辑方式、主题和 Tree-sitter 语法高亮，默认关闭自动语言分析与附加界面刷新。完整模式 `full` 继续保留现有功能，包括键盘滚动动画。快速模式同时配套精简安装，适合 SSH、容器及资源有限的服务器。
+独立的 `fast` 启动模式保留熟悉的编辑方式、主题和 Tree-sitter 语法高亮，默认关闭自动语言分析与附加界面刷新。完整模式 `extra` 继续保留现有功能，包括键盘滚动动画。快速模式同时配套精简安装，适合 SSH、容器及资源有限的服务器。
 
 ## 现状与收益来源
 
@@ -25,7 +27,7 @@
 ## 启动与切换
 
 持久化开关为 `<leader>uf`（空格、u、f）或 `:FastModeToggle`。也可使用
-`:FastMode on`、`:FastMode off`、`:FastMode auto` 明确选择；不带参数的 `:FastMode`
+`:FastMode on`、`:FastMode off`（standard）、`:FastMode auto` 明确选择；不带参数的 `:FastMode`
 等同切换。设置写入 `preferences.json` 后自动原地重启；切换以当前运行模式为准。
 有未保存修改时显示原生确认框，取消会保留当前进程和已保存的选择，再次切换可重试。
 重启恢复文件、标签页、分屏和光标位置；不恢复旧模式的选项、插件映射及终端任务。
@@ -37,12 +39,12 @@
 
 ```sh
 NVIM_MODE=fast nvim path/to/file.py
-NVIM_MODE=full nvim path/to/file.py
+NVIM_MODE=extra nvim path/to/file.py
 ```
 
-`preferences.json` 增加 `runtime.mode`，可设为 `full`、`fast` 或 `auto`。显式环境变量优先，其次是主机偏好，未配置时仍用 `full`。`auto` 只是选择规则：检测到非空 `SSH_CONNECTION` 或 `SSH_TTY` 时选择 `fast`，否则选择 `full`。服务器部署写入 `fast`，因此进入 tmux 后即使 SSH 环境信息丢失也不改变默认选择。
+`preferences.json` 增加 `runtime.mode`，可设为 `fast`、`standard`、`extra` 或 `auto`，也兼容旧 `full`。显式环境变量优先，其次是主机偏好，未配置时使用 `standard`。`auto` 只是选择规则：检测到非空 `SSH_CONNECTION` 或 `SSH_TTY` 时选择 `fast`，否则选择 `standard`。服务器部署写入 `fast`，因此进入 tmux 后即使 SSH 环境信息丢失也不改变默认选择。
 
-不依赖 `TERM=...kitty` 判断机器性能、是否远程或能否显示图片；容器也可显式选择快速模式。非法模式值给出一次配置提示，并回退到有效主机偏好或 `full`。
+不依赖 `TERM=...kitty` 判断机器性能、是否远程或能否显示图片；容器也可显式选择快速模式。非法模式值给出一次配置提示，并回退到有效主机偏好或 `standard`。
 
 模式在启动时确定。交互切换通过原地重启生效，避免在同一进程中尝试卸载插件、回收全部映射和重建语言客户端。原生状态栏显示 `FAST`；`:ModeInfo` 按需显示当前模式与选择来源、已保存的默认值、能力降级原因、手动开启的语言服务和存储路径。启动时环境变量优先；交互切换会清除重启子进程继承的 `NVIM_MODE`，让用户刚保存的选择生效，父 shell 的环境变量不受影响。普通启动不递归统计缓存。
 
@@ -64,7 +66,7 @@ NVIM_MODE=full nvim path/to/file.py
 | 文件浏览 | Oil 按需打开，保留目录编辑确认和中性灰辅助文字；关闭监听、图标与默认元数据列，仅显示名称，手动刷新。关闭 Neo-tree。 | 保留轻量目录工作流；权限、大小和时间需要显式查看。 |
 | 文件搜索 | fzf-lua 按键加载，无图标，预览默认关闭；搜索范围限当前项目，遵守忽略规则。 | 搜索期间才创建进程，减少预览解析；缺少 fzf/rg/fd 时提供原生打开、补全及 quickfix 搜索入口。 |
 | 终端、构建 | 使用原生 `:terminal`、`:make` 和 quickfix，构建仅显式触发。 | 继续支持服务器工作；无终端管理、任务面板和测试自动发现。 |
-| 扩展工作流 | 排除 DAP、Neotest、AI 集成、图片/PDF、Markdown 渲染、浏览器预览、VimTeX 和桌面输入法集成。 | 减少安装资产及运行依赖；需要完整集成时使用 `full`。 |
+| 扩展工作流 | 排除 DAP、Neotest、AI 集成、图片/PDF、Markdown 渲染、浏览器预览、VimTeX 和桌面输入法集成。 | 减少安装资产及运行依赖；需要完整集成时使用 `extra`。 |
 | 会话与恢复 | 关闭自动会话保存和 scratch 持久化；保留内存撤销及 swap 崩溃恢复。持久撤销默认关闭，可由主机偏好开启。 | 减少磁盘状态写入；重启后默认无法继续撤销旧修改，swap 仍用于找回未保存内容。 |
 
 `relativenumber` 保留为编辑习惯；默认关闭整行 cursorline 着色。保持现有的大文件保护阈值，不能把普通代码文件强制划为大文件来得到漂亮的测量结果。
@@ -124,9 +126,9 @@ Oil 在缺少系统回收站工具时仍允许浏览和普通编辑；删除操�
 
 使用现有 Lazy 管理这些插件，关闭自动安装、更新和配置变更检测。Lazy 或可选插件缺失时走不依赖插件管理器的原生编辑入口；显示一次降级说明，详细缺失项留给 `:ModeInfo`。原生入口需要真实验证打开目录、保存、缩进、退出及恢复行为。
 
-共用完整锁文件作为版本来源。快速模式的子集不是清理依据：会改变安装资产或锁文件的管理操作统一进入显式维护流程，以完整清单判断保留项。快速模式不提供会按当前子集执行 `clean/sync/update` 的入口。已有插件路径继续复用，避免通过 `NVIM_APPNAME=nvim-fast` 复制整套数据。
+共用完整锁文件作为版本来源。快速模式的子集不是清理依据：会改变安装资产或锁文件的管理操作统一进入 extra 的显式维护流程，以完整清单判断保留项。快速模式不提供会按当前子集执行 `clean/sync/update` 的入口。已有插件路径继续复用，避免通过 `NVIM_APPNAME=nvim-fast` 复制整套数据。
 
-部署参数 `--editor-mode fast` 与 `--profile python/web/...` 分开。`minimal` 只表示语言工具组；仅选择 `minimal` 不会缩减完整模式的插件与 parser。部署为 `fast` 或 `full` 都会保存相应默认模式，保留其他主机偏好。
+部署参数 `--editor-mode fast` 与 `--profile python/web/...` 分开。`minimal` 只表示语言工具组；仅选择 `minimal` 不会缩减完整模式的插件与 parser。部署为 fast/standard/extra 都会保存相应默认模式，保留其他主机偏好。
 
 新服务器选择 `--editor-mode fast` 时，未显式选择工具组就不恢复任何 Mason 工具；基础搜索依赖可选，缺少时使用已说明的原生入口。默认安装 13 个 parser，覆盖 Bash、Lua、Python、JSON、YAML、TOML、Markdown、Vim、Vimdoc、query，以及所需的注入和依赖 parser；其他语言通过部署参数显式加入。保留现有版本锁定、staging 验证和可恢复的配置切换。
 

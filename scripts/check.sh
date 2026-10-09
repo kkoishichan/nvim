@@ -105,7 +105,7 @@ PY
 
 TMP_ROOT=$(mktemp -d)
 trap 'rm -rf "$TMP_ROOT"' EXIT
-verified=0
+verified=""
 for group in "${groups[@]}"; do
 	printf 'Running %s checks...\n' "$group"
 	if [ "$group" = static ]; then
@@ -116,14 +116,16 @@ for group in "${groups[@]}"; do
 		"$ROOT/scripts/check-deploy.sh"
 		continue
 	fi
-	if [ "$verified" -eq 0 ]; then
+	group_mode=extra
+	[ "$group" != standard ] || group_mode=standard
+	if [[ " $verified " != *" extra "* && " $verified " != *" $group_mode "* ]]; then
 		mkdir -p "$TMP_ROOT/verify/cache" "$TMP_ROOT/verify/state" "$TMP_ROOT/verify/config"
 		printf 'Verifying locked dependencies before loading the configuration...\n'
-		NVIM_TEST_ROOT="$ROOT" XDG_CONFIG_HOME="$TMP_ROOT/verify/config" \
+		NVIM_MODE="$group_mode" NVIM_TEST_ROOT="$ROOT" XDG_CONFIG_HOME="$TMP_ROOT/verify/config" \
 			XDG_CACHE_HOME="$TMP_ROOT/verify/cache" XDG_STATE_HOME="$TMP_ROOT/verify/state" \
 			NVIM_LOG_FILE="$TMP_ROOT/verify/nvim.log" \
 			nvim --headless -u NONE -i NONE -l "$ROOT/scripts/verify-lock.lua"
-		verified=1
+		verified="$verified $group_mode"
 	fi
 	group_tmp="$TMP_ROOT/$group"
 	mkdir -p "$group_tmp/cache" "$group_tmp/state" "$group_tmp/config/nvim"
@@ -134,8 +136,6 @@ for group in "${groups[@]}"; do
 	done
 	script="$ROOT/scripts/run-check.lua"
 	[ "$group" != integration ] || script="$ROOT/scripts/check.lua"
-	group_mode=extra
-	[ "$group" != standard ] || group_mode=standard
 	NVIM_MODE="$group_mode" NVIM_TEST_ROOT="$ROOT" NVIM_TEST_GROUP="$group" NVIM_TEST_TMP="$group_tmp" \
 		XDG_CONFIG_HOME="$group_tmp/config" XDG_CACHE_HOME="$group_tmp/cache" XDG_STATE_HOME="$group_tmp/state" NVIM_LOG_FILE="$group_tmp/nvim.log" \
 		nvim --headless --cmd 'lua vim.opt.runtimepath:prepend(vim.env.NVIM_TEST_ROOT)' \
