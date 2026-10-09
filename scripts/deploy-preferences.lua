@@ -3,7 +3,8 @@
 -- keep it after the SSH environment is gone, inside tmux for instance.
 local path = assert(vim.env.NVIM_DEPLOY_PREFERENCES, "NVIM_DEPLOY_PREFERENCES is required")
 local mode = assert(vim.env.NVIM_DEPLOY_EDITOR_MODE, "NVIM_DEPLOY_EDITOR_MODE is required")
-assert(mode == "full" or mode == "fast", "Unknown editor mode: " .. mode)
+mode = mode == "full" and "extra" or mode
+assert(mode == "fast" or mode == "standard" or mode == "extra", "Unknown editor mode: " .. mode)
 local values = {}
 if vim.uv.fs_stat(path) then
 	local ok, parsed = pcall(vim.json.decode, table.concat(vim.fn.readfile(path), "\n"))

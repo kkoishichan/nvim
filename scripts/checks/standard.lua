@@ -158,6 +158,37 @@ return function(tmp)
 		"Standard downgraded Rust analysis"
 	)
 	assert(vim.g.rustaceanvim.dap.adapter() == false, "Standard enabled the Rust debugger")
+	for _, item in ipairs(require("user.health").packages()) do
+		assert(
+			not vim.tbl_contains(
+				{ "debugpy", "codelldb", "delve", "js-debug-adapter", "java-debug-adapter", "java-test" },
+				item[1]
+			),
+			"Standard health requires an extra-only tool: " .. item[1]
+		)
+	end
+	local root, data = vim.env.NVIM_TEST_ROOT, vim.fn.stdpath("data")
+	local support = assert(loadfile(root .. "/scripts/check-support.lua"))()
+	local selected = support.selected_plugins(root, data, "standard")
+	local active = vim.tbl_keys(plugins)
+	table.sort(active)
+	assert(vim.deep_equal(selected, active), "Deployment and standard runtime plugin sets differ")
+	local extra = support.selected_plugins(root, data, "extra")
+	local legacy = support.selected_plugins(root, data, "full")
+	local fast = support.selected_plugins(root, data, "fast")
+	assert(vim.deep_equal(extra, legacy), "Legacy full deployment differs from extra")
+	assert(#fast < #selected and #selected < #extra, "Plugin profiles are not strict subsets")
+	for _, name in ipairs(selected) do
+		assert(vim.tbl_contains(extra, name), "Standard plugin missing from extra: " .. name)
+	end
+	assert(mode.name() == "standard" and not mode.capabilities().lint_auto, "Asset selection changed the active mode")
+	print(
+		("Asset evidence: fast %d, standard %d, extra %d locked plugins; runtime and deployment agree"):format(
+			#fast,
+			#selected,
+			#extra
+		)
+	)
 	print(
 		"Standard evidence: primary editing/UI retained; extra plugins absent; manual lint/session stay manual; auxiliary LSPs gated; Java/Rust definitions preserved"
 	)

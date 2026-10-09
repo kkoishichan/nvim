@@ -43,13 +43,10 @@ function M.spec(root, data, opts)
 			performance = { rtp = { reset = false } },
 		})
 	end
-	local source = { { import = "user.plugins" } }
-	if opts and opts.mode == "fast" then
-		source = require("user.core.mode").as("fast", function()
-			return require("user.specs").base()
-		end)
-	end
-	local spec = require("lazy.core.plugin").Spec.new(source, { pkg = false })
+	local selected_mode = (opts and opts.mode) or "extra"
+	local spec = require("user.core.mode").as(selected_mode, function()
+		return require("lazy.core.plugin").Spec.new(require("user.specs").for_mode(selected_mode), { pkg = false })
+	end)
 	for _, message in ipairs(spec.notifs) do
 		assert(message.level ~= vim.log.levels.ERROR, message.msg)
 	end

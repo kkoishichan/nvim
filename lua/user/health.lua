@@ -12,6 +12,22 @@ local executable_names = {
 	["debugpy"] = "debugpy-adapter",
 	["dockerfile-language-server"] = "docker-langserver",
 }
+local extra_tools = {
+	codelldb = true,
+	debugpy = true,
+	delve = true,
+	["js-debug-adapter"] = true,
+	["java-debug-adapter"] = true,
+	["java-test"] = true,
+}
+
+function M.packages()
+	local extra = require("user.core.mode").capabilities().extended_workflows
+	return vim.tbl_filter(function(item)
+		return extra or not extra_tools[item[1]]
+	end, require("user.toolchain").packages)
+end
+
 local java_artifacts = {
 	["java-debug-adapter"] = "java-debug-adapter/com.microsoft.java.debug.plugin.jar",
 	["java-test"] = "java-test/com.microsoft.java.test.plugin.jar",
@@ -166,7 +182,7 @@ function M.check()
 		end
 	end
 	local python = toolchain.python_resolve(bufnr)
-	local debugpy = toolchain.debugpy_host()
+	local debugpy = capabilities.extended_workflows and toolchain.debugpy_host() or nil
 	if python.path then
 		health.ok(
 			"Python target: "
@@ -181,9 +197,11 @@ function M.check()
 	else
 		health.info("Python target: " .. python.reason)
 	end
-	health.info(
-		"debugpy host: " .. (debugpy.path or "unavailable") .. " [" .. debugpy.source .. "]; " .. debugpy.reason
-	)
+	if debugpy then
+		health.info(
+			"debugpy host: " .. (debugpy.path or "unavailable") .. " [" .. debugpy.source .. "]; " .. debugpy.reason
+		)
+	end
 	local jdtls_java, java_version = require("user.core.java").runtime()
 	if jdtls_java then
 		health.ok(
@@ -195,7 +213,7 @@ function M.check()
 
 	health.start("Configured tools")
 	local missing = {}
-	for _, package in ipairs(toolchain.packages) do
+	for _, package in ipairs(M.packages()) do
 		local name = package[1]
 		local receipt = installed_version(name)
 		local executable = executable_names[name] or name

@@ -383,9 +383,12 @@ return function()
 					callback = reset_lookup_caches,
 				})
 
-				vim.api.nvim_create_user_command("Lint", function()
+				local function manual_lint()
+					reset_lookup_caches()
 					run_lint(vim.api.nvim_get_current_buf(), false)
-				end, { desc = "Lint current buffer" })
+				end
+				vim.api.nvim_create_user_command("Lint", manual_lint, { desc = "Lint current buffer" })
+				vim.keymap.set("n", "<leader>cl", manual_lint, { desc = "Lint" })
 
 				-- The event that lazy-loaded nvim-lint may already have fired. The
 				-- debounce coalesces this with a replayed BufReadPost when applicable.

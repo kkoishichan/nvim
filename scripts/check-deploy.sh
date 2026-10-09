@@ -244,7 +244,7 @@ expect_code 0 --no-deps --ref 1234567890123456789012345678901234567890 --profile
 assert_backup
 rg -q 'profiles=java' "$FIXTURE_LOG"
 rg -q '"prefer_mason":true' "$FIXTURE_TARGET/preferences.json"
-rg -q '"mode":"full"' "$FIXTURE_TARGET/preferences.json"
+rg -q '"mode":"standard"' "$FIXTURE_TARGET/preferences.json"
 rg -q 'Deployment complete at commit' "$FIXTURE_CASE/output"
 new_case alternate-neovim
 export FIXTURE_NVIM_VERSION=v0.12.4
@@ -286,8 +286,20 @@ if rg -q 'deploy-tools.lua' "$FIXTURE_LOG"; then
 fi
 rg -q 'fast mode, tools: none' "$FIXTURE_CASE/output"
 expect_code 0 --no-deps --editor-mode full
-rg -q '"mode":"full"' "$FIXTURE_TARGET/preferences.json"
+rg -q '"mode":"extra"' "$FIXTURE_TARGET/preferences.json"
 rg -q '"prefer_mason":true' "$FIXTURE_TARGET/preferences.json"
+new_case standard-plan
+FIXTURE_DRY=1 expect_code 0 --dry-run
+rg -q 'editor mode: standard' "$FIXTURE_CASE/output"
+rg -q 'profiles: minimal' "$FIXTURE_CASE/output"
+rg -q 'complete parser catalog' "$FIXTURE_CASE/output"
+new_case extra-success
+original
+expect_code 0 --no-deps --editor-mode extra --profile full
+rg -q '"mode":"extra"' "$FIXTURE_TARGET/preferences.json"
+rg -q 'mode=extra' "$FIXTURE_LOG"
+rg -q 'profiles=full' "$FIXTURE_LOG"
+
 new_case fast-with-tools
 original
 expect_code 0 --no-deps --editor-mode fast --profile python

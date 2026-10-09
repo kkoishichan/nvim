@@ -120,7 +120,7 @@ M.base_parsers = {
 
 ---The parser set for a mode, plus any languages a deployment asked for. An
 ---unknown name is a mistake in the request, not a silent omission.
----@param mode string "full" or "fast"
+---@param mode string "fast", "standard" or "extra" ("full" is a compatibility alias)
 ---@param extra string[]|nil additional language names
 function M.select(mode, extra)
 	if mode ~= "fast" then
@@ -149,7 +149,7 @@ function M.select(mode, extra)
 end
 
 ---The parsers this installation manages. A deployment narrows the set with the
----mode it installed and NVIM_PARSERS; a full installation keeps the catalog.
+---mode it installed and NVIM_PARSERS; standard and extra installations keep the catalog.
 function M.selected()
 	return M.select(require("user.core.mode").name(), vim.split(vim.env.NVIM_PARSERS or "", ",", { trimempty = true }))
 end

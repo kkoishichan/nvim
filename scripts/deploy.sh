@@ -13,7 +13,7 @@ local_opt="$HOME/.local/opt"
 dict_db="$HOME/.local/share/trans/ultimate.db"
 dict_url=https://github.com/skywind3000/ECDICT-ultimate/releases/download/1.0.0/ecdict-ultimate-sqlite.zip
 profiles=()
-editor_mode=full
+editor_mode=standard
 extra_parsers=()
 dry_run=0
 skip_deps=0
@@ -37,8 +37,8 @@ Usage: ./scripts/deploy.sh [options]
   --nvim-version vX.Y.Z    Exact Neovim release (default: v0.12.5)
   --profile NAME          minimal/python/web/java/native/docs/full; repeatable
                           Every profile includes minimal. Default: minimal in
-                          full editor mode, none in fast editor mode.
-  --editor-mode NAME      full (default) or fast: the mode this host starts in.
+                          standard/extra editor modes, none in fast mode.
+  --editor-mode NAME      fast, standard (default), or extra; full aliases extra.
                           fast installs the slim plugin and parser set and
                           records runtime.mode in preferences.json.
   --parsers a,b,c         Extra Tree-sitter languages for fast mode; repeatable
@@ -76,10 +76,11 @@ add_profile() {
 	profiles+=("$1")
 }
 set_editor_mode() {
-	case "$1" in full | fast) ;;
+	case "$1" in fast | standard | extra | full) ;;
 	*) fail 2 "Unknown editor mode: $1" ;;
 	esac
 	editor_mode=$1
+	[ "$editor_mode" != full ] || editor_mode=extra
 }
 add_parsers() {
 	local name existing
@@ -151,7 +152,7 @@ parse_arguments() {
 	done
 	# A slim installation restores no language tools unless a group was asked
 	# for; the complete installation keeps its minimal default.
-	if [ "${#profiles[@]}" -eq 0 ] && [ "$editor_mode" = full ]; then
+	if [ "${#profiles[@]}" -eq 0 ] && [ "$editor_mode" != fast ]; then
 		profiles=(minimal)
 	fi
 	[ "$editor_mode" = fast ] || [ "${#extra_parsers[@]}" -eq 0 ] ||
@@ -285,9 +286,11 @@ plan() {
 	if [ "$editor_mode" = fast ]; then
 		info 'Fast editor mode: install the slim plugin set and the base parsers only; record runtime.mode=fast'
 		[ -z "$parser_csv" ] || info "Additional Tree-sitter parsers: $parser_csv"
-	fi
-	if [ "$skip_deps" -eq 0 ]; then
-		info "System packages (Neovim is installed separately at its exact release):"
+	else
+  info "$editor_mode editor mode: install its selected plugin set and complete parser catalog; record runtime.mode=$editor_mode"
+ fi
+ if [ "$skip_deps" -eq 0 ]; then
+  info "System packages (Neovim is installed separately at its exact release):"
 		print_command "${required[@]}" ${profile_packages[@]+"${profile_packages[@]}"}
 		[ "$with_extras" -eq 0 ] || print_command "${extras[@]}"
 	else info 'System package installation skipped; executable/version checks still run'; fi
@@ -297,7 +300,11 @@ plan() {
 	if [ "$skip_sync" -eq 0 ]; then
 		info "Ensure tree-sitter CLI $tree_sitter_version; reuse an exact match or download its official binary:"
 		print_command "https://github.com/tree-sitter/tree-sitter/releases/download/v$tree_sitter_version/$tree_asset.gz"
-		info 'Compile and verify all locked syntax parsers and prepare the pinned Blink completion asset'
+		if [ "$editor_mode" = fast ]; then
+   info 'Compile and verify the base syntax parsers plus requested additions; no Blink asset'
+  else
+   info 'Compile and verify all locked syntax parsers and prepare the pinned Blink completion asset'
+  fi
 	fi
 	info 'Clone into an exclusive sibling release directory, fetch/verify ref, detached checkout, validate configuration'
 	if [ "$skip_sync" -eq 0 ]; then
