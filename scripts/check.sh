@@ -6,14 +6,14 @@ set -euo pipefail
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$ROOT"
 MASON_BIN="${XDG_DATA_HOME:-$HOME/.local/share}/nvim/mason/bin"
-export NVIM_CHECK_ONLY=1 NVIM_APPNAME=nvim
+export NVIM_CHECK_ONLY=1 NVIM_APPNAME=nvim NVIM_MODE=extra
 export GIT_ALLOW_PROTOCOL=file GIT_TERMINAL_PROMPT=0
 
 usage() {
 	cat <<'EOF'
 Usage: ./scripts/check.sh [--group NAME | NAME] ...
 
-Groups: static, integration, performance, mode, editing_cost, matchup_cache, matchup_highlights, matchup_input, lsp_progress, startup_loading, ui_runtime, scrolling_colors,
+Groups: static, integration, performance, mode, standard, editing_cost, matchup_cache, matchup_highlights, matchup_input, lsp_progress, startup_loading, ui_runtime, scrolling_colors,
         statusline_refresh, scrollview_refresh, ai, languages, projects,
         project_actions, toolchain, terminals, workflow_actions, signature, lifecycle, pdf_lifecycle, image_scroll,
         windows, layout_session, ui_themes, offline_assets, deployment
@@ -28,7 +28,7 @@ groups=()
 add_group() {
 	local existing
 	case "$1" in
-	static | integration | performance | mode | editing_cost | matchup_cache | matchup_highlights | matchup_input | lsp_progress | startup_loading | ui_runtime | scrolling_colors | statusline_refresh | scrollview_refresh | ai | languages | projects | project_actions | toolchain | terminals | workflow_actions | signature | lifecycle | pdf_lifecycle | image_scroll | windows | layout_session | ui_themes | offline_assets | deployment | workflow_python_js | workflow_native | workflow_java_docs) ;;
+	static | integration | performance | mode | standard | editing_cost | matchup_cache | matchup_highlights | matchup_input | lsp_progress | startup_loading | ui_runtime | scrolling_colors | statusline_refresh | scrollview_refresh | ai | languages | projects | project_actions | toolchain | terminals | workflow_actions | signature | lifecycle | pdf_lifecycle | image_scroll | windows | layout_session | ui_themes | offline_assets | deployment | workflow_python_js | workflow_native | workflow_java_docs) ;;
 	*)
 		printf 'Unknown check group: %s\n' "$1" >&2
 		usage >&2
@@ -60,7 +60,7 @@ while [ $# -gt 0 ]; do
 	shift
 done
 if [ "${#groups[@]}" -eq 0 ]; then
-	groups=(static integration performance mode editing_cost matchup_cache matchup_highlights matchup_input lsp_progress startup_loading ui_runtime scrolling_colors statusline_refresh scrollview_refresh ai languages projects project_actions toolchain terminals workflow_actions signature lifecycle pdf_lifecycle image_scroll windows layout_session ui_themes offline_assets deployment)
+	groups=(static integration performance mode standard editing_cost matchup_cache matchup_highlights matchup_input lsp_progress startup_loading ui_runtime scrolling_colors statusline_refresh scrollview_refresh ai languages projects project_actions toolchain terminals workflow_actions signature lifecycle pdf_lifecycle image_scroll windows layout_session ui_themes offline_assets deployment)
 fi
 
 tool() {
@@ -134,7 +134,9 @@ for group in "${groups[@]}"; do
 	done
 	script="$ROOT/scripts/run-check.lua"
 	[ "$group" != integration ] || script="$ROOT/scripts/check.lua"
-	NVIM_TEST_ROOT="$ROOT" NVIM_TEST_GROUP="$group" NVIM_TEST_TMP="$group_tmp" \
+	group_mode=extra
+	[ "$group" != standard ] || group_mode=standard
+	NVIM_MODE="$group_mode" NVIM_TEST_ROOT="$ROOT" NVIM_TEST_GROUP="$group" NVIM_TEST_TMP="$group_tmp" \
 		XDG_CONFIG_HOME="$group_tmp/config" XDG_CACHE_HOME="$group_tmp/cache" XDG_STATE_HOME="$group_tmp/state" NVIM_LOG_FILE="$group_tmp/nvim.log" \
 		nvim --headless --cmd 'lua vim.opt.runtimepath:prepend(vim.env.NVIM_TEST_ROOT)' \
 		-u "$ROOT/init.lua" -i NONE -l "$script"

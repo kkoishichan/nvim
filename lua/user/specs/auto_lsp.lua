@@ -230,7 +230,7 @@ return function(profile)
 			local function refresh_servers()
 				-- Enable newly installed servers without restarting any running
 				-- client; the root and on_init guards are installed only once.
-				vim.lsp.enable(definitions.resolve())
+				vim.lsp.enable(definitions.resolve({ automatic = true }))
 			end
 			vim.api.nvim_create_autocmd("User", {
 				group = vim.api.nvim_create_augroup("user_lsp_tools", { clear = true }),

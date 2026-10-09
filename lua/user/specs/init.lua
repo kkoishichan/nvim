@@ -28,6 +28,37 @@ function M.base()
 	return spec
 end
 
+---The same selector serves runtime, asset preparation and deployment. Standard
+---never imports the extra plugin modules, including their lazy key/event hooks.
+function M.for_mode(name)
+	name = require("user.core.mode").canonical(name)
+	if name == "fast" then
+		return M.base()
+	elseif name == "extra" then
+		return { { import = "user.plugins" } }
+	end
+	assert(name == "standard", "Unknown editor mode: " .. tostring(name))
+	local spec = {}
+	for _, factory in ipairs({ "ui", "editor", "navigation", "auto_lsp", "languages", "java", "lint" }) do
+		vim.list_extend(spec, require("user.specs." .. factory)())
+	end
+	for _, module in ipairs({
+		"completion",
+		"folding",
+		"formatting",
+		"git",
+		"multicursor",
+		"neogen",
+		"picker",
+		"terminal",
+		"tools",
+		"treesitter",
+	}) do
+		vim.list_extend(spec, require("user.plugins." .. module))
+	end
+	return spec
+end
+
 ---Top-level plugin names in the fast set. Deployment and lock checks use this
 ---to decide what to prepare; each plugin's dependencies are resolved from the
 ---same spec, so the two can never disagree.

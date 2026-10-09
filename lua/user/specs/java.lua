@@ -126,6 +126,10 @@ local function setup_java_keys(bufnr, jdtls, has_debug, has_test)
 		"Java extract method"
 	)
 
+	if not require("user.core.mode").capabilities().extended_workflows then
+		return
+	end
+
 	-- Preserve the configuration's generic test workflow inside Java buffers.
 	map("n", "<leader>rr", test("test_nearest_method", false), "Run nearest Java test")
 	map("n", "<leader>rf", test("test_class", false), "Run Java test class")
@@ -206,7 +210,10 @@ local function start_jdtls(bufnr)
 		table.insert(cmd, "--jvm-arg=-javaagent:" .. lombok)
 	end
 
-	local bundles, has_debug, has_test = java_bundles()
+	local bundles, has_debug, has_test = {}, false, false
+	if require("user.core.mode").capabilities().extended_workflows then
+		bundles, has_debug, has_test = java_bundles()
+	end
 	local capabilities = require("blink.cmp").get_lsp_capabilities()
 	capabilities.textDocument.foldingRange = {
 		dynamicRegistration = false,

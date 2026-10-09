@@ -25,11 +25,7 @@ vim.opt.rtp:prepend(lazypath)
 
 require("lazy").setup({
 	lockfile = vim.fs.joinpath(bootstrap.root(), "lazy-lock.json"),
-	-- Fast mode names the modules it wants, so the remaining plugin files are
-	-- never executed; full mode keeps importing the complete directory.
-	spec = mode.is_fast() and require("user.specs").base() or {
-		{ import = "user.plugins" },
-	},
+	spec = require("user.specs").for_mode(mode.name()),
 	defaults = {
 		lazy = true,
 		version = false,
@@ -87,15 +83,15 @@ if not capabilities.plugin_manager_auto then
 
 	-- Lazy's manager acts on the spec of the running session. In a mode that
 	-- imports a subset, clean/sync/update would treat the rest of the shared
-	-- installation as unused, so management stays an explicit full-mode run
+	-- installation as unused, so management stays an explicit extra-mode run
 	-- against the complete list.
 	vim.api.nvim_create_user_command("Lazy", function()
 		vim.notify(
-			"Plugin management runs against the complete list: NVIM_MODE=full nvim +Lazy",
+			"Plugin management runs against the complete list: NVIM_MODE=extra nvim +Lazy",
 			vim.log.levels.WARN,
 			{ title = "Editor mode" }
 		)
-	end, { nargs = "*", bang = true, desc = "Plugin management is a full-mode operation" })
+	end, { nargs = "*", bang = true, desc = "Plugin management is an extra-mode operation" })
 end
 
 mode.announce()

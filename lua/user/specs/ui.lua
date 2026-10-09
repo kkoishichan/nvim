@@ -49,6 +49,9 @@ local function dashboard_header()
 end
 
 local function pdf_page()
+	if not require("user.core.mode").capabilities().extended_workflows then
+		return ""
+	end
 	return require("user.core.pdf").page()
 end
 
@@ -184,7 +187,7 @@ return function(profile)
 		opts = {
 			bigfile = { enabled = false },
 			dashboard = {
-				enabled = true,
+				enabled = profile.extra == true,
 				width = 50,
 				preset = {
 					header = dashboard_header(),
@@ -239,7 +242,7 @@ return function(profile)
 			picker = { enabled = false },
 			quickfile = { enabled = false },
 			scroll = { enabled = false },
-			scratch = { enabled = true },
+			scratch = { enabled = profile.extra == true },
 			terminal = { enabled = false },
 			words = { enabled = false },
 			styles = {
@@ -271,7 +274,7 @@ return function(profile)
 				},
 			},
 		},
-		keys = {
+		keys = profile.extra and {
 			{
 				"<leader>.",
 				function()
@@ -279,6 +282,14 @@ return function(profile)
 				end,
 				desc = "Scratch buffer",
 			},
+			{
+				"<leader>z",
+				function()
+					Snacks.zen()
+				end,
+				desc = "Zen mode",
+			},
+		} or {
 			{
 				"<leader>z",
 				function()

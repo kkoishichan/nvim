@@ -1,0 +1,164 @@
+-- Profile boundaries are behavioral: omitted features must leave no lazy
+-- entry, and manual workflows must remain manual after their first use.
+return function(tmp)
+	local api = vim.api
+	local mode = require("user.core.mode")
+	local cap = mode.capabilities()
+	assert(mode.name() == "standard", "Run this group in standard mode")
+	assert(
+		cap.lsp_auto and cap.completion and cap.format_on_save and cap.scroll_animation,
+		"Standard lost automatic editing capabilities"
+	)
+	assert(
+		cap.session and not cap.session_auto and cap.lint and not cap.lint_auto,
+		"Standard enabled automatic lint or sessions"
+	)
+	assert(
+		not cap.decorations and not cap.extended_workflows and not cap.auxiliary_lsp,
+		"Standard enabled extra capabilities"
+	)
+	local plugins = require("lazy.core.config").plugins
+	for _, name in ipairs({
+		"blink.cmp",
+		"nvim-lspconfig",
+		"rustaceanvim",
+		"nvim-jdtls",
+		"nvim-lint",
+		"oil.nvim",
+		"neo-tree.nvim",
+		"fzf-lua",
+		"bufferline.nvim",
+		"lualine.nvim",
+		"nvim-treesitter-context",
+		"nvim-ufo",
+		"gitsigns.nvim",
+		"diffview.nvim",
+		"neoscroll.nvim",
+	}) do
+		assert(plugins[name], "Standard lost " .. name)
+	end
+	for _, name in ipairs({
+		"nvim-dap",
+		"neotest",
+		"opencode.nvim",
+		"claudecode.nvim",
+		"image.nvim",
+		"markview.nvim",
+		"vimtex",
+		"typst-preview.nvim",
+		"vim-matchup",
+		"vim-illuminate",
+		"indent-blankline.nvim",
+		"nvim-highlight-colors",
+		"todo-comments.nvim",
+		"nvim-lightbulb",
+		"dropbar.nvim",
+		"nvim-scrollview",
+		"outline.nvim",
+		"edgy.nvim",
+		"persistence.nvim",
+		"overseer.nvim",
+		"fcitx.nvim",
+		"faster.nvim",
+		"crates.nvim",
+	}) do
+		assert(not plugins[name], "Standard registered extra plugin " .. name)
+	end
+	for _, module in ipairs({ "dap", "test", "media", "tasks", "edgy", "opencode", "claudecode", "performance" }) do
+		assert(not package.loaded["user.plugins." .. module], "Executed excluded module " .. module)
+	end
+	assert(not package.loaded["user.core.pdf"], "Statusline eagerly loaded PDF support")
+	local snacks = require("lazy.core.plugin").values(plugins["snacks.nvim"], "opts", false)
+	assert(
+		not snacks.dashboard.enabled and not snacks.scratch.enabled and snacks.input.enabled,
+		"Snacks profile is incorrect"
+	)
+	for _, mapping in ipairs(api.nvim_get_keymap("n")) do
+		assert(mapping.lhs ~= " .", "Standard retained the scratch entry")
+	end
+	local diagnostic = vim.diagnostic.config()
+	assert(
+		diagnostic.underline and diagnostic.signs and not diagnostic.virtual_lines and not diagnostic.virtual_text,
+		"Standard diagnostic display is incorrect"
+	)
+	assert(vim.o.undofile and vim.o.swapfile, "Standard lost recovery data")
+	for _, command in ipairs({
+		"EditorMode",
+		"FastMode",
+		"ManualLspStart",
+		"ManualLspStop",
+		"FastLspStart",
+		"SessionSave",
+	}) do
+		assert(vim.fn.exists(":" .. command) == 2, "Missing command " .. command)
+	end
+	assert(#api.nvim_get_autocmds({ group = "user_workspace_session" }) == 0, "Manual sessions register autosave")
+	assert(not plugins["nvim-lint"]._.loaded, "Standalone lint loaded automatically")
+	require("lazy").load({ plugins = { "nvim-lint" } })
+	local lint = require("lint")
+	local calls, original = 0, lint.try_lint
+	lint.try_lint = function()
+		calls = calls + 1
+	end
+	require("lazy").load({ plugins = { "nvim-lspconfig" } })
+	vim.lsp.enable(require("user.core.lsp_definitions").resolve(), false)
+	local file = tmp .. "/manual.sql"
+	vim.fn.writefile({ "select 1;" }, file)
+	vim.cmd.edit(vim.fn.fnameescape(file))
+	vim.wait(600, function()
+		return false
+	end, 25)
+	assert(calls == 0, "Opening a standard buffer ran standalone lint")
+	for _, event in ipairs({ "BufReadPost", "BufWritePost", "InsertLeave" }) do
+		assert(#api.nvim_get_autocmds({ group = "user_lint", event = event }) == 0, "Manual lint registered " .. event)
+	end
+	vim.cmd.Lint()
+	assert(calls == 1, "Manual SQL lint did not run Sqruff")
+	lint.try_lint = original
+	assert(require("user.core.session").save(tmp .. "/manual.vim"), "Manual session save failed")
+	assert(vim.fn.filereadable(tmp .. "/manual.vim") == 1, "Manual session was not written")
+	local definitions = require("user.core.lsp_definitions")
+	definitions.configure()
+	local automatic = definitions.resolve({ automatic = true })
+	assert(
+		not vim.tbl_contains(automatic, "typos_lsp") and not vim.tbl_contains(automatic, "emmet_language_server"),
+		"Auxiliary server was automatically enabled"
+	)
+	assert(
+		vim.tbl_contains(automatic, "ruff") and vim.tbl_contains(automatic, "basedpyright"),
+		"Python lost a collaborating server"
+	)
+	assert(
+		not definitions.project_configured("biome", 0) and not definitions.project_configured("tailwindcss", 0),
+		"Unconfigured project enabled optional LSP"
+	)
+	vim.fn.writefile({ "{}" }, tmp .. "/biome.json")
+	vim.fn.writefile({ '{"devDependencies":{"tailwindcss":"4"}}' }, tmp .. "/package.json")
+	assert(
+		definitions.project_configured("biome", 0) and definitions.project_configured("tailwindcss", 0),
+		"Configured project did not enable optional LSP"
+	)
+	-- Manual discovery must not install fast-only definitions over an existing
+	-- language integration or take control of its automatic client.
+	vim.lsp.config("rust_analyzer", { settings = { ["rust-analyzer"] = { procMacro = { enable = true } } } })
+	vim.lsp.config("jdtls", { init_options = { bundles = { "keep-this-bundle" } } })
+	require("user.core.manual_lsp").resolve()
+	assert(
+		vim.lsp.config.rust_analyzer.settings["rust-analyzer"].procMacro.enable,
+		"Manual discovery downgraded Rust analysis"
+	)
+	assert(
+		vim.lsp.config.jdtls.init_options.bundles[1] == "keep-this-bundle",
+		"Manual discovery overwrote Java bundles"
+	)
+	local rust = require("user.specs.languages")()[1]
+	rust.init()
+	assert(
+		vim.g.rustaceanvim.server.default_settings["rust-analyzer"].check.command == "clippy",
+		"Standard downgraded Rust analysis"
+	)
+	assert(vim.g.rustaceanvim.dap.adapter() == false, "Standard enabled the Rust debugger")
+	print(
+		"Standard evidence: primary editing/UI retained; extra plugins absent; manual lint/session stay manual; auxiliary LSPs gated; Java/Rust definitions preserved"
+	)
+end

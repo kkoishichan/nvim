@@ -9,6 +9,9 @@ local M = {
 local configured = false
 
 local function configure()
+	if not require("user.core.mode").is_fast() then
+		return
+	end
 	if configured then
 		return
 	end
@@ -63,8 +66,8 @@ function M.resolve()
 	configure()
 	for name, command in pairs({ rust_analyzer = "rust-analyzer", jdtls = "jdtls" }) do
 		local executable = toolchain.executable(command)
-		if executable then
-			if name == "rust_analyzer" then
+		if executable and (require("user.core.mode").is_fast() or vim.lsp.config[name]) then
+			if name == "rust_analyzer" and require("user.core.mode").is_fast() then
 				vim.lsp.config(name, { cmd = { executable } })
 			end
 			table.insert(ready, name)

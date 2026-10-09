@@ -47,7 +47,7 @@ local virtual_text = {
 -- Fast mode starts at "off"; the same key still cycles display on once a
 -- language server has been started by hand.
 local modes = { "lines", "text", "off" }
-local mode = live and "lines" or "off"
+local mode = capabilities.diagnostics_expanded and "lines" or "off"
 
 local function apply_diagnostic_mode()
 	vim.diagnostic.config(vim.tbl_extend("force", base, {

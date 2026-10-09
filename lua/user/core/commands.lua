@@ -43,7 +43,7 @@ vim.api.nvim_create_user_command("FastModeToggle", function()
 end, { desc = "Toggle and save fast mode, then restart" })
 
 vim.api.nvim_create_user_command("FastMode", function(command)
-	local names = { on = "fast", off = "full", auto = "auto" }
+	local names = { on = "fast", off = "standard", auto = "auto" }
 	if command.args == "" then
 		mode.toggle()
 	elseif names[command.args] then
@@ -57,6 +57,32 @@ end, {
 		return { "on", "off", "auto" }
 	end,
 	desc = "Save editor mode and restart to apply",
+})
+
+vim.api.nvim_create_user_command("EditorMode", function(command)
+	local function apply(name)
+		if name then
+			mode.set_default(name)
+		end
+	end
+	if command.args == "" then
+		vim.ui.select({ "fast", "standard", "extra", "auto" }, {
+			prompt = "Editor mode (saved; restart to apply)",
+			format_item = function(name)
+				return name .. (name == mode.name() and " (active)" or "")
+			end,
+		}, apply)
+	elseif vim.tbl_contains({ "fast", "standard", "extra", "full", "auto" }, command.args) then
+		apply(mode.canonical(command.args))
+	else
+		vim.notify("Use :EditorMode fast|standard|extra|auto", vim.log.levels.ERROR)
+	end
+end, {
+	nargs = "?",
+	complete = function()
+		return { "fast", "standard", "extra", "auto" }
+	end,
+	desc = "Select and save an editor mode, then restart",
 })
 
 -- Everything the mode decided, on demand. Startup prints at most one line and

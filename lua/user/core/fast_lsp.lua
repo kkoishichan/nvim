@@ -100,7 +100,11 @@ end
 
 local function launch(name, bufnr, request)
 	definitions()
-	local config = vim.tbl_deep_extend("force", vim.deepcopy(vim.lsp.config[name] or {}), open_files_only[name] or {})
+	local config = vim.tbl_deep_extend(
+		"force",
+		vim.deepcopy(vim.lsp.config[name] or {}),
+		require("user.core.mode").is_fast() and open_files_only[name] or {}
+	)
 	config.name = name
 
 	local function start(root)
@@ -237,18 +241,20 @@ function M.summary()
 end
 
 function M.setup()
-	vim.api.nvim_create_user_command("FastLspStart", function(command)
-		M.start(command.args)
-	end, {
-		nargs = "?",
-		desc = "Start one installed language server for this buffer",
-		complete = function()
-			return M.candidates(vim.api.nvim_get_current_buf(), true)
-		end,
-	})
-	vim.api.nvim_create_user_command("FastLspStop", function()
-		M.stop()
-	end, { desc = "Stop the language servers this mode started" })
+	for _, prefix in ipairs({ "ManualLsp", "FastLsp" }) do
+		vim.api.nvim_create_user_command(prefix .. "Start", function(command)
+			M.start(command.args)
+		end, {
+			nargs = "?",
+			desc = "Start one installed language server for this buffer",
+			complete = function()
+				return M.candidates(vim.api.nvim_get_current_buf(), true)
+			end,
+		})
+		vim.api.nvim_create_user_command(prefix .. "Stop", function()
+			M.stop()
+		end, { desc = "Release manually attached language servers" })
+	end
 end
 
 return M

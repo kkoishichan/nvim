@@ -249,13 +249,15 @@ end, { desc = "Theme picker" })
 
 map("n", "<leader>uT", "<cmd>TransparentToggle<cr>", { desc = "Toggle transparent background" })
 map("n", "<leader>up", "<cmd>FloatStyleToggle<cr>", { desc = "Toggle saved popup style (restart)" })
+map("n", "<leader>um", "<cmd>EditorMode<cr>", { desc = "Select editor mode and restart" })
 map("n", "<leader>uf", "<cmd>FastModeToggle<cr>", { desc = "Toggle fast mode and restart" })
 
 map("n", "<leader>L", "<cmd>Lazy<cr>", { desc = "Lazy" })
 
-if capabilities.extended_workflows then
+if capabilities.lsp_auto then
 	map("n", "<leader>M", "<cmd>Mason<cr>", { desc = "Mason" })
-
+end
+if capabilities.extended_workflows then
 	local function ai(method)
 		return function(...)
 			return require("user.core.ai")[method](...)

@@ -20,6 +20,52 @@ M.auxiliary = {
 	typos_lsp = true,
 }
 
+---Optional project servers require evidence of that tool in standard mode.
+---Package dependencies cover Tailwind v4 projects without tailwind.config.*.
+function M.project_configured(server, bufnr)
+	local markers = server == "biome" and { "biome.json", "biome.jsonc" }
+		or {
+			"tailwind.config.js",
+			"tailwind.config.cjs",
+			"tailwind.config.mjs",
+			"tailwind.config.ts",
+			"tailwind.config.cts",
+			"tailwind.config.mts",
+		}
+	if vim.fs.root(bufnr, markers) then
+		return true
+	end
+	if server ~= "tailwindcss" then
+		return false
+	end
+	local file = vim.api.nvim_buf_get_name(bufnr)
+	local dir = file ~= "" and vim.fs.dirname(file) or vim.fn.getcwd()
+	while dir do
+		local path = vim.fs.joinpath(dir, "package.json")
+		if vim.uv.fs_stat(path) then
+			local ok, package = pcall(function()
+				return vim.json.decode(table.concat(vim.fn.readfile(path), "\n"))
+			end)
+			if ok and type(package) == "table" then
+				for _, section in ipairs({ "dependencies", "devDependencies", "peerDependencies" }) do
+					if type(package[section]) == "table" and package[section].tailwindcss then
+						return true
+					end
+				end
+			end
+		end
+		if vim.uv.fs_stat(vim.fs.joinpath(dir, ".git")) then
+			break
+		end
+		local parent = vim.fs.dirname(dir)
+		if parent == dir then
+			break
+		end
+		dir = parent
+	end
+	return false
+end
+
 local configured = false
 local original_commands = {}
 local node_commands = {}
@@ -302,6 +348,18 @@ function M.configure(opts)
 					end
 				end
 			end
+			if
+				require("user.core.mode").capabilities().lsp_auto
+				and not require("user.core.mode").capabilities().auxiliary_lsp
+				and (server == "biome" or server == "tailwindcss")
+			then
+				local guarded_root = root
+				root = function(bufnr, on_dir)
+					if M.project_configured(server, bufnr) then
+						guarded_root(bufnr, on_dir)
+					end
+				end
+			end
 			vim.lsp.config(server, { cmd = command, root_dir = root, on_init = policy.lsp_init(config.on_init) })
 		end
 	end
@@ -314,7 +372,10 @@ function M.resolve(opts)
 	M.configure()
 	local ready = {}
 	for _, server in ipairs(M.servers) do
-		local cmd = original_commands[server]
+		local automatic = not (opts and opts.automatic)
+			or require("user.core.mode").capabilities().auxiliary_lsp
+			or (server ~= "typos_lsp" and server ~= "emmet_language_server")
+		local cmd = automatic and original_commands[server] or nil
 		if type(cmd) == "table" and type(cmd[1]) == "string" then
 			local resolved = toolchain.executable(cmd[1])
 			if resolved then

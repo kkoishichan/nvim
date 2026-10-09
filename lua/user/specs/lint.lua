@@ -1,0 +1,399 @@
+local toolchain = require("user.toolchain")
+return function()
+	local automatic = require("user.core.mode").capabilities().lint_auto
+	return {
+		{
+			"mfussenegger/nvim-lint",
+			ft = automatic and { "cmake", "css", "dockerfile", "go", "lua", "make", "markdown", "sh", "sql", "yaml" }
+				or nil,
+			cmd = "Lint",
+			keys = { { "<leader>cl", "<cmd>Lint<cr>", desc = "Lint" } },
+			config = function()
+				local lint = require("lint")
+				local uv = vim.uv or vim.loop
+				local upward_cache = {}
+				local stylelint_root_cache = {}
+				local function reset_lookup_caches()
+					upward_cache = {}
+					stylelint_root_cache = {}
+				end
+
+				lint.linters_by_ft = {
+					cmake = { "cmakelint" },
+					css = { "stylelint" },
+					dockerfile = { "hadolint" },
+					go = { "golangcilint" },
+					lua = { "selene" },
+					make = { "checkmake" },
+					markdown = { "markdownlint-cli2" },
+					sh = { "shellcheck" },
+					sql = { "sqruff" },
+					yaml = { "yamllint" },
+					-- Verible diagnostics come from verible-verilog-ls. Running its CLI
+					-- here as well only duplicates messages and analysis work.
+					-- No zsh: shellcheck only supports sh/bash/dash/ksh.
+				}
+
+				-- Keep SQL diagnostics on the same PostgreSQL dialect as formatting.
+				-- Sqruff is the sole SQL diagnostic provider, including parse errors.
+				lint.linters.sqruff.args = { "--dialect", "postgres", "--parsing-errors", "lint", "--format=json", "-" }
+
+				local function buffer_dir(bufnr)
+					local name = vim.api.nvim_buf_get_name(bufnr)
+					if name == "" then
+						return nil
+					end
+					return vim.fs.dirname(vim.fs.normalize(name))
+				end
+
+				local function find_upward(bufnr, markers)
+					local dir = buffer_dir(bufnr)
+					if not dir then
+						return nil
+					end
+					local cache_key = dir .. "\0" .. table.concat(markers, "\0")
+					local cached = upward_cache[cache_key]
+					if cached ~= nil then
+						return cached or nil
+					end
+
+					while dir do
+						for _, marker in ipairs(markers) do
+							if uv.fs_stat(vim.fs.joinpath(dir, marker)) then
+								upward_cache[cache_key] = dir
+								return dir
+							end
+						end
+
+						local parent = vim.fs.dirname(dir)
+						if not parent or parent == dir then
+							break
+						end
+						dir = parent
+					end
+					upward_cache[cache_key] = false
+					return nil
+				end
+
+				local stylelint_markers = {
+					".stylelintrc",
+					".stylelintrc.cjs",
+					".stylelintrc.js",
+					".stylelintrc.json",
+					".stylelintrc.mjs",
+					".stylelintrc.yaml",
+					".stylelintrc.yml",
+					"stylelint.config.cjs",
+					"stylelint.config.cts",
+					"stylelint.config.js",
+					"stylelint.config.mjs",
+					"stylelint.config.mts",
+					"stylelint.config.ts",
+				}
+
+				local function stylelint_root(bufnr)
+					local start_dir = buffer_dir(bufnr)
+					if not start_dir then
+						return nil
+					end
+					local cached = stylelint_root_cache[start_dir]
+					if cached ~= nil then
+						return cached or nil
+					end
+
+					local root = find_upward(bufnr, stylelint_markers)
+					if root then
+						stylelint_root_cache[start_dir] = root
+						return root
+					end
+
+					-- Stylelint also accepts a `stylelint` key in package.json.
+					local dir = buffer_dir(bufnr)
+					while dir do
+						local package_json = vim.fs.joinpath(dir, "package.json")
+						if uv.fs_stat(package_json) then
+							local ok_read, lines = pcall(vim.fn.readfile, package_json)
+							local ok_json, package = false, nil
+							if ok_read then
+								ok_json, package = pcall(vim.json.decode, table.concat(lines, "\n"))
+							end
+							if ok_json and type(package) == "table" and package.stylelint ~= nil then
+								stylelint_root_cache[start_dir] = dir
+								return dir
+							end
+						end
+
+						local parent = vim.fs.dirname(dir)
+						if not parent or parent == dir then
+							break
+						end
+						dir = parent
+					end
+					stylelint_root_cache[start_dir] = false
+					return nil
+				end
+
+				-- Project-aware linters should not guess a ruleset. Besides avoiding
+				-- false diagnostics, the root is passed as cwd so each tool finds the
+				-- same configuration that enabled it.
+				local project_roots = {
+					golangcilint = function(bufnr)
+						return find_upward(bufnr, {
+							".golangci.json",
+							".golangci.toml",
+							".golangci.yaml",
+							".golangci.yml",
+						})
+					end,
+					selene = function(bufnr)
+						return find_upward(bufnr, { "selene.toml" })
+					end,
+					stylelint = stylelint_root,
+				}
+
+				local original_commands = {}
+				local function resolve_linter(name)
+					local linter = lint.linters[name]
+					if type(linter) == "function" then
+						local ok, resolved = pcall(linter)
+						if not ok then
+							return nil
+						end
+						linter = resolved
+					end
+					if linter and original_commands[name] == nil then
+						original_commands[name] = linter.cmd
+					end
+					return linter
+				end
+
+				local function executable_available(bufnr, name)
+					if name == "stylelint" or name == "markdownlint-cli2" then
+						return toolchain.node_executable(name, bufnr)
+					end
+
+					local cmd = original_commands[name]
+					if type(cmd) == "function" then
+						local ok, resolved = pcall(cmd)
+						if not ok then
+							return false
+						end
+						cmd = resolved
+					end
+					if type(cmd) ~= "string" then
+						return false
+					end
+					local resolved = toolchain.executable(cmd)
+					return resolved
+				end
+
+				local function configured_linters(bufnr)
+					local names = {}
+					local roots = {}
+					local commands = {}
+					for _, name in ipairs(lint.linters_by_ft[vim.bo[bufnr].filetype] or {}) do
+						local root_for = project_roots[name]
+						local root = root_for and root_for(bufnr) or nil
+						local configured = not root_for or root ~= nil
+						local linter = configured and resolve_linter(name) or nil
+
+						local command = configured and linter and executable_available(bufnr, name) or nil
+
+						if command then
+							table.insert(names, name)
+							roots[name] = root
+							commands[name] = command
+						else
+							-- A removed/disabled project configuration must not leave its old
+							-- diagnostics behind in an already-open buffer.
+							vim.diagnostic.reset(lint.get_namespace(name), bufnr)
+						end
+					end
+					return names, roots, commands
+				end
+
+				local function is_empty_buffer(bufnr)
+					if vim.api.nvim_buf_line_count(bufnr) ~= 1 then
+						return false
+					end
+					return vim.api.nvim_buf_get_lines(bufnr, 0, 1, false)[1] == ""
+				end
+
+				local function run_lint(bufnr, stdin_only)
+					if
+						not vim.api.nvim_buf_is_valid(bufnr)
+						or not vim.api.nvim_buf_is_loaded(bufnr)
+						or not require("user.core.buffer_policy").allow(bufnr)
+					then
+						return
+					end
+
+					vim.api.nvim_buf_call(bufnr, function()
+						local names, roots, commands = configured_linters(bufnr)
+						if #names == 0 then
+							return
+						end
+
+						if is_empty_buffer(bufnr) then
+							for _, name in ipairs(names) do
+								vim.diagnostic.reset(lint.get_namespace(name), bufnr)
+							end
+							return
+						end
+						local started_tick = vim.api.nvim_buf_get_changedtick(bufnr)
+
+						lint.try_lint(names, {
+							-- InsertLeave checks only in-memory text. Disk-only linters run
+							-- after reading/saving and are also withheld from modified buffers.
+							filter = function(linter)
+								-- ShellCheck advertises stdin but its adapter passes the existing
+								-- filename to preserve source-path/SCRIPTDIR. That makes it a disk
+								-- check for named files, regardless of the stdin flag.
+								local reads_buffer = linter.stdin == true
+									and not (
+										linter.name == "shellcheck"
+										and vim.fn.filereadable(vim.api.nvim_buf_get_name(bufnr)) == 1
+									)
+								if not reads_buffer and vim.bo[bufnr].modified then
+									vim.diagnostic.reset(lint.get_namespace(linter.name), bufnr)
+								end
+								if stdin_only then
+									return reads_buffer
+								end
+								return reads_buffer or not vim.bo[bufnr].modified
+							end,
+							wrap_linter = function(linter)
+								linter.cmd = commands[linter.name]
+								-- A process can finish after the user has edited again. Drop
+								-- those stale results instead of publishing diagnostics against
+								-- a different in-memory revision.
+								if type(linter.parser) == "function" then
+									local parser = linter.parser
+									linter.parser = function(...)
+										if
+											not vim.api.nvim_buf_is_valid(bufnr)
+											or vim.api.nvim_buf_get_changedtick(bufnr) ~= started_tick
+										then
+											return {}
+										end
+										return parser(...)
+									end
+								end
+
+								local root = roots[linter.name]
+								if root then
+									linter.cwd = root
+								end
+								return linter
+							end,
+						})
+					end)
+				end
+
+				-- Generation tokens provide a small per-buffer debounce without keeping
+				-- libuv handles alive. Full and stdin-only runs are debounced separately.
+				local pending = {}
+				local function schedule_lint(bufnr, stdin_only, delay)
+					if not vim.api.nvim_buf_is_valid(bufnr) or not vim.api.nvim_buf_is_loaded(bufnr) then
+						return
+					end
+					local kind = stdin_only and "stdin" or "full"
+					pending[bufnr] = pending[bufnr] or { generation = {}, scheduled = {}, ticks = {} }
+					local state = pending[bufnr]
+					local changedtick = vim.api.nvim_buf_get_changedtick(bufnr)
+					if stdin_only and (state.ticks.stdin == changedtick or state.ticks.full == changedtick) then
+						return
+					elseif not stdin_only and state.ticks.full == changedtick and not state.scheduled.full then
+						return
+					end
+					if stdin_only and state.scheduled.full then
+						-- The pending full pass includes stdin linters already.
+						return
+					elseif not stdin_only then
+						-- A newer full pass supersedes a pending stdin-only pass.
+						state.generation.stdin = (state.generation.stdin or 0) + 1
+						state.scheduled.stdin = false
+					end
+					state.generation[kind] = (state.generation[kind] or 0) + 1
+					state.scheduled[kind] = true
+					state.ticks[kind] = changedtick
+					local generation = state.generation[kind]
+
+					local function execute()
+						local current = pending[bufnr]
+						if
+							not current
+							or current.generation[kind] ~= generation
+							or not vim.api.nvim_buf_is_valid(bufnr)
+							or not vim.api.nvim_buf_is_loaded(bufnr)
+						then
+							return
+						end
+
+						current.scheduled[kind] = false
+						run_lint(bufnr, stdin_only)
+					end
+
+					vim.defer_fn(execute, delay)
+				end
+
+				local group = vim.api.nvim_create_augroup("user_lint", { clear = true })
+				if automatic then
+					vim.api.nvim_create_autocmd("BufReadPost", {
+						group = group,
+						callback = function(event)
+							schedule_lint(event.buf, false, 400)
+						end,
+					})
+					vim.api.nvim_create_autocmd("BufWritePost", {
+						group = group,
+						callback = function(event)
+							local name = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(event.buf), ":t")
+							if
+								name == "package.json"
+								or name == "selene.toml"
+								or name:match("^%.golangci%.")
+								or name:match("^%.?stylelint")
+							then
+								reset_lookup_caches()
+							end
+							schedule_lint(event.buf, false, 150)
+						end,
+					})
+					vim.api.nvim_create_autocmd("InsertLeave", {
+						group = group,
+						callback = function(event)
+							schedule_lint(event.buf, true, 250)
+						end,
+					})
+				end
+				vim.api.nvim_create_autocmd("BufWipeout", {
+					group = group,
+					callback = function(event)
+						pending[event.buf] = nil
+					end,
+				})
+				vim.api.nvim_create_autocmd("FocusGained", {
+					group = group,
+					callback = reset_lookup_caches,
+				})
+				vim.api.nvim_create_autocmd("User", {
+					group = group,
+					pattern = "UserToolsChanged",
+					callback = reset_lookup_caches,
+				})
+
+				vim.api.nvim_create_user_command("Lint", function()
+					run_lint(vim.api.nvim_get_current_buf(), false)
+				end, { desc = "Lint current buffer" })
+
+				-- The event that lazy-loaded nvim-lint may already have fired. The
+				-- debounce coalesces this with a replayed BufReadPost when applicable.
+				local current = vim.api.nvim_get_current_buf()
+				if automatic then
+					schedule_lint(current, false, 400)
+				end
+			end,
+		},
+	}
+end

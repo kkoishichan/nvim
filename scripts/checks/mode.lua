@@ -150,11 +150,11 @@ vim.cmd("qa!")
 		return vim.json.decode(table.concat(lines, "\n"))
 	end
 
-	-- 1. An unconfigured host still gets the complete editor.
+	-- 1. An unconfigured host gets the standard editor.
 	local default = run("default")
-	assert(default.mode == "full", "An unconfigured host did not start in full mode: " .. default.mode)
-	assert(default.source:match("^default"), "Full mode was not reported as the default: " .. default.source)
-	assert(#default.disabled == 0, "Full mode disabled capabilities: " .. table.concat(default.disabled, ", "))
+	assert(default.mode == "standard", "An unconfigured host did not start in standard mode: " .. default.mode)
+	assert(default.source:match("^default"), "Standard mode was not reported as the default: " .. default.source)
+	assert(vim.tbl_contains(default.disabled, "extended_workflows"), "Standard mode kept extended workflows")
 	assert(default.clipboard == "unnamedplus" and default.cursorline, "Full mode changed its editing defaults")
 
 	-- 2. Priority: the environment wins, then the host preference, then default.
@@ -166,14 +166,41 @@ vim.cmd("qa!")
 	assert(preference_fast.source:find("preferences.json", 1, true), "The preference source was not reported")
 
 	local override = run("override", { mode = "full", preferences = { runtime = { mode = "fast" } } })
-	assert(override.mode == "full", "NVIM_MODE did not take priority over the host preference")
+	assert(override.mode == "extra", "NVIM_MODE did not take priority over the host preference")
+
+	local legacy = run("legacy_preference", { preferences = { runtime = { mode = "full" } } })
+	assert(legacy.mode == "extra" and #legacy.disabled == 0, "Legacy full preference lost features")
+	local explicit_extra = run("explicit_extra", { mode = "extra" })
+	assert(explicit_extra.mode == "extra" and #explicit_extra.disabled == 0, "Extra mode is incomplete")
+	local picker = run("mode_picker", {
+		code = [[
+local preferences = require("user.core.preferences")
+local requests = 0
+package.loaded["user.core.mode_restart"] = { restart = function() requests = requests + 1 end }
+vim.ui.select = function(items, _, choose)
+ assert(vim.deep_equal(items, { "fast", "standard", "extra", "auto" }), "Mode picker choices drifted")
+ choose("extra")
+end
+vim.cmd.EditorMode()
+report.extra.saved = preferences.get("runtime").mode
+report.extra.current = mode.name()
+report.extra.requests = requests
+vim.cmd("EditorMode full")
+report.extra.alias = preferences.get("runtime").mode
+]],
+	})
+	assert(
+		picker.extra.saved == "extra" and picker.extra.current == "standard" and picker.extra.requests == 1,
+		"Mode picker did not save/restart without changing the active session"
+	)
+	assert(picker.extra.alias == "extra", "EditorMode full was not canonicalized")
 
 	local invalid = run("invalid", { mode = "turbo", preferences = { runtime = { mode = "fast" } } })
 	assert(invalid.mode == "fast", "An unknown NVIM_MODE did not fall back to the host preference")
 	assert(#invalid.notices > 0 and invalid.notices[1]:find("turbo", 1, true), "An unknown NVIM_MODE was not reported")
 
 	local invalid_preference = run("invalid_preference", { preferences = { runtime = { mode = "turbo" } } })
-	assert(invalid_preference.mode == "full", "An unknown runtime.mode did not fall back to full mode")
+	assert(invalid_preference.mode == "standard", "An unknown runtime.mode did not fall back to full mode")
 	assert(#invalid_preference.notices > 0, "An unknown runtime.mode was accepted silently")
 
 	-- 3. `auto` is a selection rule over the connection, not a guess about the
@@ -183,7 +210,7 @@ vim.cmd("qa!")
 	local auto_tty = run("auto_tty", { mode = "auto", ssh_tty = "/dev/pts/3" })
 	assert(auto_tty.mode == "fast", "auto ignored SSH_TTY")
 	local auto_local = run("auto_local", { mode = "auto" })
-	assert(auto_local.mode == "full", "auto did not select full for a local session")
+	assert(auto_local.mode == "standard", "auto did not select standard for a local session")
 	-- A server writes the preference, so a tmux shell that lost SSH_CONNECTION
 	-- still starts in fast mode.
 	local auto_detached = run("auto_detached", { preferences = { runtime = { mode = "fast" } } })
@@ -205,7 +232,7 @@ vim.cmd("FastMode on")
 ]],
 	})
 	assert(
-		toggled.extra.saved.runtime.mode == "fast" and toggled.extra.current == "full",
+		toggled.extra.saved.runtime.mode == "fast" and toggled.extra.current == "standard",
 		"Toggle changed the running mode or failed to save"
 	)
 	assert(
@@ -213,7 +240,10 @@ vim.cmd("FastMode on")
 		"Toggle lost other preferences"
 	)
 	assert(toggled.extra.retried == "fast", "Retrying a blocked restart canceled the pending mode instead")
-	assert(toggled.extra.toggled_back == "full", "An explicit current-mode selection did not cancel the pending change")
+	assert(
+		toggled.extra.toggled_back == "standard",
+		"An explicit current-mode selection did not cancel the pending change"
+	)
 	assert(toggled.extra.mapping:find("FastModeToggle", 1, true), "Fast mode toggle mapping missing")
 	local restarted = run(
 		"persistent_toggle",
@@ -224,8 +254,8 @@ report.extra.current = mode.name()
 	)
 	assert(restarted.mode == "fast" and restarted.extra.current == "fast", "Saved fast mode did not survive restart")
 	assert(
-		run("persistent_toggle", { keep_preferences = true }).mode == "full",
-		"Saved full mode did not survive restart"
+		run("persistent_toggle", { keep_preferences = true }).mode == "standard",
+		"Saved standard mode did not survive restart"
 	)
 	local switch_requests = run("switch_requests", {
 		mode = "fast",
@@ -245,7 +275,7 @@ report.extra.auto_requests = requests
 report.extra.current = mode.name()
 ]],
 	})
-	assert(switch_requests.extra.saved == "full", "Toggle followed a stale preference instead of the active mode")
+	assert(switch_requests.extra.saved == "standard", "Toggle followed a stale preference instead of the active mode")
 	assert(switch_requests.extra.requests == 1, "Changing mode did not request a restart")
 	assert(switch_requests.extra.same_mode_requests == 1, "Selecting the active mode requested an unnecessary restart")
 	assert(switch_requests.extra.auto_requests == 2, "Auto mode did not restart when its resolved mode changed")
@@ -305,7 +335,7 @@ report.extra.current = mode.name()
 		"Toggle overwrote invalid preferences"
 	)
 	assert(
-		not failed_toggle.extra.readonly_saved and failed_toggle.extra.current == "full",
+		not failed_toggle.extra.readonly_saved and failed_toggle.extra.current == "standard",
 		"Unwritable preference changed the mode"
 	)
 
@@ -382,7 +412,7 @@ report.extra.mini_after = package.loaded["mini.ai"] ~= nil
 	}
 	for capability, plugin in pairs(evidence) do
 		assert(vim.tbl_contains(fast.disabled, capability), capability .. " is not reported as disabled in fast mode")
-		assert(vim.tbl_contains(default.plugins, plugin), "Full mode no longer provides " .. plugin)
+		assert(vim.tbl_contains(explicit_extra.plugins, plugin), "Full mode no longer provides " .. plugin)
 		assert(
 			not vim.tbl_contains(fast.plugins, plugin),
 			capability .. " is reported off but " .. plugin .. " is installed"
@@ -915,7 +945,7 @@ report.extra.register = vim.fn.getreg('"')
 	assert(headless.extra.register == "copy me\n", "Yanking into the ordinary register stopped working")
 
 	-- 15. A slim session never treats the rest of the shared installation as
-	--     unused: plugin management stays a full-mode operation.
+	--     unused: plugin management stays a extra-mode operation.
 	assert(fast.commands.Lazy, "The plugin manager entry disappeared instead of explaining itself")
 	local manager = run("fast_manager", {
 		mode = "fast",
@@ -935,7 +965,7 @@ report.extra.kept = #vim.fn.readdir(vim.fs.joinpath(vim.fn.stdpath("data"), "laz
 	})
 	assert(#manager.extra.refusals == 2, "The plugin manager ran against the slim subset")
 	assert(
-		manager.extra.refusals[1]:find("NVIM_MODE=full", 1, true),
+		manager.extra.refusals[1]:find("NVIM_MODE=extra", 1, true),
 		"The refusal did not name the mode that manages plugins"
 	)
 	assert(manager.extra.kept, "A slim session removed installed plugins")
@@ -1083,9 +1113,9 @@ report.extra.colorscheme = vim.g.colors_name
 	assert(not explorer[1].opts.skip_confirm_for_simple_edits, "The slim explorer dropped its edit confirmation")
 
 	print(
-		("Mode evidence: full by default; NVIM_MODE > preference > default; auto follows SSH; fast imports %d plugins (full %d) and %d of %d parsers, with %d disabled capabilities; Python colon indent, autopairs, plain save and directory switching kept; one server on request then released (%s); native search, native entry, read-only state and read-only config handled; plugin management stayed a full-mode operation; %d Tree-sitter captures identical to full mode with no semantic provider of its own."):format(
+		("Mode evidence: standard by default; NVIM_MODE > preference > default; auto follows SSH; fast imports %d plugins (full %d) and %d of %d parsers, with %d disabled capabilities; Python colon indent, autopairs, plain save and directory switching kept; one server on request then released (%s); native search, native entry, read-only state and read-only config handled; plugin management stayed an extra-mode operation; %d Tree-sitter captures identical to full mode with no semantic provider of its own."):format(
 			#fast.plugins,
-			#default.plugins,
+			#explicit_extra.plugins,
 			#base,
 			#catalog.parsers,
 			#fast.disabled,

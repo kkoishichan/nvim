@@ -12,6 +12,7 @@ assert(
 		"lsp_progress",
 		"startup_loading",
 		"mode",
+		"standard",
 		"ui_runtime",
 		"scrolling_colors",
 		"statusline_refresh",

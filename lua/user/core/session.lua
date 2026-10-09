@@ -311,23 +311,55 @@ function M.setup(opts)
 	directory = opts.dir and vim.fs.normalize(opts.dir) or directory
 	enabled = true
 	local group = api.nvim_create_augroup("user_workspace_session", { clear = true })
-	api.nvim_create_autocmd("VimLeavePre", {
-		group = group,
-		callback = function()
-			if not enabled then
-				return
-			end
-			for _, bufnr in ipairs(api.nvim_list_bufs()) do
-				if file_buffer(bufnr) and vim.bo[bufnr].buflisted then
-					M.save()
+	if opts.autosave ~= false then
+		api.nvim_create_autocmd("VimLeavePre", {
+			group = group,
+			callback = function()
+				if not enabled then
 					return
 				end
-			end
-		end,
-	})
+				for _, bufnr in ipairs(api.nvim_list_bufs()) do
+					if file_buffer(bufnr) and vim.bo[bufnr].buflisted then
+						M.save()
+						return
+					end
+				end
+			end,
+		})
+	end
 	api.nvim_create_user_command("SessionSave", function()
 		M.save()
 	end, { desc = "Save the workspace, including all project tabs" })
+	vim.keymap.set("n", "<leader>sw", function()
+		M.save()
+	end, { desc = "Save workspace session" })
+	if opts.autosave == false then
+		for _, entry in ipairs({
+			{
+				"<leader>ss",
+				function()
+					M.load()
+				end,
+				"Restore session",
+			},
+			{
+				"<leader>sS",
+				function()
+					M.select()
+				end,
+				"Select session",
+			},
+			{
+				"<leader>sl",
+				function()
+					M.load({ last = true })
+				end,
+				"Restore last session",
+			},
+		}) do
+			vim.keymap.set("n", entry[1], entry[2], { desc = entry[3] })
+		end
+	end
 end
 
 return M

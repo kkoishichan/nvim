@@ -61,6 +61,9 @@ return function(profile)
 					end,
 					cmd = { toolchain.executable("rust-analyzer") or "rust-analyzer" },
 					on_attach = function(_, bufnr)
+						if not profile.extra then
+							return
+						end
 						local function debug_continue()
 							if not toolchain.executable("codelldb") then
 								vim.notify(
@@ -97,6 +100,9 @@ return function(profile)
 				dap = {
 					autoload_configurations = false,
 					adapter = function()
+						if not profile.extra then
+							return false
+						end
 						local command = toolchain.executable("codelldb")
 						if not command then
 							return false

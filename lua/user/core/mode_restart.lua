@@ -82,7 +82,9 @@ function M.restart(opts)
 			end
 		end)
 	end
-	local retry = apply_mode and "Run :FastModeToggle to retry." or "Press <leader>R to retry."
+	local retry = apply_mode
+			and ("Run :EditorMode " .. require("user.core.preferences").get("runtime").mode .. " to retry.")
+		or "Press <leader>R to retry."
 	vim.notify(
 		notice .. "Restart was not completed. " .. (ok and retry or tostring(err)),
 		vim.log.levels.WARN,

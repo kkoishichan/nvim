@@ -9,17 +9,22 @@
 
 local M = {}
 
-local runtime_modes = { fast = true, full = true }
+local runtime_modes = { fast = true, standard = true, extra = true }
+
+function M.canonical(name)
+	return name == "full" and "extra" or name
+end
 
 -- The vocabulary the rest of the configuration uses to ask what this session is
--- allowed to do. Full mode grants all of it. Fast mode keeps editing, the theme
+-- allowed to do. Extra grants all of it, standard a curated set. Fast keeps the theme
 -- and Tree-sitter highlighting, and drops the work that would otherwise run
 -- while a file is opened, typed into, saved or scrolled.
 local optional_capabilities = {
 	"completion", -- Blink, snippets, automatic candidate menus
 	"conflicts", -- automatic Git conflict scanning and highlighting
 	"cursorline", -- full-width current line colouring
-	"decorations", -- matchup, illuminate, indent lines, context, colours, TODO
+	"decorations", -- matchup, illuminate, indent lines, colours, TODO
+	"diagnostics_expanded", -- automatic current-line virtual messages
 	"diagnostics_live", -- underline, virtual lines and live markers
 	"explorer_extras", -- Oil watchers/icons/metadata columns, Neo-tree
 	"extended_workflows", -- DAP, tests, AI, media, preview, VimTeX, IME
@@ -27,20 +32,51 @@ local optional_capabilities = {
 	"format_on_save",
 	"git", -- Gitsigns, blame, diff watchers, Git statusline segments
 	"icons", -- Nerd Font glyphs in the interface
-	"lint",
+	"lint", -- standalone linter available on request
+	"lint_auto",
+	"auxiliary_lsp", -- automatic Emmet/typos and unrestricted optional project servers
 	"lsp_auto", -- language servers started without an explicit request
 	"picker_extras", -- picker icons and automatic preview
 	"plugin_manager_auto", -- install of missing plugins, change detection
 	"scroll_animation",
-	"session", -- automatic session and scratch persistence
+	"session_auto", -- save a workspace on exit
+	"session", -- manual workspace save/restore
 	"signature", -- automatic signature rendering
 	"spell_auto",
 	"statusline_plugin", -- Lua statusline component pipeline
 	"system_clipboard", -- automatic unnamedplus synchronisation
 	"terminal_manager", -- terminal manager and task panels
-	"ui_panels", -- bufferline, dropbar, scrollview, Edgy, dashboard, notify
+	"ui_panels", -- panel layout, bufferline, notify
 	"undofile", -- persistent undo on disk
 }
+
+-- Standard is an explicit whitelist. New optional capabilities stay in extra
+-- until their ongoing cost and role in everyday editing have been considered.
+local standard = {}
+for _, name in ipairs({
+	"completion",
+	"conflicts",
+	"cursorline",
+	"diagnostics_live",
+	"explorer_extras",
+	"folding_provider",
+	"format_on_save",
+	"git",
+	"icons",
+	"lint",
+	"lsp_auto",
+	"picker_extras",
+	"scroll_animation",
+	"session",
+	"signature",
+	"statusline_plugin",
+	"system_clipboard",
+	"terminal_manager",
+	"ui_panels",
+	"undofile",
+}) do
+	standard[name] = true
+end
 
 local notices = {}
 local degradations = {}
@@ -78,32 +114,32 @@ local function automatic()
 	if (vim.env.SSH_CONNECTION or "") ~= "" or (vim.env.SSH_TTY or "") ~= "" then
 		return "fast", "SSH session"
 	end
-	return "full", "local session"
+	return "standard", "local session"
 end
 
 local function select_mode(runtime, configured_by_host)
 	local env = vim.env.NVIM_MODE
 	if env and env ~= "" then
-		local value = env:lower()
+		local value = M.canonical(env:lower())
 		if runtime_modes[value] then
-			return value, "NVIM_MODE=" .. value
+			return value, "NVIM_MODE=" .. env:lower()
 		end
 		if value == "auto" then
 			local resolved, reason = automatic()
 			return resolved, "NVIM_MODE=auto selected " .. resolved .. " (" .. reason .. ")"
 		end
-		note(("NVIM_MODE=%s is not full, fast or auto; using the host preference"):format(env))
+		note(("NVIM_MODE=%s is not fast, standard, extra or auto; using the host preference"):format(env))
 	end
 
-	local configured = configured_by_host and runtime.mode or nil
+	local configured = configured_by_host and M.canonical(runtime.mode) or nil
 	if runtime_modes[configured] then
-		return configured, "preferences.json runtime.mode=" .. configured
+		return configured, "preferences.json runtime.mode=" .. runtime.mode
 	end
 	if configured == "auto" then
 		local resolved, reason = automatic()
 		return resolved, "preferences.json runtime.mode=auto selected " .. resolved .. " (" .. reason .. ")"
 	end
-	return "full", "default (no NVIM_MODE, no runtime.mode)"
+	return "standard", "default (no NVIM_MODE, no runtime.mode)"
 end
 
 local function directory_problem(path)
@@ -189,11 +225,11 @@ local function resolve()
 	local name, source = select_mode(runtime, preferences.provided("runtime.mode"))
 	local values = {}
 	for _, capability in ipairs(optional_capabilities) do
-		values[capability] = name == "full"
+		values[capability] = name == "extra" or (name == "standard" and standard[capability] == true)
 	end
 	-- Persistent undo is recovery data, not a cache. Fast mode leaves it off by
 	-- default and lets a host that wants it back say so.
-	values.undofile = name == "full" or runtime.persistent_undo
+	values.undofile = name ~= "fast" or runtime.persistent_undo
 
 	local storage = resolve_storage(runtime)
 	if not storage.writable then
@@ -213,7 +249,7 @@ local function resolve()
 	return state
 end
 
----The resolved mode name: "full" or "fast".
+---The resolved mode name: "fast", "standard" or "extra".
 function M.name()
 	return resolve().name
 end
@@ -229,7 +265,7 @@ function M.set_default(name)
 		vim.notify(err, vim.log.levels.ERROR, { title = "Editor mode" })
 		return false
 	end
-	local target = name == "auto" and automatic() or name
+	local target = name == "auto" and automatic() or M.canonical(name)
 	if target == M.name() then
 		vim.notify(
 			"Saved editor mode: " .. name .. " (already active).",
@@ -243,7 +279,7 @@ function M.set_default(name)
 end
 
 function M.toggle()
-	return M.set_default(M.is_fast() and "full" or "fast")
+	return M.set_default(M.is_fast() and "standard" or "fast")
 end
 
 ---Where the mode came from, for `:ModeInfo` and health output.
