@@ -1,0 +1,331 @@
+local color_filetypes = {
+	"astro",
+	"css",
+	"heex",
+	"html",
+	"javascript",
+	"javascriptreact",
+	"json",
+	"jsonc",
+	"less",
+	"lua",
+	"markdown",
+	"sass",
+	"scss",
+	"svelte",
+	"templ",
+	"toml",
+	"typescript",
+	"typescriptreact",
+	"vue",
+	"yaml",
+}
+local color_filetype_set = {}
+for _, filetype in ipairs(color_filetypes) do
+	color_filetype_set[filetype] = true
+end
+
+local function expensive_buffer(bufnr)
+	return not require("user.core.buffer_policy").allow(bufnr)
+end
+
+return function(profile)
+	profile = profile or {}
+	local plugins = require("user.specs.editing")()
+	if profile.extra then
+		table.insert(plugins, {
+			"folke/persistence.nvim",
+			event = "BufReadPre",
+			opts = { branch = false },
+			config = function(_, opts)
+				local persistence = require("persistence")
+				persistence.setup(opts)
+				-- Workspace sessions preserve every tab and their project metadata.
+				-- Only the shared session service owns automatic saves.
+				persistence.stop()
+				require("user.core.session").setup({ dir = opts.dir })
+			end,
+			keys = {
+				{
+					"<leader>ss",
+					function()
+						require("user.core.session").load()
+					end,
+					desc = "Restore session",
+				},
+				{
+					"<leader>sS",
+					function()
+						require("user.core.session").select()
+					end,
+					desc = "Select session",
+				},
+				{
+					"<leader>sl",
+					function()
+						require("user.core.session").load({ last = true })
+					end,
+					desc = "Restore last session",
+				},
+				{
+					"<leader>sd",
+					function()
+						require("user.core.session").stop()
+					end,
+					desc = "Stop saving session",
+				},
+			},
+		})
+	end
+	if profile.extra then
+		table.insert(plugins, {
+			"brenoprata10/nvim-highlight-colors",
+			ft = color_filetypes,
+			opts = {
+				render = "background",
+				enable_named_colors = true,
+				enable_tailwind = true,
+				exclude_buftypes = { "nofile", "prompt", "quickfix", "terminal" },
+				exclude_buffer = function(bufnr)
+					return expensive_buffer(bufnr) or not color_filetype_set[vim.bo[bufnr].filetype]
+				end,
+			},
+			config = function(_, opts)
+				require("user.core.color_preview").setup(opts)
+			end,
+		})
+	end
+	table.insert(plugins, {
+		"mbbill/undotree",
+		cmd = { "UndotreeToggle", "UndotreeShow", "UndotreeFocus" },
+		keys = {
+			{ "<leader>uu", "<cmd>UndotreeToggle<cr>", desc = "Undo tree" },
+		},
+		init = function()
+			vim.g.undotree_WindowLayout = 2
+			vim.g.undotree_SetFocusWhenToggle = 1
+			vim.g.undotree_ShortIndicators = 1
+		end,
+	})
+	if profile.extra then
+		table.insert(plugins, {
+			"h-hg/fcitx.nvim",
+			event = "VeryLazy",
+			cond = function()
+				return vim.fn.executable("fcitx5-remote") == 1 or vim.fn.executable("fcitx-remote") == 1
+			end,
+		})
+	end
+	if profile.extra then
+		table.insert(plugins, {
+			"andymass/vim-matchup",
+			event = { "BufReadPost", "BufNewFile" },
+			init = function()
+				vim.g.matchup_matchparen_deferred = 1
+				vim.g.matchup_matchparen_deferred_show_delay = 120
+				vim.g.matchup_matchparen_deferred_hide_delay = 300
+				vim.g.matchup_matchparen_hi_surround_always = 1
+				vim.g.matchup_matchparen_offscreen = {}
+				vim.g.matchup_matchparen_stopline = 300
+				vim.g.matchup_treesitter_stopline = 300
+			end,
+			config = function()
+				require("user.core.matchup_cache").setup()
+			end,
+		})
+	end
+	if profile.extra then
+		table.insert(plugins, {
+			"lukas-reineke/indent-blankline.nvim",
+			main = "ibl",
+			event = { "BufReadPost", "BufNewFile" },
+			opts = {
+				indent = {
+					char = "│",
+					tab_char = "│",
+				},
+				scope = {
+					enabled = true,
+					show_start = false,
+					show_end = false,
+				},
+				exclude = {
+					buftypes = { "terminal", "nofile", "quickfix", "prompt" },
+					filetypes = {
+						"dashboard",
+						"fzf",
+						"gitcommit",
+						"help",
+						"image",
+						"lazy",
+						"lspinfo",
+						"mason",
+						"neo-tree",
+						"snacks_notif",
+						"snacks_picker_input",
+						"snacks_picker_list",
+						"terminal",
+					},
+				},
+			},
+		})
+	end
+	if profile.extra then
+		table.insert(plugins, {
+			"RRethy/vim-illuminate",
+			event = { "BufReadPost", "BufNewFile" },
+			opts = {
+				providers = { "lsp", "treesitter", "regex" },
+				delay = 200,
+				filetypes_denylist = {
+					"DiffviewFiles",
+					"Trouble",
+					"fzf",
+					"gitcommit",
+					"help",
+					"image",
+					"lazy",
+					"neo-tree",
+					"snacks_notif",
+					"terminal",
+				},
+				large_file_cutoff = 2000,
+				min_count_to_highlight = 2,
+				under_cursor = true,
+				disable_keymaps = true,
+			},
+			config = function(_, opts)
+				require("illuminate").configure(opts)
+				require("user.core.highlights").on_colorscheme("illuminate", function()
+					local p = require("user.core.palette").get()
+					vim.api.nvim_set_hl(0, "IlluminatedWordText", { bg = p.subtle })
+					vim.api.nvim_set_hl(0, "IlluminatedWordRead", { bg = p.subtle })
+					vim.api.nvim_set_hl(0, "IlluminatedWordWrite", { bg = p.strong, underline = true })
+				end)
+			end,
+			keys = {
+				{
+					"]r",
+					function()
+						require("illuminate").goto_next_reference(false)
+					end,
+					desc = "Next reference",
+				},
+				{
+					"[r",
+					function()
+						require("illuminate").goto_prev_reference(false)
+					end,
+					desc = "Previous reference",
+				},
+			},
+		})
+	end
+	table.insert(plugins, {
+		"nvim-treesitter/nvim-treesitter-context",
+		event = { "BufReadPost", "BufNewFile" },
+		dependencies = {
+			"nvim-treesitter/nvim-treesitter",
+		},
+		opts = {
+			enable = true,
+			multiwindow = false,
+			max_lines = 3,
+			min_window_height = 12,
+			line_numbers = false,
+			multiline_threshold = 2,
+			trim_scope = "outer",
+			mode = "topline",
+			separator = nil,
+			zindex = 20,
+			on_attach = function(bufnr)
+				if expensive_buffer(bufnr) then
+					return false
+				end
+
+				local disabled = {
+					fzf = true,
+					["fzflua_backdrop"] = true,
+					["neo-tree"] = true,
+					["snacks_picker_input"] = true,
+					["snacks_picker_list"] = true,
+					["snacks_notif"] = true,
+					qf = true,
+				}
+
+				return not disabled[vim.bo[bufnr].filetype]
+			end,
+		},
+		config = function(_, opts)
+			require("user.core.sticky_context").setup()
+			require("treesitter-context").setup(opts)
+			require("user.core.highlights").on_colorscheme("treesitter-context", function()
+				local p = require("user.core.palette").get()
+				local bg = not require("user.core.transparency").is_enabled() and p.bg or nil
+				vim.api.nvim_set_hl(0, "TreesitterContext", { bg = bg })
+				vim.api.nvim_set_hl(0, "TreesitterContextBottom", { underline = true, sp = p.strong })
+			end)
+		end,
+		keys = {
+			{
+				"<leader>uc",
+				"<cmd>TSContext toggle<cr>",
+				desc = "Toggle sticky context",
+			},
+			{
+				"[c",
+				function()
+					-- In a diff window keep the built-in "previous change" jump.
+					if vim.wo.diff then
+						vim.cmd.normal({ "[c", bang = true })
+					else
+						require("treesitter-context").go_to_context(vim.v.count1)
+					end
+				end,
+				desc = "Goto sticky context",
+			},
+		},
+	})
+	table.insert(plugins, {
+		"folke/ts-comments.nvim",
+		event = "VeryLazy",
+		opts = {},
+	})
+	if profile.extra then
+		table.insert(plugins, {
+			"folke/todo-comments.nvim",
+			event = { "BufReadPost", "BufNewFile" },
+			dependencies = { "nvim-lua/plenary.nvim" },
+			opts = {
+				signs = true,
+			},
+			keys = {
+				{
+					"<leader>ft",
+					"<cmd>TodoFzfLua<cr>",
+					desc = "Todos",
+				},
+				{
+					"<leader>xt",
+					"<cmd>TodoQuickFix<cr>",
+					desc = "Todo quickfix",
+				},
+				{
+					"]t",
+					function()
+						require("todo-comments").jump_next()
+					end,
+					desc = "Next todo",
+				},
+				{
+					"[t",
+					function()
+						require("todo-comments").jump_prev()
+					end,
+					desc = "Previous todo",
+				},
+			},
+		})
+	end
+	return plugins
+end
