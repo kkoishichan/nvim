@@ -38,12 +38,24 @@ local function setup_lsp_keymaps()
 			map("n", "<leader>cpr", "<cmd>Glance references<cr>", "Peek references")
 			map("n", "<leader>cpt", "<cmd>Glance type_definitions<cr>", "Peek type definition")
 			map("n", "<leader>cs", "<cmd>FzfLua lsp_document_symbols<cr>", "Document symbols")
-			map("n", "<leader>cS", "<cmd>FzfLua lsp_workspace_symbols<cr>", "Workspace symbols")
 
 			local allowed = require("user.core.buffer_policy").allow(bufnr)
-			if capabilities.codelens and allowed and client_supports(client, "textDocument/codeLens", bufnr) then
-				vim.lsp.codelens.enable(true, { bufnr = bufnr })
-				map("n", "<leader>cL", vim.lsp.codelens.run, "Run code lens")
+			if allowed and client_supports(client, "textDocument/codeLens", bufnr) then
+				if capabilities.codelens then
+					vim.lsp.codelens.enable(true, { bufnr = bufnr })
+					map("n", "<leader>cL", vim.lsp.codelens.run, "Run code lens")
+				else
+					-- The explicit twin of automatic code lenses: show them for
+					-- this buffer on request, run one on the next press.
+					map("n", "<leader>cL", function()
+						if vim.lsp.codelens.is_enabled({ bufnr = bufnr }) then
+							vim.lsp.codelens.run()
+						else
+							vim.lsp.codelens.enable(true, { bufnr = bufnr })
+							vim.notify("Code lenses shown for this buffer; press again to run one", vim.log.levels.INFO)
+						end
+					end, "Show or run code lens")
+				end
 			end
 			if client_supports(client, "textDocument/inlayHint", bufnr) then
 				if capabilities.inlay_hints_auto and allowed then

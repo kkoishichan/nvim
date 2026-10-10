@@ -717,6 +717,26 @@ return function(profile)
 				},
 				lualine_x = {
 					{
+						function()
+							local quiet = package.loaded["user.core.quiet"]
+							return quiet and quiet.active() and "QUIET" or ""
+						end,
+					},
+					{
+						-- Project-wide counts, shown only while servers analyse the
+						-- whole workspace; the next component keeps the buffer's own.
+						"diagnostics",
+						sources = { "nvim_workspace_diagnostic" },
+						sections = { "error", "warn" },
+						update_in_insert = false,
+						fmt = function(text)
+							return text ~= "" and ("ws " .. text) or ""
+						end,
+						cond = function()
+							return require("user.core.mode").capabilities().workspace_diagnostics
+						end,
+					},
+					{
 						"diagnostics",
 						sources = { "nvim_diagnostic" },
 						update_in_insert = false,

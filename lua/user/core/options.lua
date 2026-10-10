@@ -17,7 +17,12 @@ local capabilities = mode.capabilities()
 local opt = vim.opt
 
 opt.autowrite = false
-opt.autoread = true
+-- Reconciliation with files rewritten outside the editor is decided by the
+-- FileChangedShell handler in core/autocmds.lua. With 'autoread' set Neovim
+-- reloads a clean buffer before that event and never raises it, so the
+-- pre-reload snapshot (:ExternalChanges) would be skipped; the handler
+-- reloads clean buffers itself, which is what 'autoread' would have done.
+opt.autoread = false
 opt.breakindent = true
 -- Automatic unnamedplus synchronisation probes the desktop clipboard (or talks
 -- to the remote end) on every yank. Fast mode keeps the ordinary registers and

@@ -55,6 +55,7 @@ local optional_capabilities = {
 	"terminal_manager", -- terminal manager and task panels
 	"ui_panels", -- panel layout, bufferline, notify
 	"undofile", -- persistent undo on disk
+	"workspace_diagnostics", -- basedpyright and vtsls analyse the whole project below a size threshold
 	"workspace_tools", -- on-request inspection: Outline, crates.nvim, dictionary, scratch
 }
 

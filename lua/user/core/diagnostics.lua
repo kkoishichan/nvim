@@ -87,3 +87,19 @@ end, { desc = "Next diagnostic" })
 
 vim.keymap.set("n", "<leader>cd", open_diagnostic_float, { desc = "Line diagnostics" })
 vim.keymap.set("n", "<leader>cD", vim.diagnostic.setloclist, { desc = "Diagnostic loclist" })
+
+local M = {}
+
+---The current message style: "lines", "text" or "off".
+function M.current()
+	return mode
+end
+
+---Switch the message style without cycling.
+function M.set(name)
+	assert(vim.tbl_contains(modes, name), "unknown diagnostic display mode: " .. tostring(name))
+	mode = name
+	apply_diagnostic_mode()
+end
+
+return M

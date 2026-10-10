@@ -25,10 +25,15 @@ return function(tmp)
 			and not cap.docking
 			and not cap.auxiliary_lsp
 			and not cap.codelens
-			and not cap.inlay_hints_auto,
+			and not cap.inlay_hints_auto
+			and not cap.workspace_diagnostics,
 		"Standard enabled extra capabilities"
 	)
 	local plugins = require("lazy.core.config").plugins
+	-- The options this session actually started with. The asset evidence below
+	-- re-runs lazy's configuration for the other modes, which replaces the
+	-- options table, so the promise assertions read it before that happens.
+	local lazy_options = require("lazy.core.config").options
 	for _, name in ipairs({
 		"blink.cmp",
 		"nvim-lspconfig",
@@ -236,7 +241,77 @@ return function(tmp)
 			#extra
 		)
 	)
+	-- The workspace editor's promises, one per verb of the boundary rule, and
+	-- the explicit twin of every automatic behaviour extra adds.
+	vim.fn.writefile({ "local value = compute(alpha, beta)", "return value" }, tmp .. "/promise.lua")
+	vim.cmd.edit(vim.fn.fnameescape(tmp .. "/promise.lua"))
+	vim.wait(300, function()
+		return false
+	end, 10)
+	local normal = {}
+	local leader = vim.g.mapleader or "\\"
+	for _, mapping in ipairs(api.nvim_get_keymap("n")) do
+		normal[mapping.lhs] = true
+		if mapping.lhs:sub(1, #leader) == leader then
+			normal["<Leader>" .. mapping.lhs:sub(#leader + 1)] = true
+		end
+	end
+	for _, lhs in ipairs({
+		"<Leader>cl",
+		"<Leader>cC",
+		"<Leader>cS",
+		"<Leader>cf",
+		"<Leader>sw",
+		"<Leader>ft",
+		"<Leader>cd",
+		"<Leader>ud",
+		"<Leader>ge",
+		"<Leader>uq",
+	}) do
+		assert(normal[lhs], "Standard lost the explicit entry " .. lhs)
+	end
+	for _, name in ipairs({ "Lint", "ProjectCheck", "SessionSave", "ManualLspStart", "ExternalChanges", "Quiet" }) do
+		assert(vim.fn.exists(":" .. name) == 2, "Standard lost the explicit command " .. name)
+	end
+	for lhs in pairs(normal) do
+		assert(not lhs:match("^<Leader>[drja]"), "Standard maps a run entry: " .. lhs)
+	end
+	for _, name in ipairs({
+		"DapInstall",
+		"OverseerRun",
+		"TaskBuild",
+		"ClaudeCode",
+		"PdfOpen",
+		"Markview",
+		"TypstPreview",
+		"LivePreview",
+		"VimtexCompile",
+	}) do
+		assert(vim.fn.exists(":" .. name) == 0, "Standard provides the extra command " .. name)
+	end
+	local ok_spell, spell = pcall(api.nvim_get_autocmds, { group = "user_prose_spell" })
+	assert(not ok_spell or #spell == 0, "Standard enables automatic spelling")
+	assert(
+		lazy_options.install.missing == false and lazy_options.change_detection.enabled == false,
+		("Standard automates plugin management (install.missing=%s change_detection=%s)"):format(
+			tostring(lazy_options.install.missing),
+			tostring(lazy_options.change_detection.enabled)
+		)
+	)
+	for _, module in ipairs({
+		"illuminate",
+		"ibl",
+		"todo-comments",
+		"nvim-highlight-colors",
+		"nvim-lightbulb",
+		"dropbar",
+		"scrollview",
+		"edgy",
+	}) do
+		assert(package.loaded[module] == nil, "Standard loaded the resident layer " .. module)
+	end
+	assert(vim.fn.exists("*matchup#init") == 0, "Standard loaded match-up")
 	print(
-		"Standard evidence: primary editing/UI retained; workspace tools present; lint on write; extra plugins absent; manual sessions stay manual; auxiliary LSPs gated; Java/Rust definitions preserved"
+		"Standard evidence: primary editing/UI retained; workspace tools present; lint on write; extra plugins absent; manual sessions stay manual; auxiliary LSPs gated; Java/Rust definitions preserved; run/render/automation/docking/resident promises hold; explicit twins present"
 	)
 end

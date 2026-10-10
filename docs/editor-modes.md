@@ -29,7 +29,7 @@ standard 与 extra 的边界用五个动词判定，功能满足任何一条就�
 | 主题、Tree-sitter 高亮、基础编辑、leader 菜单 | 保留 | 保留 | 保留 |
 | 自动补全、片段、Blink 签名 | 原生手动补全 | 保留 | 保留 |
 | 主要 LSP | 手动启动 | 自动启动 | 自动启动 |
-| 诊断显示 | 手动启动的服务显示标记和下划线 | 下划线、标记和行尾短消息 | 当前行展开消息 |
+| 诊断显示 | 手动启动的服务显示标记和下划线 | 下划线、标记和行尾短消息 | 当前行展开消息；basedpyright 与 vtsls 在项目规模门槛内分析整个工作区 |
 | 格式化 | 手动 | 保存时格式化 | 保存时格式化 |
 | 独立 lint | `:Lint` / `<leader>cl` 手动 | 保存时自动运行，`<leader>cl` / `:Lint` 手动 | 另在读取和离开插入模式时运行 |
 | 文件浏览与搜索 | 精简 Oil / fzf，无默认预览 | Oil、Neo-tree、fzf 预览 | 保留全部 |
@@ -70,6 +70,10 @@ NVIM_MODE=fast nvim path/to/file.py
 
 ## 语言能力与手动工作流
 
+项目级视图在三档都有，但走显式请求：`<leader>cS` 在附着了能回答 `workspace/symbol` 的服务时发起实时查询（vtsls、basedpyright、clangd 对空查询几乎不返回结果，所以不用静态列表），没有这样的服务时用 ripgrep 按文件类型的定义模式列出全项目的定义再模糊过滤，没有模式的文件类型退回普通 grep。`:ProjectCheck` / `<leader>cC` 按项目标记选择 ruff、tsc、cargo check、go vet 或 selene 之一运行一次，结果进 quickfix（有 Trouble 时打开 Trouble），多个适用时按当前文件类型选择或弹出选择；工具没装时提示，不自动安装。
+
+extra 另把 basedpyright 和 vtsls 切到工作区分析模式，服务会为没有打开的文件报诊断，Trouble 的 workspace 视图和 lualine 的 `ws` 计数因此覆盖整个项目。门槛由 `preferences.json` 的 `runtime.workspace_diagnostics_max_files`（默认 1500）控制，源码文件数超过时留在 open-files 模式，`:checkhealth user` 的 Running language servers 一节说明每个服务的决定。standard 和 fast 不开启。两处实现细节：basedpyright 在工作区模式下由客户端收回拉取式诊断能力，因为宣告了该能力的客户端只会按请求收到诊断，而 Neovim 只按文档拉取、没有工作区级拉取，未打开的文件会永远收不到；vtsls 的项目诊断会连 TypeScript 自带的 lib 文件一起报，客户端只保留项目根内且不在 `node_modules` 下的文件，用户打开过的文件除外。
+
 standard 保留主要语言服务和必要协作：Python 使用 basedpyright + Ruff，Vue 使用 vtsls + vue_ls。Biome 需要向上找到 `biome.json` / `biome.jsonc`；Tailwind 需要 `tailwind.config.*` 或项目 `package.json` 中的 Tailwind 依赖，覆盖无需传统配置文件的 v4 项目。仅有 `.git` 的普通 Web 项目不会启动这些附加服务。
 
 typos-lsp 和 Emmet 不自动启用，可执行 `:ManualLspStart typos_lsp` 或 `:ManualLspStart emmet_language_server`。`:ManualLspStart [server]` / `:ManualLspStop` 在三档中都可用，`FastLspStart/Stop` 是兼容入口。手动生命周期只释放自己管理的附着，不停止自动集成拥有的客户端；也不会覆盖 Java/Rust 配置。
@@ -83,6 +87,35 @@ standard 的独立检查在保存时自动运行，也可通过 `<leader>cl` / `
 首次使用陌生项目的 `node_modules/.bin` 工具时，通过 Neovim 原生信任提示查看项目根的 `package.json`；确认后执行 `:ProjectTrust allow`，再重试工具。未允许时回退到 Mason/系统工具，无头运行不弹窗。信任以仓库根为范围，没有仓库时使用工作区根；`:ProjectTrust deny` 拒绝，`remove` 清除持久记录及解析缓存，`status` 仅显示本会话状态（`unasked`、`allowed`、`denied`、`bypassed`），不会触发确认。`NVIM_TRUST_PROJECTS=1` 或 `vim.g.user_trust_projects = true` 可显式旁路；检查与基准使用该环境开关。本阶段不限制项目 `.venv` 解释器。
 
 standard 会话键位为 `<leader>sw` / `:SessionSave` 保存，`<leader>ss` 恢复当前工作区，`<leader>sS` 选择，`<leader>sl` 恢复最近会话。extra 另保留退出自动保存及 `<leader>sd` 停止自动保存；两档共用原有会话格式和未保存文件保护。
+
+## 显式入口规则
+
+extra 的每一个自动行为，在 standard 和 fast 里都有一个显式入口；降档只失去"自动"，不失去功能。`scripts/checks/standard.lua` 和 `mode.lua` 断言这些入口存在。
+
+| extra 的自动行为 | standard / fast 的显式入口 |
+| --- | --- |
+| 读取与离开插入模式时 lint | `:Lint` / `<leader>cl`；standard 另在保存时自动 |
+| 工作区诊断 | `:ProjectCheck` / `<leader>cC` |
+| 退出时自动保存会话 | `:SessionSave` / `<leader>sw`（fast 用原生 `:mksession`） |
+| 自动启动的语言服务 | `:ManualLspStart`（fast）；standard 本身自动 |
+| codelens 常驻刷新 | `<leader>cL` 按需显示，再按一次执行 |
+| inlay hints 默认开 | `<leader>uh` |
+| 当前行展开诊断消息 | `<leader>cd` 浮窗，`<leader>ud` 切换样式 |
+| TODO 高亮 | `<leader>ft` 全项目搜索关键字 |
+| 引用高亮 | `gr` / `<leader>cpr` |
+| 配对提示 | 原生 `%` |
+| 自动拼写 | `:set spell` |
+| 插件自动安装与变更检测 | `NVIM_MODE=extra nvim +Lazy` |
+
+dropbar、scrollview 这类纯显示层没有孪生入口，它们本来就不代表一个动作。渲染类功能（图片、PDF、预览）是功能而非自动行为，不在规则范围内。
+
+## 会话内安静
+
+档位决定导入哪些插件，需要重启；已导入的常驻层此刻跑不跑是会话决定。`:Quiet` / `<leader>uq` 通过各插件自己的公开接口暂停 matchup、illuminate、缩进线、颜色预览、TODO 高亮、lightbulb、scrollview、行内 blame、codelens、inlay hints，并把当前行展开的诊断降为行尾短消息；再执行一次按原状态逐项恢复，用户此前自己关掉的层不会被动。`:ModeInfo` 的 quiet 行和 lualine 的 QUIET 标记显示状态。standard 是结构上安静（根本不加载这些层），extra 是可以安静。
+
+## 外部修改审阅
+
+干净 buffer 在磁盘文件变化后自动重载，重载前的内容会保留最近 20 次（每个最多 20000 行）。`:ExternalChanges` / `<leader>ge` 选择一次重载，左右分屏对比重载前后，`q` 关闭，`R` 把重载前的内容放回 buffer 作为未保存修改。有未保存修改的 buffer 不会被重载，也不会进入列表；它们用 `<leader>gD` 看磁盘差异。重载由 FileChangedShell 处理函数决定，`autoread` 保持关闭：开启时 Neovim 会在触发该事件前就重载干净 buffer，重载前的内容无从保留。
 
 ## 部署、缓存与维护
 

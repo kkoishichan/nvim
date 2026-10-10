@@ -27,6 +27,37 @@ end, {
 	desc = "Manage trust for project Node executables",
 })
 
+vim.api.nvim_create_user_command("ProjectCheck", function(command)
+	require("user.core.project_check").run(command.args ~= "" and command.args or nil)
+end, {
+	nargs = "?",
+	complete = function()
+		return require("user.core.project_check").names()
+	end,
+	desc = "Run the project's checker once and collect its findings in the quickfix list",
+})
+
+vim.api.nvim_create_user_command("Quiet", function(command)
+	local quiet = require("user.core.quiet")
+	if command.args == "on" then
+		quiet.enable()
+	elseif command.args == "off" then
+		quiet.disable()
+	else
+		quiet.toggle()
+	end
+end, {
+	nargs = "?",
+	complete = function()
+		return { "on", "off", "toggle" }
+	end,
+	desc = "Pause or resume the always-on decoration layers for this session",
+})
+
+vim.api.nvim_create_user_command("ExternalChanges", function()
+	require("user.core.external_changes").pick()
+end, { desc = "Review files that were reloaded after changing on disk" })
+
 vim.api.nvim_create_user_command("TransparentToggle", function()
 	require("user.core.transparency").toggle()
 end, { desc = "Toggle and save transparent background" })
@@ -150,6 +181,12 @@ vim.api.nvim_create_user_command("ModeInfo", function()
 	local managed = lsp and lsp.summary() or "none"
 	table.insert(lines, { "  manual servers   " .. managed .. "\n" })
 	table.insert(lines, { "  adapters         " .. require("user.core.adapters").summary() .. "\n" })
+	local quiet = package.loaded["user.core.quiet"]
+	local paused = quiet and quiet.active() and quiet.paused() or nil
+	table.insert(
+		lines,
+		{ "  quiet            " .. (paused and ("on: " .. table.concat(paused, ", ")) or "off") .. "\n" }
+	)
 
 	vim.api.nvim_echo(lines, false, {})
 end, { desc = "Report the active editor mode, its capabilities and storage" })

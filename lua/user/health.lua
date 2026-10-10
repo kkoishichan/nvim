@@ -290,6 +290,21 @@ function M.check()
 		local path = type(command) == "table" and table.concat(command, " ")
 			or "dynamic launcher (see tool source above)"
 		health.info(client.name .. " #" .. client.id .. ": " .. path .. "; root " .. (client.root_dir or "single file"))
+		for _, decision in pairs(require("user.core.lsp_definitions").workspace_decisions) do
+			if decision.server == client.name and decision.root == client.root_dir then
+				if decision.enabled then
+					health.ok(
+						("%s analyses the whole project (%d source files, limit %d)"):format(
+							client.name,
+							decision.files,
+							decision.limit
+						)
+					)
+				else
+					health.info(("%s stays in open-files mode: %s"):format(client.name, decision.reason or "unknown"))
+				end
+			end
+		end
 	end
 	if #clients == 0 then
 		health.info("No language server is currently running")

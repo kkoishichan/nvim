@@ -182,8 +182,10 @@ end
 --     instant refresh). Optional focused polling covers the "window focused but
 --     cursor idle" gap; visible files are checked first and hidden ones batched.
 --   * Reconciliation is decided in one place (FileChangedShell): clean buffers
---     reload silently; buffers with unsaved edits are never clobbered (warn
---     instead of the blocking W12 prompt); deleted files keep their buffer.
+--     reload silently after their content is kept for review; buffers with
+--     unsaved edits are never clobbered (warn instead of the blocking W12
+--     prompt); deleted files keep their buffer. 'autoread' stays off because
+--     Neovim would otherwise reload clean buffers without raising the event.
 --   * Reload notices are coalesced/de-duplicated so a burst of edits is one line.
 local external_changes = augroup("external_changes")
 local check_generation = 0
@@ -325,6 +327,8 @@ vim.api.nvim_create_autocmd("FileChangedShell", {
 			return
 		end
 
+		-- Keep what the buffer showed so the reload can be reviewed or undone.
+		require("user.core.external_changes").snapshot(event.buf)
 		vim.v.fcs_choice = "reload"
 	end,
 })
@@ -340,6 +344,7 @@ vim.api.nvim_create_autocmd("FileChangedShellPost", {
 			return
 		end
 		local name = vim.fn.fnamemodify(event.match, ":~:.")
+		require("user.core.external_changes").record(event.buf, event.match)
 		if not reloaded[name] then
 			reloaded[name] = true
 			reloaded_count = reloaded_count + 1

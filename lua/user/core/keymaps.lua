@@ -46,6 +46,22 @@ if capabilities.render then
 end
 
 map("n", "<leader>gD", "<cmd>DiffDisk<cr>", { desc = "Diff disk" })
+-- Project-wide views work in every mode: symbols from a server that indexes the
+-- workspace or from ripgrep definition patterns, and the project's own checker
+-- into the quickfix list.
+map("n", "<leader>cS", function()
+	require("user.core.symbols").workspace()
+end, { desc = "Workspace symbols" })
+map("n", "<leader>cC", "<cmd>ProjectCheck<cr>", { desc = "Check project" })
+if not capabilities.decorations then
+	-- The todo-comments layer is an extra decoration; its explicit twin is a
+	-- project-wide search for the same keywords.
+	map("n", "<leader>ft", function()
+		require("user.core.symbols").todos()
+	end, { desc = "Todos" })
+end
+map("n", "<leader>ge", "<cmd>ExternalChanges<cr>", { desc = "Review external changes" })
+map("n", "<leader>uq", "<cmd>Quiet<cr>", { desc = "Toggle quiet (pause decoration layers)" })
 map("n", "<leader>f.", "<cmd>FileDir<cr>", { desc = "File directory" })
 map("n", "<leader>fd", "<cmd>DirectoryPick<cr>", { desc = "Find directory" })
 map("n", "<leader>fp", "<cmd>ProjectPick<cr>", { desc = "Find project" })

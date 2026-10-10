@@ -486,7 +486,23 @@ report.extra.function_object = vim.fn.getreg('"')
 	assert(not vim.tbl_contains(fast.disabled, "lint"), "Fast mode disabled manual lint")
 	assert(vim.tbl_contains(fast.disabled, "lint_on_write"), "Fast mode enabled lint on save")
 	assert(vim.tbl_contains(fast.disabled, "lint_live"), "Fast mode enabled live lint")
-	for _, lhs in ipairs({ "<Leader>tt", "<Leader>cl", "<Leader>gs", "s" }) do
+	assert(
+		vim.tbl_contains(fast.disabled, "workspace_diagnostics"),
+		"Fast mode does not report workspace diagnostics as disabled"
+	)
+	assert(fast.commands.Lint and fast.commands.ProjectCheck, "Fast mode lost its on-request commands")
+	for _, lhs in ipairs({
+		"<Leader>tt",
+		"<Leader>cl",
+		"<Leader>gs",
+		"<Leader>cS",
+		"<Leader>cC",
+		"<Leader>ft",
+		"<Leader>cf",
+		"<Leader>cd",
+		"<Leader>ud",
+		"s",
+	}) do
 		assert(fast.mappings[lhs], "Fast mode lost its on-request mapping " .. lhs)
 	end
 
@@ -942,7 +958,8 @@ table.sort(report.extra.paths)
 	)
 
 	-- 10. A mapping for a feature this mode does not run must not exist at all,
-	--     so it cannot become an implicit load entry.
+	--     so it cannot become an implicit load entry. (<Leader>ft stays: it is
+	--     the explicit twin of the todo-comments layer, a ripgrep search.)
 	for _, lhs in ipairs({
 		"<Leader>aa",
 		"<Leader>ap",
@@ -952,7 +969,6 @@ table.sort(report.extra.paths)
 		"<Leader>mo",
 		"<Leader>M",
 		"<Leader>e",
-		"<Leader>ft",
 	}) do
 		assert(not fast.mappings[lhs], "Fast mode kept " .. lhs .. " for a feature it does not load")
 	end

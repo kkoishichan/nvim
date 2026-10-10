@@ -70,6 +70,114 @@ local configured = false
 local original_commands = {}
 local node_commands = {}
 
+-- Servers that can analyse the whole project do so only in a mode that
+-- accepts the background cost, and only below a size the host accepts.
+local skipped_directories = {
+	[".git"] = true,
+	[".jj"] = true,
+	[".cache"] = true,
+	[".mypy_cache"] = true,
+	[".ruff_cache"] = true,
+	[".venv"] = true,
+	venv = true,
+	node_modules = true,
+	target = true,
+	dist = true,
+	build = true,
+	__pycache__ = true,
+}
+
+---Decisions taken for `:checkhealth user`, keyed by server and root.
+M.workspace_decisions = {}
+
+---Whether `server` should analyse all of `root`. Counts source files with the
+---given extensions, skipping dependency and build directories, up to the host
+---limit; the walk stops as soon as the limit is exceeded.
+---@param root string|nil
+---@param extensions table<string, true>
+---@param server string
+---@return boolean enabled, integer files
+function M.workspace_scope(root, extensions, server)
+	local limit = require("user.core.preferences").get("runtime").workspace_diagnostics_max_files
+	local allowed = require("user.core.mode").capabilities().workspace_diagnostics
+	local count = 0
+	if allowed and root then
+		for name, kind in
+			vim.fs.dir(root, {
+				depth = 32,
+				skip = function(directory)
+					return not skipped_directories[vim.fs.basename(directory)]
+				end,
+			})
+		do
+			if kind == "file" and extensions[name:match("%.([^.]+)$") or ""] then
+				count = count + 1
+				if count > limit then
+					break
+				end
+			end
+		end
+	end
+	local enabled = allowed and root ~= nil and count <= limit
+	M.workspace_decisions[server .. "\0" .. tostring(root)] = {
+		server = server,
+		root = root,
+		files = count,
+		limit = limit,
+		enabled = enabled,
+		reason = not allowed and "mode keeps servers in open-files mode"
+			or (count > limit and ("more than " .. limit .. " source files"))
+			or nil,
+	}
+	return enabled, count
+end
+
+-- The client keeps a reference to the settings table it was created with, so
+-- before_init has to change that table in place; replacing it would leave
+-- workspace/configuration answering from the original.
+---Whether a published diagnostic belongs to the project: files under the
+---root and outside node_modules, plus anything the user has actually opened.
+---Project-wide analysis otherwise reports TypeScript's own lib files and
+---vendored packages, which would drown the workspace counts.
+---@param root string|nil
+---@param path string
+---@param loaded boolean
+function M.project_diagnostic(root, path, loaded)
+	if loaded then
+		return true
+	end
+	path = vim.fs.normalize(path)
+	if path:find("/node_modules/", 1, true) then
+		return false
+	end
+	if not root then
+		return true
+	end
+	root = vim.fs.normalize(root)
+	return path == root or vim.startswith(path, root .. "/")
+end
+
+local function project_only_diagnostics(err, result, ctx)
+	if result and result.uri then
+		local client = vim.lsp.get_client_by_id(ctx.client_id)
+		local path = vim.uri_to_fname(result.uri)
+		if not M.project_diagnostic(client and client.root_dir, path, vim.fn.bufloaded(path) == 1) then
+			return
+		end
+	end
+	return vim.lsp.handlers["textDocument/publishDiagnostics"](err, result, ctx)
+end
+
+local function extend_settings(config, settings)
+	if type(config.settings) ~= "table" then
+		config.settings = settings
+		return
+	end
+	for key, value in pairs(vim.tbl_deep_extend("force", config.settings, settings)) do
+		config.settings[key] = value
+	end
+end
+
 local function node_lsp_command(name, args)
 	return function(dispatchers, config)
 		local root = (config or {}).root_dir
@@ -156,6 +264,21 @@ function M.configure(opts)
 				},
 			},
 		},
+		before_init = function(params, config)
+			if M.workspace_scope(config.root_dir, { py = true, pyi = true }, "basedpyright") then
+				extend_settings(config, {
+					python = { analysis = { diagnosticMode = "workspace" } },
+					basedpyright = { analysis = { diagnosticMode = "workspace" } },
+				})
+				-- A client that advertises pull diagnostics is served on request
+				-- only, and Neovim pulls per document: the unopened files of the
+				-- workspace would never be reported. Withhold the capability so
+				-- the server pushes for every tracked file instead.
+				if params.capabilities and params.capabilities.textDocument then
+					params.capabilities.textDocument.diagnostic = nil
+				end
+			end
+		end,
 	})
 
 	vim.lsp.config("biome", {
@@ -273,6 +396,27 @@ function M.configure(opts)
 		settings = {
 			vtsls = vtsls_settings,
 		},
+		handlers = {
+			["textDocument/publishDiagnostics"] = project_only_diagnostics,
+		},
+		before_init = function(_, config)
+			local sources = {
+				ts = true,
+				tsx = true,
+				mts = true,
+				cts = true,
+				js = true,
+				jsx = true,
+				mjs = true,
+				cjs = true,
+				vue = true,
+			}
+			if M.workspace_scope(config.root_dir, sources, "vtsls") then
+				extend_settings(config, {
+					typescript = { tsserver = { experimental = { enableProjectDiagnostics = true } } },
+				})
+			end
+		end,
 	})
 
 	vim.lsp.config("jsonls", {

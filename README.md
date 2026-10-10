@@ -371,7 +371,8 @@ NVIM_MODE=fast nvim path/to/file.py
 
 优先级为 `NVIM_MODE` > 主机偏好 > standard，与 SSH 环境无关。旧 `runtime.mode=auto` 按 standard 读取。
 模式切换清除重启子进程的 `NVIM_MODE`，应用刚保存的选择；父 shell 不变。
-standard 默认显示诊断下划线、标记和行尾短消息，extra 默认展开当前行消息；完整消息可通过 `<leader>cd` 查看，`<leader>ud` 循环消息样式。
+standard 默认显示诊断下划线、标记和行尾短消息，extra 默认展开当前行消息；完整消息可通过 `<leader>cd` 查看，`<leader>ud` 循环消息样式。项目级诊断走 `:ProjectCheck` / `<leader>cC`（ruff、tsc、cargo check、go vet、selene 之一，结果进 quickfix）；extra 另让 basedpyright 和 vtsls 在 `runtime.workspace_diagnostics_max_files` 门槛内分析整个工作区。`<leader>cS` 的工作区符号搜索在有支持的服务时实时查询，否则按文件类型的定义模式用 ripgrep 列出。
+extra 的每个自动行为在 standard / fast 都有显式入口（`<leader>ft` 搜 TODO、`<leader>cL` 按需 codelens 等）；`:Quiet` / `<leader>uq` 在会话内暂停并原状恢复常驻装饰层；`:ExternalChanges` / `<leader>ge` 审阅磁盘改动触发的重载并可回退。
 Biome / Tailwind 需项目配置或依赖，typos-lsp / Emmet 只通过 `:ManualLspStart <server>` 手动开启。
 Java / Rust 保留原有分析，调试和测试接入仅在 extra 中启用。
 
