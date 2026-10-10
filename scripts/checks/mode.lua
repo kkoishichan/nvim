@@ -452,7 +452,7 @@ report.extra.function_object = vim.fn.getreg('"')
 	-- this session genuinely does not have, so the list is a verified claim
 	-- rather than a label.
 	local evidence = {
-		automation = "persistence.nvim",
+		automation = "fcitx.nvim",
 		completion = "blink.cmp",
 		decorations = "vim-illuminate",
 		docking = "edgy.nvim",
