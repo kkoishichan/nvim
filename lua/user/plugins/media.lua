@@ -1,3 +1,7 @@
+if not require("user.core.mode").capabilities().render then
+	return {}
+end
+
 local function has_ui()
 	local has_magick = vim.fn.executable("magick") == 1
 		or (vim.fn.executable("convert") == 1 and vim.fn.executable("identify") == 1)

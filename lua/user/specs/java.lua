@@ -126,7 +126,7 @@ local function setup_java_keys(bufnr, jdtls, has_debug, has_test)
 		"Java extract method"
 	)
 
-	if not require("user.core.mode").capabilities().extended_workflows then
+	if not require("user.core.mode").capabilities().run then
 		return
 	end
 
@@ -211,7 +211,7 @@ local function start_jdtls(bufnr)
 	end
 
 	local bundles, has_debug, has_test = {}, false, false
-	if require("user.core.mode").capabilities().extended_workflows then
+	if require("user.core.mode").capabilities().run then
 		bundles, has_debug, has_test = java_bundles()
 	end
 	local capabilities = require("blink.cmp").get_lsp_capabilities()

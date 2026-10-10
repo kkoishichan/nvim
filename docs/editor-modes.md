@@ -20,6 +20,8 @@ standard 与 extra 的边界用五个动词判定，功能满足任何一条就�
 
 “按需打开、看完即走”的检视和导航工具属于 standard：文件树、标签栏、Peek、Problems 列表、Diffview 和终端开关都保留。保存是显式请求，所以保存时的格式化和 lint 也属于 standard。
 
+能力名按职责拆分为 `run`（DAP、Neotest、Overseer、AI，以及 Java/Rust 的调试与测试）、`render`（图片、PDF、文档和浏览器预览、VimTeX）、`automation`（自动工作流与输入法切换）、`docking`（Edgy 和 dashboard）。四项均只在 extra 开启，fast 和 standard 关闭；本次拆分只调整命名，三档行为不变。自动工作流保留 `session_auto`、`spell_auto`、`plugin_manager_auto` 等细项，读取和离开插入模式时的 lint 使用 `lint_live`，保存时的 lint 仍使用 `lint_on_write`。
+
 ## 功能取舍
 
 | 功能 | fast | standard | extra |

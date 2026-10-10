@@ -39,8 +39,8 @@ local function refresh_markview(bufnr)
 	end, 20)
 end
 
-return function(profile)
-	profile = profile or {}
+return function()
+	local capabilities = mode.capabilities()
 	local plugins = {}
 	table.insert(plugins, {
 		"mrcjkb/rustaceanvim",
@@ -62,7 +62,7 @@ return function(profile)
 					end,
 					cmd = { toolchain.executable("rust-analyzer") or "rust-analyzer" },
 					on_attach = function(_, bufnr)
-						if not profile.extra then
+						if not capabilities.run then
 							return
 						end
 						local function debug_continue()
@@ -101,7 +101,7 @@ return function(profile)
 				dap = {
 					autoload_configurations = false,
 					adapter = function()
-						if not profile.extra then
+						if not capabilities.run then
 							return false
 						end
 						local command = toolchain.executable("codelldb")
@@ -195,7 +195,7 @@ return function(profile)
 			end,
 		})
 	end
-	if profile.extra then
+	if capabilities.render then
 		table.insert(plugins, {
 			"OXY2DEV/markview.nvim",
 			ft = { "markdown", "quarto", "rmd", "typst", "tex", "plaintex", "latex" },
@@ -224,7 +224,7 @@ return function(profile)
 			},
 		})
 	end
-	if profile.extra then
+	if capabilities.render then
 		table.insert(plugins, {
 			"iamcco/markdown-preview.nvim",
 			cmd = { "MarkdownPreview", "MarkdownPreviewStop", "MarkdownPreviewToggle" },
@@ -275,7 +275,7 @@ return function(profile)
 			end,
 		})
 	end
-	if profile.extra then
+	if capabilities.render then
 		table.insert(plugins, {
 			"lervag/vimtex",
 			ft = { "tex", "plaintex", "bib" },
@@ -327,7 +327,7 @@ return function(profile)
 			end,
 		})
 	end
-	if profile.extra then
+	if capabilities.render then
 		table.insert(plugins, {
 			"brianhuster/live-preview.nvim",
 			cmd = "LivePreview",
@@ -357,7 +357,7 @@ return function(profile)
 			end,
 		})
 	end
-	if profile.extra then
+	if capabilities.render then
 		table.insert(plugins, {
 			"chomosuke/typst-preview.nvim",
 			cmd = {

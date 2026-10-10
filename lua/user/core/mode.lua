@@ -20,6 +20,7 @@ end
 -- and Tree-sitter highlighting, and drops the work that would otherwise run
 -- while a file is opened, typed into, saved or scrolled.
 local optional_capabilities = {
+	"automation", -- automatic workflows, including input-method switching
 	"codelens", -- inline LSP code lenses, refreshed as the buffer changes
 	"completion", -- Blink, snippets, automatic candidate menus
 	"conflicts", -- automatic Git conflict scanning and highlighting
@@ -28,20 +29,22 @@ local optional_capabilities = {
 	"diagnostics_expanded", -- automatic current-line virtual messages
 	"diagnostics_live", -- underline, virtual lines and live markers
 	"diagnostics_text", -- trailing virtual text for the diagnostic on each line
+	"docking", -- Edgy panel layout and dashboard
 	"explorer_extras", -- Oil watchers/icons/metadata columns, Neo-tree
-	"extended_workflows", -- DAP, tests, AI, media, preview, VimTeX, IME
 	"folding_provider", -- UFO and automatic fold computation
 	"format_on_save",
 	"git", -- Gitsigns, blame, diff watchers, Git statusline segments
 	"icons", -- Nerd Font glyphs in the interface
 	"inlay_hints_auto", -- inlay hints on attach
 	"lint", -- standalone linter available on request
-	"lint_auto",
+	"lint_live", -- standalone lint on read and InsertLeave, in addition to saves
 	"lint_on_write", -- standalone linter runs after a save (BufWritePost only)
 	"auxiliary_lsp", -- automatic Emmet/typos and unrestricted optional project servers
 	"lsp_auto", -- language servers started without an explicit request
 	"picker_extras", -- picker icons and automatic preview
 	"plugin_manager_auto", -- install of missing plugins, change detection
+	"render", -- images, PDF, markup and browser previews, VimTeX
+	"run", -- debugging, tests, tasks and AI agents
 	"scroll_animation",
 	"session_auto", -- save a workspace on exit
 	"session", -- manual workspace save/restore

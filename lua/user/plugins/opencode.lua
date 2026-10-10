@@ -1,3 +1,7 @@
+if not require("user.core.mode").capabilities().run then
+	return {}
+end
+
 return {
 	{
 		"nickjvandyke/opencode.nvim",

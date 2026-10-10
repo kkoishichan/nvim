@@ -109,7 +109,7 @@ return function(profile)
 			vim.g.undotree_ShortIndicators = 1
 		end,
 	})
-	if profile.extra then
+	if require("user.core.mode").capabilities().automation then
 		table.insert(plugins, {
 			"h-hg/fcitx.nvim",
 			event = "VeryLazy",

@@ -10,7 +10,7 @@ return function(tmp)
 		"Standard lost automatic editing capabilities"
 	)
 	assert(
-		cap.session and not cap.session_auto and cap.lint and not cap.lint_auto,
+		cap.session and not cap.session_auto and cap.lint and not cap.lint_live,
 		"Standard enabled live lint or automatic sessions"
 	)
 	assert(
@@ -19,7 +19,10 @@ return function(tmp)
 	)
 	assert(
 		not cap.decorations
-			and not cap.extended_workflows
+			and not cap.run
+			and not cap.render
+			and not cap.automation
+			and not cap.docking
 			and not cap.auxiliary_lsp
 			and not cap.codelens
 			and not cap.inlay_hints_auto,
@@ -225,7 +228,7 @@ return function(tmp)
 	for _, name in ipairs(selected) do
 		assert(vim.tbl_contains(extra, name), "Standard plugin missing from extra: " .. name)
 	end
-	assert(mode.name() == "standard" and not mode.capabilities().lint_auto, "Asset selection changed the active mode")
+	assert(mode.name() == "standard" and not mode.capabilities().lint_live, "Asset selection changed the active mode")
 	print(
 		("Asset evidence: fast %d, standard %d, extra %d locked plugins; runtime and deployment agree"):format(
 			#fast,

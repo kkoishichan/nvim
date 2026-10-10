@@ -474,9 +474,9 @@ vim.api.nvim_create_user_command("DirectoryPick", pick_directory, {
 	desc = "Pick a directory, set cwd, and open it",
 })
 
--- PDF viewing and Typst builds belong to the extended workflows; a mode that
+-- PDF viewing and Typst builds belong to rendering; a mode that
 -- does not install their dependencies should not advertise their commands.
-if capabilities.extended_workflows then
+if capabilities.render then
 	local function pdf_target_from_current_file()
 		if type(vim.b.pdf_preview_file) == "string" and vim.b.pdf_preview_file ~= "" then
 			return vim.b.pdf_preview_file

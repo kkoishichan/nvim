@@ -77,7 +77,7 @@ vim.api.nvim_create_autocmd("VimLeavePre", {
 	callback = cleanup_lifecycle,
 })
 
-if capabilities.extended_workflows then
+if capabilities.render then
 	require("user.core.pdf")
 end
 require("user.core.sensitive").setup()
@@ -443,7 +443,7 @@ vim.api.nvim_create_autocmd({ "InsertLeave", "TextChanged" }, {
 	end,
 })
 
-if capabilities.extended_workflows then
+if capabilities.render then
 	require("user.core.pdf_registration").setup({
 		augroup = augroup,
 		lifecycle = lifecycle,

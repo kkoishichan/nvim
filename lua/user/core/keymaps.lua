@@ -41,7 +41,7 @@ if capabilities.workspace_tools then
 	end, { desc = "Dictionary" })
 end
 
-if capabilities.extended_workflows then
+if capabilities.render then
 	map("n", "<leader>mo", "<cmd>PdfOpen<cr>", { desc = "Open PDF" })
 end
 
@@ -269,7 +269,7 @@ map("n", "<leader>L", "<cmd>Lazy<cr>", { desc = "Lazy" })
 if capabilities.lsp_auto then
 	map("n", "<leader>M", "<cmd>Mason<cr>", { desc = "Mason" })
 end
-if capabilities.extended_workflows then
+if capabilities.run then
 	local function ai(method)
 		return function(...)
 			return require("user.core.ai")[method](...)

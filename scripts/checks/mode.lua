@@ -158,7 +158,9 @@ vim.cmd("qa!")
 	local default = run("default")
 	assert(default.mode == "standard", "An unconfigured host did not start in standard mode: " .. default.mode)
 	assert(default.source:match("^default"), "Standard mode was not reported as the default: " .. default.source)
-	assert(vim.tbl_contains(default.disabled, "extended_workflows"), "Standard mode kept extended workflows")
+	for _, capability in ipairs({ "run", "render", "automation", "docking", "lint_live" }) do
+		assert(vim.tbl_contains(default.disabled, capability), "Standard mode kept " .. capability)
+	end
 	assert(default.clipboard == "unnamedplus" and default.cursorline, "Full mode changed its editing defaults")
 
 	-- 2. Priority: the environment wins, then the host preference, then default.
@@ -450,12 +452,15 @@ report.extra.function_object = vim.fn.getreg('"')
 	-- this session genuinely does not have, so the list is a verified claim
 	-- rather than a label.
 	local evidence = {
+		automation = "persistence.nvim",
 		completion = "blink.cmp",
 		decorations = "vim-illuminate",
+		docking = "edgy.nvim",
 		explorer_extras = "neo-tree.nvim",
-		extended_workflows = "nvim-dap",
 		folding_provider = "nvim-ufo",
 		git = "gitsigns.nvim",
+		render = "markview.nvim",
+		run = "nvim-dap",
 		scroll_animation = "neoscroll.nvim",
 		session = "persistence.nvim",
 		signature = "blink.cmp",
@@ -480,6 +485,7 @@ report.extra.function_object = vim.fn.getreg('"')
 	)
 	assert(not vim.tbl_contains(fast.disabled, "lint"), "Fast mode disabled manual lint")
 	assert(vim.tbl_contains(fast.disabled, "lint_on_write"), "Fast mode enabled lint on save")
+	assert(vim.tbl_contains(fast.disabled, "lint_live"), "Fast mode enabled live lint")
 	for _, lhs in ipairs({ "<Leader>tt", "<Leader>cl", "<Leader>gs", "s" }) do
 		assert(fast.mappings[lhs], "Fast mode lost its on-request mapping " .. lhs)
 	end

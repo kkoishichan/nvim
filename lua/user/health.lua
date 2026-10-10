@@ -22,9 +22,9 @@ local extra_tools = {
 }
 
 function M.packages()
-	local extra = require("user.core.mode").capabilities().extended_workflows
+	local run = require("user.core.mode").capabilities().run
 	return vim.tbl_filter(function(item)
-		return extra or not extra_tools[item[1]]
+		return run or not extra_tools[item[1]]
 	end, require("user.toolchain").packages)
 end
 
@@ -198,7 +198,7 @@ function M.check()
 		end
 	end
 	local python = toolchain.python_resolve(bufnr)
-	local debugpy = capabilities.extended_workflows and toolchain.debugpy_host() or nil
+	local debugpy = capabilities.run and toolchain.debugpy_host() or nil
 	if python.path then
 		health.ok(
 			"Python target: "

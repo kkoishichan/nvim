@@ -1,6 +1,6 @@
 local toolchain = require("user.toolchain")
 return function()
-	local automatic = require("user.core.mode").capabilities().lint_auto
+	local automatic = require("user.core.mode").capabilities().lint_live
 	local on_write = require("user.core.mode").capabilities().lint_on_write
 	return {
 		{

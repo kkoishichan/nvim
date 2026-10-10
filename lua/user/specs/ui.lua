@@ -49,7 +49,7 @@ local function dashboard_header()
 end
 
 local function pdf_page()
-	if not require("user.core.mode").capabilities().extended_workflows then
+	if not require("user.core.mode").capabilities().render then
 		return ""
 	end
 	return require("user.core.pdf").page()
@@ -206,7 +206,7 @@ return function(profile)
 		opts = {
 			bigfile = { enabled = false },
 			dashboard = {
-				enabled = profile.extra == true,
+				enabled = require("user.core.mode").capabilities().docking,
 				width = 50,
 				preset = {
 					header = dashboard_header(),

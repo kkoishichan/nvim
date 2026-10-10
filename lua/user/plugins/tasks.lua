@@ -1,3 +1,7 @@
+if not require("user.core.mode").capabilities().run then
+	return {}
+end
+
 local project = require("user.core.project")
 
 local function task_belongs_to(task, root)

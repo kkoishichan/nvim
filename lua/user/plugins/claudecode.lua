@@ -1,3 +1,7 @@
+if not require("user.core.mode").capabilities().run then
+	return {}
+end
+
 -- Claude Code's official-style IDE integration: a WebSocket server that the
 -- `claude` CLI connects to (same protocol as the VS Code / JetBrains
 -- extensions), running Claude Code in a terminal split with selection sharing,

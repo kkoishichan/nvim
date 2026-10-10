@@ -1,3 +1,7 @@
+if not require("user.core.mode").capabilities().run then
+	return {}
+end
+
 local function testing()
 	return require("user.core.testing")
 end

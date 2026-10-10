@@ -1,3 +1,7 @@
+if not require("user.core.mode").capabilities().docking then
+	return {}
+end
+
 -- Modern-IDE panel docking. Every auxiliary window gets one fixed home, so the
 -- layout is always identical instead of "whoever opens first takes the space".
 -- The zones mirror VSCode / JetBrains tool-window regions:

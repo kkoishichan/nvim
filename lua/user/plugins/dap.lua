@@ -1,3 +1,7 @@
+if not require("user.core.mode").capabilities().run then
+	return {}
+end
+
 local toolchain = require("user.toolchain")
 local float_style = require("user.core.float_style")
 
