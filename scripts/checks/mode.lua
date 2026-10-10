@@ -172,16 +172,15 @@ vim.cmd("qa!")
 	assert(legacy.mode == "extra" and #legacy.disabled == 0, "Legacy full preference lost features")
 	local explicit_extra = run("explicit_extra", { mode = "extra" })
 	assert(explicit_extra.mode == "extra" and #explicit_extra.disabled == 0, "Extra mode is incomplete")
-	local picker = run("mode_picker", {
+	local selection = run("mode_selection", {
 		code = [[
 local preferences = require("user.core.preferences")
 local requests = 0
 package.loaded["user.core.mode_restart"] = { restart = function() requests = requests + 1 end }
-vim.ui.select = function(items, _, choose)
- assert(vim.deep_equal(items, { "fast", "standard", "extra", "auto" }), "Mode picker choices drifted")
- choose("extra")
+vim.ui.select = function()
+ error("Mode selection opened a picker")
 end
-vim.cmd.EditorMode()
+vim.cmd("EditorMode extra")
 report.extra.saved = preferences.get("runtime").mode
 report.extra.current = mode.name()
 report.extra.requests = requests
@@ -190,10 +189,10 @@ report.extra.alias = preferences.get("runtime").mode
 ]],
 	})
 	assert(
-		picker.extra.saved == "extra" and picker.extra.current == "standard" and picker.extra.requests == 1,
-		"Mode picker did not save/restart without changing the active session"
+		selection.extra.saved == "extra" and selection.extra.current == "standard" and selection.extra.requests == 1,
+		"Mode selection did not save/restart without changing the active session"
 	)
-	assert(picker.extra.alias == "extra", "EditorMode full was not canonicalized")
+	assert(selection.extra.alias == "extra", "EditorMode full was not canonicalized")
 
 	local invalid = run("invalid", { mode = "turbo", preferences = { runtime = { mode = "fast" } } })
 	assert(invalid.mode == "fast", "An unknown NVIM_MODE did not fall back to the host preference")
@@ -223,7 +222,11 @@ local preferences = require("user.core.preferences")
 vim.cmd("FastModeToggle")
 report.extra.saved = preferences.get()
 report.extra.current = mode.name()
-report.extra.mapping = vim.fn.maparg("<leader>um", "n")
+report.extra.mappings = {}
+for _, key in ipairs({ "f", "s", "e", "a" }) do
+ report.extra.mappings[key] = vim.fn.maparg("<leader>um" .. key, "n")
+end
+report.extra.removed_prefix = vim.fn.maparg("<leader>um", "n")
 report.extra.removed_mapping = vim.fn.maparg("<leader>uf", "n")
 vim.cmd("FastModeToggle")
 report.extra.retried = preferences.get("runtime").mode
@@ -245,7 +248,10 @@ vim.cmd("FastMode on")
 		toggled.extra.toggled_back == "standard",
 		"An explicit current-mode selection did not cancel the pending change"
 	)
-	assert(toggled.extra.mapping:find("EditorMode", 1, true), "Editor mode picker mapping missing")
+	for key, name in pairs({ f = "fast", s = "standard", e = "extra", a = "auto" }) do
+		assert(toggled.extra.mappings[key]:find("EditorMode " .. name, 1, true), "Mode mapping missing: um" .. key)
+	end
+	assert(toggled.extra.removed_prefix == "", "Mode prefix still opens a picker")
 	assert(toggled.extra.removed_mapping == "", "Removed fast mode toggle mapping is still present")
 	local restarted = run(
 		"persistent_toggle",

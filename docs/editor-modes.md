@@ -32,7 +32,7 @@
 
 ## 切换与兼容
 
-- `<leader>um` 或 `:EditorMode` 打开和主题选择相同样式的弹窗，标记当前模式；也可执行 `:EditorMode fast|standard|extra|auto`。
+- `<leader>umf` 选择 fast，`<leader>ums` 选择 standard，`<leader>ume` 选择 extra，`<leader>uma` 选择 auto；直接执行，不打开模式选择弹窗。也可执行 `:EditorMode fast|standard|extra|auto`。
 - 选择写入 `preferences.json` 的 `runtime.mode`，随后通过原生重启应用。
 - 兼容命令 `:FastModeToggle`：standard 或 extra → fast，fast → standard；`:FastMode off` 明确选择 standard，`on` 选择 fast，`auto` 选择自动规则。
 - `NVIM_MODE` 优先于主机偏好，其次才是默认 standard。`auto` 在 SSH 环境选择 fast，本地选择 standard。

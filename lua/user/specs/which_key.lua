@@ -65,6 +65,7 @@ return function()
 					{ "<leader>s", group = "session" },
 					{ "<leader>t", group = "terminal" },
 					{ "<leader>u", group = "ui" },
+					{ "<leader>um", group = "editor mode" },
 					{ "<leader>v", group = "multicursor" },
 					{ "<leader>x", group = "diagnostics" },
 					{ "gs", group = "surround" },

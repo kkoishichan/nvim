@@ -26,7 +26,7 @@
 
 ## 启动与切换
 
-按 `<leader>um`（空格、u、m）打开与主题选择相同样式的模式弹窗，或用 `:EditorMode fast` 选择快速模式。
+按 `<leader>umf`（空格、u、m、f）直接选择快速模式；同组的 `ums`、`ume`、`uma` 分别选择 standard、extra、auto（均带 leader）。也可用 `:EditorMode fast`。
 兼容命令 `:FastModeToggle` 以及 `:FastMode on`、`:FastMode off`（standard）、`:FastMode auto` 仍可使用；不带参数的 `:FastMode`
 等同切换。设置写入 `preferences.json` 后自动原地重启；切换以当前运行模式为准。
 有未保存修改时显示原生确认框，取消会保留当前进程和已保存的选择，再次切换可重试。

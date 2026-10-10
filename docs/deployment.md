@@ -50,7 +50,7 @@ standard 选中 47 个插件并保留完整 parser 目录，extra 选中 83 个�
 
 显式追加 `--profile` 时，还会准备并校验锁定的 Mason 安装器。工具安装运行在独立进程，
 不依赖完整模式，也不会把 Mason 加入快速模式的日常插件集。从 fast 重新部署为 standard/extra
-会同步修改保存的默认模式。日常可用 `<leader>um` / `:EditorMode` 选择并保存三档模式、自动重启；`FastMode off` 选择 standard。
+会同步修改保存的默认模式。日常可用 `<leader>umf` / `ums` / `ume` / `uma`（均带 leader）直接选择 fast / standard / extra / auto，持久保存并自动重启；也可用 `:EditorMode <模式>`，`FastMode off` 选择 standard。
 
 搜索依赖（fzf、ripgrep、fd）在快速模式下是可选的：缺少时给出警告并继续，编辑器使用原生打开、补全和 quickfix 搜索入口。构建 parser 仍需要 C 编译器和固定版本的 tree-sitter CLI。
 
