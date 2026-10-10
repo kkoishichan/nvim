@@ -2,6 +2,24 @@
 
 2026-10-10 实现。没有环境覆盖和主机偏好时，默认使用 `standard`；`extra` 保留原完整模式的功能，`fast` 面向服务器及轻量编辑。模式决定插件和自动工作的范围，主题、透明开关、弹窗样式、大文件阈值及鼠标输入协议保持原有设置。
 
+三档按编辑工作的职责划分：
+
+| 档 | 定位 | 做什么 | 不做什么 |
+| --- | --- | --- | --- |
+| fast | 编辑器 | 编辑、高亮、手动唤起语言能力 | 不自动启动任何进程 |
+| standard | 工作区编辑器 | 编辑、导航、检视：在项目里移动、看文件和代码的状态、改代码 | 不执行、不渲染、不自动化、不接管布局、不常驻扫描 |
+| extra | IDE | 在 standard 之上加执行、渲染、自动化、停靠布局和常驻装饰层 | 无 |
+
+standard 与 extra 的边界用五个动词判定，功能满足任何一条就归 extra：
+
+1. **执行**：启动或驱动进程来跑代码，包括调试、测试、任务编排和 AI 代理。
+2. **渲染**：把非文本内容画进编辑器，包括图片、PDF、Markdown 与 Typst 渲染和浏览器预览。
+3. **自动化**：不经用户请求就做事，包括读取或离开插入模式时的 lint、自动会话、自动拼写、插件自动安装和输入法切换。
+4. **停靠**：接管窗口布局，包括 Edgy 和 dashboard。
+5. **常驻**：随光标或重绘持续计算的装饰层，包括 matchup、illuminate、缩进线、颜色、TODO、lightbulb、dropbar、scrollview 和行内 blame。
+
+“按需打开、看完即走”的检视和导航工具属于 standard：文件树、标签栏、Peek、Problems 列表、Diffview 和终端开关都保留。保存是显式请求，所以保存时的格式化和 lint 也属于 standard。
+
 ## 功能取舍
 
 | 功能 | fast | standard | extra |
@@ -9,26 +27,27 @@
 | 主题、Tree-sitter 高亮、基础编辑、leader 菜单 | 保留 | 保留 | 保留 |
 | 自动补全、片段、Blink 签名 | 原生手动补全 | 保留 | 保留 |
 | 主要 LSP | 手动启动 | 自动启动 | 自动启动 |
-| 诊断显示 | 默认手动查看 | 下划线和标记；消息按需查看 | 原有当前行展开消息 |
+| 诊断显示 | 默认手动查看 | 下划线、标记和行尾短消息 | 当前行展开消息 |
 | 格式化 | 手动 | 保存时格式化 | 保存时格式化 |
-| 独立 lint | 不加载 | `<leader>cl` / `:Lint` 手动 | 原有自动检查，也可手动 |
+| 独立 lint | 不加载 | 保存时自动运行，`<leader>cl` / `:Lint` 手动 | 另在读取和离开插入模式时运行 |
 | 文件浏览与搜索 | 精简 Oil / fzf，无默认预览 | Oil、Neo-tree、fzf 预览 | 保留全部 |
-| Git | 原生终端操作 | Gitsigns、Lazygit、Diffview | 保留全部 |
+| Git | 原生终端操作 | Gitsigns、Lazygit、Diffview；行内 blame 默认关，`<leader>ghB` 开 | 保留全部，行内 blame 默认开 |
 | 折叠与代码查看 | 手动折叠 | UFO、Glance、Trouble、bqf | 保留全部 |
 | 编辑工具 | mini 基础编辑 | surround、align、move、文本对象、Flash、多光标、grug-far、undotree、neogen | 保留全部 |
-| 常用界面 | 原生状态栏 | bufferline、lualine、sticky context、通知 | 另有 dropbar、scrollview、Outline、Edgy、dashboard、scratch |
+| 常用界面 | 原生状态栏 | bufferline、lualine、sticky context、通知、Outline、scratch | 另有 dropbar、scrollview、Edgy、dashboard |
 | 键盘滚动动画 | 关闭 | 保留 | 保留 |
 | 终端 | 原生 `:terminal` | ToggleTerm | ToggleTerm、Overseer 任务编排 |
 | 会话 | 不自动保存 | 手动保存和恢复 | 原有自动保存和手动恢复 |
 | swap / 持久 undo | 保留 swap；undo 可选 | 保留 | 保留 |
 | matchup、引用高亮、缩进线、颜色预览、TODO、lightbulb | 关闭 | 关闭 | 保留 |
-| 自动拼写、输入法、词典 | 关闭 | 关闭 | 保留 |
+| 词典 | 关闭 | `<leader>k` 按需检视 | 保留 |
+| 自动拼写、输入法 | 关闭 | 关闭 | 保留 |
 | DAP、Neotest、AI、图片/PDF、文档渲染与浏览器预览 | 关闭 | 关闭 | 保留 |
 | 自动下载缺失插件、配置变更检测 | 关闭 | 关闭 | 保留原行为 |
 
-标准模式的白名单还包括 ts-comments、Tree-sitter 文本对象和 lazydev；不启用 faster.nvim 的事件屏蔽。扩展功能不会留下触发加载的快捷键、自动事件或后台定时器。三个模式复用配置工厂，standard 不先执行 extra 模块再过滤。
+标准模式的白名单还包括 ts-comments、Tree-sitter 文本对象、lazydev 和 crates.nvim 的 Cargo.toml 检视与补全；不启用 faster.nvim 的事件屏蔽。扩展功能不会留下触发加载的快捷键、自动事件或后台定时器。三个模式复用配置工厂，standard 不先执行 extra 模块再过滤。
 
-以默认 VS Code 主题计算，选中的锁定插件数为 fast **9**、standard **47**、extra **83**，包含依赖及 headless 下条件禁用但仍需准备的插件。fast 选择内置 `default` 主题时为 8 个。standard/extra 保留完整 43 个 parser，fast 默认为 13 个，可显式追加。
+以默认 VS Code 主题计算，选中的锁定插件数为 fast **9**、standard **50**、extra **83**，包含依赖及 headless 下条件禁用但仍需准备的插件。fast 选择内置 `default` 主题时为 8 个。standard/extra 保留完整 43 个 parser，fast 默认为 13 个，可显式追加。
 
 ## 切换与兼容
 
@@ -55,9 +74,9 @@ typos-lsp 和 Emmet 不自动启用，可执行 `:ManualLspStart typos_lsp` 或 
 
 standard 的 Java/Rust 保留原有分析能力，Java 不加载调试/测试 bundles 或对应映射，Rust 不配置 DAP；fast 的 Rust 才使用关闭保存检查、构建脚本和过程宏的精简设置。打开语言服务仍会带来同步、索引和分析成本，standard 不承诺达到无 LSP 的 fast 速度。
 
-standard 默认只绘制诊断下划线和标记，`<leader>cd` 查看消息，`<leader>cD` 查看位置列表，`<leader>ud` 仍能循环展开行、行尾文字和关闭消息。保存时格式化保留原有 800 ms 默认预算及开关。
+standard 默认绘制诊断下划线、标记和行尾短消息，`<leader>cd` 查看完整消息，`<leader>cD` 查看位置列表，`<leader>ud` 仍能循环展开行、行尾文字和关闭消息。extra 默认展开当前行消息。保存时格式化保留原有 800 ms 默认预算及开关。
 
-独立检查仅通过 `<leader>cl` / `:Lint` 启动，第一次使用后仍不会变为自动检查。**SQL 的 Sqruff 是唯一诊断来源，因此 standard 的 SQL 诊断需要手动触发**；sql-language-server 继续提供补全等能力。Selene、Stylelint 和 golangci-lint 仍需项目配置。
+standard 的独立检查在保存时自动运行，也可通过 `<leader>cl` / `:Lint` 手动启动；读取和离开插入模式不会触发检查，extra 另在这两个时机自动运行。**SQL 的 Sqruff 是唯一诊断来源，standard 保存时自动检查**；sql-language-server 继续提供补全等能力。Selene、Stylelint 和 golangci-lint 仍需项目配置。
 
 standard 会话键位为 `<leader>sw` / `:SessionSave` 保存，`<leader>ss` 恢复当前工作区，`<leader>sS` 选择，`<leader>sl` 恢复最近会话。extra 另保留退出自动保存及 `<leader>sd` 停止自动保存；两档共用原有会话格式和未保存文件保护。
 
@@ -77,6 +96,6 @@ standard 和 fast 普通启动不下载、不更新插件。新机器先部署�
 
 ## 验收
 
-`./scripts/check.sh` 显式准备验证完整 extra 功能，并加入 standard 行为组；CI 使用 extra 准备完整依赖。仅验收 standard 安装可运行 `./scripts/check.sh standard`，只要求其选中插件。覆盖模式优先级、旧 full 兼容、持久化和取消重启、插件/映射隔离、手动 lint/会话、Java/Rust 定义保护、部署一致性及现有界面行为。
+`./scripts/check.sh` 显式准备验证完整 extra 功能，并加入 standard 行为组；CI 使用 extra 准备完整依赖。仅验收 standard 安装可运行 `./scripts/check.sh standard`，只要求其选中插件。覆盖模式优先级、旧 full 兼容、持久化和取消重启、插件/映射隔离、保存与手动 lint、手动会话、Java/Rust 定义保护、部署一致性及现有界面行为。
 
 五轮交错测量及限制见[三档性能测量](editor-mode-measurements.md)。fast 的服务器细节见[快速模式文档](fast-mode.md)。性能数据反映功能取舍，不能将 PTY 内重绘耗时等同于真实 kitty 绘制、触控板驱动或 SSH 网络延迟。

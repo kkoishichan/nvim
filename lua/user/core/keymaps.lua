@@ -32,13 +32,16 @@ map("n", "<C-Down>", "<cmd>resize -2<cr>", { desc = "Decrease height" })
 map("n", "<C-Left>", "<cmd>vertical resize -2<cr>", { desc = "Decrease width" })
 map("n", "<C-Right>", "<cmd>vertical resize +2<cr>", { desc = "Increase width" })
 
-if capabilities.extended_workflows then
+if capabilities.workspace_tools then
 	map("n", "<leader>k", function()
 		require("user.core.dict").lookup()
 	end, { desc = "Dictionary" })
 	map("x", "<leader>k", function()
 		require("user.core.dict").lookup_visual()
 	end, { desc = "Dictionary" })
+end
+
+if capabilities.extended_workflows then
 	map("n", "<leader>mo", "<cmd>PdfOpen<cr>", { desc = "Open PDF" })
 end
 

@@ -112,7 +112,7 @@ return {
 				changedelete = { text = "┃" },
 				untracked = { text = "┆" },
 			},
-			current_line_blame = true,
+			current_line_blame = require("user.core.mode").capabilities().decorations,
 			current_line_blame_opts = {
 				virt_text = true,
 				virt_text_pos = "eol",

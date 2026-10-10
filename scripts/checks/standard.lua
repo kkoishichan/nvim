@@ -1,5 +1,5 @@
 -- Profile boundaries are behavioral: omitted features must leave no lazy
--- entry, and manual workflows must remain manual after their first use.
+-- entry, and save-triggered lint must not turn into live checking.
 return function(tmp)
 	local api = vim.api
 	local mode = require("user.core.mode")
@@ -11,7 +11,11 @@ return function(tmp)
 	)
 	assert(
 		cap.session and not cap.session_auto and cap.lint and not cap.lint_auto,
-		"Standard enabled automatic lint or sessions"
+		"Standard enabled live lint or automatic sessions"
+	)
+	assert(
+		cap.workspace_tools and cap.lint_on_write and cap.diagnostics_text,
+		"Standard lost workspace inspection capabilities"
 	)
 	assert(
 		not cap.decorations and not cap.extended_workflows and not cap.auxiliary_lsp,
@@ -34,6 +38,8 @@ return function(tmp)
 		"gitsigns.nvim",
 		"diffview.nvim",
 		"neoscroll.nvim",
+		"outline.nvim",
+		"crates.nvim",
 	}) do
 		assert(plugins[name], "Standard lost " .. name)
 	end
@@ -54,13 +60,11 @@ return function(tmp)
 		"nvim-lightbulb",
 		"dropbar.nvim",
 		"nvim-scrollview",
-		"outline.nvim",
 		"edgy.nvim",
 		"persistence.nvim",
 		"overseer.nvim",
 		"fcitx.nvim",
 		"faster.nvim",
-		"crates.nvim",
 	}) do
 		assert(not plugins[name], "Standard registered extra plugin " .. name)
 	end
@@ -70,15 +74,17 @@ return function(tmp)
 	assert(not package.loaded["user.core.pdf"], "Statusline eagerly loaded PDF support")
 	local snacks = require("lazy.core.plugin").values(plugins["snacks.nvim"], "opts", false)
 	assert(
-		not snacks.dashboard.enabled and not snacks.scratch.enabled and snacks.input.enabled,
+		not snacks.dashboard.enabled and snacks.scratch.enabled and snacks.input.enabled,
 		"Snacks profile is incorrect"
 	)
+	local scratch_mapping = false
 	for _, mapping in ipairs(api.nvim_get_keymap("n")) do
-		assert(mapping.lhs ~= " .", "Standard retained the scratch entry")
+		scratch_mapping = scratch_mapping or mapping.lhs == " ."
 	end
+	assert(scratch_mapping, "Standard lost the scratch entry")
 	local diagnostic = vim.diagnostic.config()
 	assert(
-		diagnostic.underline and diagnostic.signs and not diagnostic.virtual_lines and not diagnostic.virtual_text,
+		diagnostic.underline and diagnostic.signs and diagnostic.virtual_text and not diagnostic.virtual_lines,
 		"Standard diagnostic display is incorrect"
 	)
 	assert(vim.o.undofile and vim.o.swapfile, "Standard lost recovery data")
@@ -98,11 +104,16 @@ return function(tmp)
 	local lint = require("lint")
 	local calls, original = 0, lint.try_lint
 	lint.try_lint = function(names)
-		assert(vim.deep_equal(names, { "sqruff" }), "Manual SQL check selected the wrong provider")
+		assert(vim.deep_equal(names, { "sqruff" }), "SQL check selected the wrong provider")
 		calls = calls + 1
 	end
 	require("lazy").load({ plugins = { "nvim-lspconfig" } })
 	vim.lsp.enable(require("user.core.lsp_definitions").resolve(), false)
+	local toolchain = require("user.toolchain")
+	local executable = toolchain.executable
+	toolchain.executable = function(name, ...)
+		return name == "sqruff" and "/fixture/sqruff" or executable(name, ...)
+	end
 	local file = tmp .. "/manual.sql"
 	vim.fn.writefile({ "select 1;" }, file)
 	vim.cmd.edit(vim.fn.fnameescape(file))
@@ -110,17 +121,24 @@ return function(tmp)
 		return false
 	end, 25)
 	assert(calls == 0, "Opening a standard buffer ran standalone lint")
-	for _, event in ipairs({ "BufReadPost", "BufWritePost", "InsertLeave" }) do
-		assert(#api.nvim_get_autocmds({ group = "user_lint", event = event }) == 0, "Manual lint registered " .. event)
+	assert(require("gitsigns.config").config.current_line_blame == false, "Standard enabled current-line blame")
+	assert(#api.nvim_get_autocmds({ group = "user_lint", event = "BufWritePost" }) > 0, "Lint on write is missing")
+	for _, event in ipairs({ "BufReadPost", "InsertLeave" }) do
+		assert(
+			#api.nvim_get_autocmds({ group = "user_lint", event = event }) == 0,
+			"Save-only lint registered " .. event
+		)
 	end
-	local toolchain = require("user.toolchain")
-	local executable = toolchain.executable
-	toolchain.executable = function(name, ...)
-		return name == "sqruff" and "/fixture/sqruff" or executable(name, ...)
-	end
+	vim.cmd.write()
+	assert(
+		vim.wait(1000, function()
+			return calls == 1
+		end, 25),
+		"Saving SQL did not run Sqruff once"
+	)
 	vim.cmd.Lint()
 	toolchain.executable = executable
-	assert(calls == 1, "Manual SQL lint did not run Sqruff")
+	assert(calls == 2, "Manual SQL lint did not run Sqruff after saving")
 	lint.try_lint = original
 	assert(require("user.core.session").save(tmp .. "/manual.vim"), "Manual session save failed")
 	assert(vim.fn.filereadable(tmp .. "/manual.vim") == 1, "Manual session was not written")
@@ -212,6 +230,6 @@ return function(tmp)
 		)
 	)
 	print(
-		"Standard evidence: primary editing/UI retained; extra plugins absent; manual lint/session stay manual; auxiliary LSPs gated; Java/Rust definitions preserved"
+		"Standard evidence: primary editing/UI retained; workspace tools present; lint on write; extra plugins absent; manual sessions stay manual; auxiliary LSPs gated; Java/Rust definitions preserved"
 	)
 end

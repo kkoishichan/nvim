@@ -148,7 +148,26 @@ end
 
 return function(profile)
 	profile = profile or {}
+	local workspace_tools = require("user.core.mode").capabilities().workspace_tools
 	local plugins = vim.list_extend(require("user.specs.theme")(), require("user.specs.which_key")())
+	local snacks_keys = {
+		{
+			"<leader>z",
+			function()
+				Snacks.zen()
+			end,
+			desc = "Zen mode",
+		},
+	}
+	if workspace_tools then
+		table.insert(snacks_keys, 1, {
+			"<leader>.",
+			function()
+				Snacks.scratch()
+			end,
+			desc = "Scratch buffer",
+		})
+	end
 	table.insert(plugins, {
 		"nvim-mini/mini.icons",
 		lazy = false,
@@ -242,7 +261,7 @@ return function(profile)
 			picker = { enabled = false },
 			quickfile = { enabled = false },
 			scroll = { enabled = false },
-			scratch = { enabled = profile.extra == true },
+			scratch = { enabled = workspace_tools },
 			terminal = { enabled = false },
 			words = { enabled = false },
 			styles = {
@@ -274,30 +293,7 @@ return function(profile)
 				},
 			},
 		},
-		keys = profile.extra and {
-			{
-				"<leader>.",
-				function()
-					Snacks.scratch()
-				end,
-				desc = "Scratch buffer",
-			},
-			{
-				"<leader>z",
-				function()
-					Snacks.zen()
-				end,
-				desc = "Zen mode",
-			},
-		} or {
-			{
-				"<leader>z",
-				function()
-					Snacks.zen()
-				end,
-				desc = "Zen mode",
-			},
-		},
+		keys = snacks_keys,
 	})
 	table.insert(plugins, {
 		"karb94/neoscroll.nvim",

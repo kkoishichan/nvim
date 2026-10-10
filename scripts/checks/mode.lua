@@ -438,12 +438,14 @@ report.extra.mini_after = package.loaded["mini.ai"] ~= nil
 		folding_provider = "nvim-ufo",
 		git = "gitsigns.nvim",
 		lint = "nvim-lint",
+		lint_on_write = "nvim-lint",
 		scroll_animation = "neoscroll.nvim",
 		session = "persistence.nvim",
 		signature = "blink.cmp",
 		statusline_plugin = "lualine.nvim",
 		terminal_manager = "toggleterm.nvim",
 		ui_panels = "bufferline.nvim",
+		workspace_tools = "outline.nvim",
 	}
 	for capability, plugin in pairs(evidence) do
 		assert(vim.tbl_contains(fast.disabled, capability), capability .. " is not reported as disabled in fast mode")
@@ -453,6 +455,7 @@ report.extra.mini_after = package.loaded["mini.ai"] ~= nil
 			capability .. " is reported off but " .. plugin .. " is installed"
 		)
 	end
+	assert(vim.tbl_contains(fast.disabled, "diagnostics_text"), "Fast mode does not report diagnostic text as disabled")
 
 	-- The language extension is installed but not started: only an explicit
 	-- request puts it on the runtimepath.
@@ -834,6 +837,8 @@ table.sort(report.extra.paths)
 		"<Leader>aa",
 		"<Leader>ap",
 		"<Leader>k",
+		"<Leader>.",
+		"<Leader>o",
 		"<Leader>mo",
 		"<Leader>M",
 		"<Leader>e",

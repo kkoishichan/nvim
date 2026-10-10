@@ -10,6 +10,7 @@ local markview_filetypes = {
 
 local toolchain = require("user.toolchain")
 local float_style = require("user.core.float_style")
+local mode = require("user.core.mode")
 
 local function refresh_markview(bufnr)
 	if not vim.api.nvim_buf_is_valid(bufnr) or not markview_filetypes[vim.bo[bufnr].filetype] then
@@ -121,7 +122,7 @@ return function(profile)
 			}
 		end,
 	})
-	if profile.extra then
+	if mode.capabilities().workspace_tools then
 		table.insert(plugins, {
 			"saecki/crates.nvim",
 			tag = "stable",

@@ -7,17 +7,18 @@ Neovim 打磨成接近 IDE 的日常工作流。
 - 默认 `vscode` Dark+ 主题（可持久切换，主题选择器也提供内置 `default`），`<Space>` 作为 leader，`\` 作为 localleader。
 - `fzf-lua` 负责查找、搜索、符号 / 调用关系与 Git 列表，并接管 `vim.ui.select`。
 - `glance.nvim` 提供定义、声明、实现、类型与引用的双栏 Peek 界面。
+- standard / extra 提供 Outline 符号大纲、离线词典，以及 crates.nvim 的 Cargo.toml 检视与补全。
 - `oil.nvim` 像编辑 buffer 一样管理文件系统；`neo-tree.nvim` 提供侧边文件树。
 - `blink.cmp` 负责补全、snippet 与签名帮助；`Tab` / `Enter` 确认候选，方向键选择，
 	`Alt-Space` 主动唤起（`Ctrl-Space` 留给输入法）。签名使用 Blink 内置浮窗，自动触发，
 	进入已有调用的插入模式时也会请求；长签名自动换行，最多显示 6 行，保留语法和当前参数高亮。
 	`Ctrl-K` 显示／隐藏签名，`Ctrl-B` / `Ctrl-F` 滚动签名；位置与补全菜单避让由 Blink 处理。
 - `nvim-lspconfig` + Mason 负责语言服务与外部工具安装。
-- `conform.nvim` 格式化，`nvim-lint` 静态检查。
+- `conform.nvim` 格式化，`nvim-lint` 静态检查；standard 保存时检查，也可手动；extra 另在读取和离开插入模式时检查。
 - `nvim-ufo` + Tree-sitter 折叠。
 - `toggleterm.nvim` 提供 VSCode 风格的多终端管理。
 - extra 提供 `overseer.nvim` 任务运行、`neotest` 测试、`nvim-dap` + `dap-ui` 调试。
-- `snacks.nvim` 提供 input 与 zen；extra 另有 dashboard、scratch；通知由 `nvim-notify` 提供。
+- `snacks.nvim` 在 standard / extra 提供 input、zen 与 scratch；extra 另有 dashboard；通知由 `nvim-notify` 提供。
 - LSP 任务持续至少 500 ms 才显示进度，短检查静默完成；长任务按 250 ms 刷新，完成后提示保留 1.2 秒。
 - 除通知外，小型临时弹窗默认统一使用 Pmenu 配色的无边框 padding 设计，透明模式下也保留底色，可通过 `<leader>up`
   持久切换为插件和主题样式（重启生效）；`Esc` 一次收起当前
@@ -220,7 +221,7 @@ extra 中 `faster.nvim` 继续负责宏执行优化。普通文件保留完整�
 vim.g.user_checktime_batch_size = 16 -- 每批检查的隐藏 buffer 数
 ```
 
-Git 行 blame 默认启用，可用 `<leader>ghB` 切换；scrollview 搜索结果标记保持启用，
+Git 行 blame 在 standard 默认关闭、extra 默认开启，两档均可用 `<leader>ghB` 切换；extra 的 scrollview 搜索结果标记保持启用，
 不设置单独开关。Neo-tree 保持目录 watcher、Git 状态和诊断功能。
 
 滚轮和触控板使用原生滚动；颜色预览按 50 ms 时间窗合并视口刷新，让正文先响应输入，
@@ -336,8 +337,10 @@ Claude 原生 IDE 集成在一个 Neovim 中只有一个终端：首次打开时
 ## 运行模式
 
 `standard` 是未配置主机的默认模式：保留自动补全、主 LSP、保存格式化、Git、文件树、
-搜索预览、折叠、sticky context、buffer 标签栏、状态栏、通知和键盘滚动动画。
-独立 lint 和会话改为手动；调试、测试、AI、媒体/文档预览、额外装饰与侧栏由 `extra` 提供。
+搜索预览、折叠、sticky context、buffer 标签栏、状态栏、通知和键盘滚动动画，
+并提供 Outline、scratch、词典及 crates.nvim 的 Cargo.toml 检视与补全。
+独立 lint 在保存时自动运行，也可手动；会话手动保存和恢复。
+调试、测试、AI、媒体/文档预览、额外装饰和停靠布局由 `extra` 提供。
 `extra` 保留原完整功能，`fast` 面向 SSH、容器与资源有限的服务器。
 旧 `full` 环境变量和偏好继续作为 extra 别名，不自动改写已有偏好。
 
@@ -346,7 +349,7 @@ Claude 原生 IDE 集成在一个 Neovim 中只有一个终端：首次打开时
 | 选择模式并持久保存、自动重启 | `<leader>umf` fast、`ums` standard、`ume` extra（均带 leader）；`:EditorMode fast\|standard\|extra` |
 | 明确开启、关闭 fast | `:FastMode on` / `:FastMode off`（关闭后为 standard） |
 | 查看实际模式、来源、关闭功能和降级 | `:ModeInfo` |
-| standard 手动独立 lint | `<leader>cl` / `:Lint`；SQL 的 Sqruff 诊断也需手动触发 |
+| standard 独立 lint | 保存时自动运行，`<leader>cl` / `:Lint` 手动；SQL 的 Sqruff 诊断保存时自动检查 |
 | standard / extra 手动会话 | `<leader>sw` 保存，`ss` 恢复，`sS` 选择，`sl` 恢复最近会话（均带 leader） |
 
 三档都有 leader 快捷键提示，按空格等待 300 ms 显示当前可用操作；fast 使用纯文本标签。
@@ -363,7 +366,7 @@ NVIM_MODE=fast nvim path/to/file.py
 
 优先级为 `NVIM_MODE` > 主机偏好 > standard，与 SSH 环境无关。旧 `runtime.mode=auto` 按 standard 读取。
 模式切换清除重启子进程的 `NVIM_MODE`，应用刚保存的选择；父 shell 不变。
-standard 默认显示诊断下划线和标记，消息按需通过 `<leader>cd` 查看，`<leader>ud` 循环消息样式。
+standard 默认显示诊断下划线、标记和行尾短消息，extra 默认展开当前行消息；完整消息可通过 `<leader>cd` 查看，`<leader>ud` 循环消息样式。
 Biome / Tailwind 需项目配置或依赖，typos-lsp / Emmet 只通过 `:ManualLspStart <server>` 手动开启。
 Java / Rust 保留原有分析，调试和测试接入仅在 extra 中启用。
 
@@ -446,7 +449,7 @@ Go 汇编仅在 `.s`、Go 项目和 Plan 9 指令特征同时匹配时使用 asm
 - `gsa` / `gsd` / `gsr` ：添加 / 删除 / 替换 surround
 - `<M-1>` … `<M-9>` ：跳到第 N 个 buffer，`<M-0>` 跳到最后一个
 - `<C-/>` ：切换底部终端（兼容传统终端的 `<C-_>` 编码）
-- `<leader>k` ：离线词典；`<leader>ut` ：选择并持久保存主题
+- `<leader>k` ：standard / extra 的离线词典；`<leader>ut` ：选择并持久保存主题
 - `<leader>uT` / `:TransparentToggle` ：切换并持久保存透明背景，切换主题后仍生效。编辑区、行号栏、文件树、sticky context、buffer 标签栏、有边框的弹窗和 Trouble 面板跟随开关；统一无框样式的补全、签名、leader 菜单、悬停文档、诊断、输入框和预览（含 Glance）保留底色。候选选中行、当前参数、搜索匹配及编辑区选中行保留高亮；透明程度由终端设置决定。透明模式下，仅 TokyoNight（fg_gutter）和 Catppuccin（surface1）的窗口分隔线改用主题色板中的原生暗灰色，其他主题保留原色；buffer 标签栏（含 Explorer 标题）底部用连续细线分隔，不额外占一行，标签之间不显示竖分割线。切换时刷新当前主题及插件颜色缓存，关闭后恢复主题原色。状态保存在 `stdpath("state")/transparent.txt`，默认关闭。
 - `<leader>up` / `:FloatStyleToggle` ：切换并持久保存统一弹窗样式，默认开启。`:FloatStyle on` 开启，`:FloatStyle off` 恢复插件和主题提供的边框、背景及标题颜色；`:FloatStyle` 查看当前和已保存的选择。设置写入 `preferences.json` 的 `ui.float_style`，重启后统一生效，连续切换可撤销待生效的选择。三档均支持；通知样式、弹窗功能、快捷键和透明背景开关独立保留。
 - 无边框小弹窗始终保留菜单底色；有边框浮窗在非透明模式使用当前主题原本的弹窗底色（NormalFloat），透明模式不设置底色。关闭统一样式后，插件的有框弹窗同样遵循透明开关。通知的正文、空行、标题留白和行尾一起切换，避免只有文字带背景；淡入淡出及内容更新保持一致，通知修复不受弹窗样式开关影响。

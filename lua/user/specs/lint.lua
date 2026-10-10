@@ -1,10 +1,12 @@
 local toolchain = require("user.toolchain")
 return function()
 	local automatic = require("user.core.mode").capabilities().lint_auto
+	local on_write = require("user.core.mode").capabilities().lint_on_write
 	return {
 		{
 			"mfussenegger/nvim-lint",
-			ft = automatic and { "cmake", "css", "dockerfile", "go", "lua", "make", "markdown", "sh", "sql", "yaml" }
+			ft = (automatic or on_write)
+					and { "cmake", "css", "dockerfile", "go", "lua", "make", "markdown", "sh", "sql", "yaml" }
 				or nil,
 			cmd = "Lint",
 			keys = { { "<leader>cl", "<cmd>Lint<cr>", desc = "Lint" } },
@@ -345,6 +347,14 @@ return function()
 							schedule_lint(event.buf, false, 400)
 						end,
 					})
+					vim.api.nvim_create_autocmd("InsertLeave", {
+						group = group,
+						callback = function(event)
+							schedule_lint(event.buf, true, 250)
+						end,
+					})
+				end
+				if automatic or on_write then
 					vim.api.nvim_create_autocmd("BufWritePost", {
 						group = group,
 						callback = function(event)
@@ -358,12 +368,6 @@ return function()
 								reset_lookup_caches()
 							end
 							schedule_lint(event.buf, false, 150)
-						end,
-					})
-					vim.api.nvim_create_autocmd("InsertLeave", {
-						group = group,
-						callback = function(event)
-							schedule_lint(event.buf, true, 250)
 						end,
 					})
 				end

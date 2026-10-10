@@ -23,9 +23,10 @@ local optional_capabilities = {
 	"completion", -- Blink, snippets, automatic candidate menus
 	"conflicts", -- automatic Git conflict scanning and highlighting
 	"cursorline", -- full-width current line colouring
-	"decorations", -- matchup, illuminate, indent lines, colours, TODO
+	"decorations", -- matchup, illuminate, indent lines, colours, TODO, line blame
 	"diagnostics_expanded", -- automatic current-line virtual messages
 	"diagnostics_live", -- underline, virtual lines and live markers
+	"diagnostics_text", -- trailing virtual text for the diagnostic on each line
 	"explorer_extras", -- Oil watchers/icons/metadata columns, Neo-tree
 	"extended_workflows", -- DAP, tests, AI, media, preview, VimTeX, IME
 	"folding_provider", -- UFO and automatic fold computation
@@ -34,6 +35,7 @@ local optional_capabilities = {
 	"icons", -- Nerd Font glyphs in the interface
 	"lint", -- standalone linter available on request
 	"lint_auto",
+	"lint_on_write", -- standalone linter runs after a save (BufWritePost only)
 	"auxiliary_lsp", -- automatic Emmet/typos and unrestricted optional project servers
 	"lsp_auto", -- language servers started without an explicit request
 	"picker_extras", -- picker icons and automatic preview
@@ -48,6 +50,7 @@ local optional_capabilities = {
 	"terminal_manager", -- terminal manager and task panels
 	"ui_panels", -- panel layout, bufferline, notify
 	"undofile", -- persistent undo on disk
+	"workspace_tools", -- on-request inspection: Outline, crates.nvim, dictionary, scratch
 }
 
 -- Standard is an explicit whitelist. New optional capabilities stay in extra
@@ -58,12 +61,14 @@ for _, name in ipairs({
 	"conflicts",
 	"cursorline",
 	"diagnostics_live",
+	"diagnostics_text",
 	"explorer_extras",
 	"folding_provider",
 	"format_on_save",
 	"git",
 	"icons",
 	"lint",
+	"lint_on_write",
 	"lsp_auto",
 	"picker_extras",
 	"scroll_animation",
@@ -74,6 +79,7 @@ for _, name in ipairs({
 	"terminal_manager",
 	"ui_panels",
 	"undofile",
+	"workspace_tools",
 }) do
 	standard[name] = true
 end

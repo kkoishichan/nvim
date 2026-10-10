@@ -3,6 +3,7 @@
 -- line* expands beneath it via virtual_lines (built-in, 0.11+). This keeps long
 -- messages from overflowing the window the way trailing virtual_text does, shows
 -- code and message together without occluding, and points at the exact column.
+-- Standard starts at "text", extra at "lines", and fast at "off".
 local float_style = require("user.core.float_style")
 local capabilities = require("user.core.mode").capabilities()
 
@@ -47,7 +48,7 @@ local virtual_text = {
 -- Fast mode starts at "off"; the same key still cycles display on once a
 -- language server has been started by hand.
 local modes = { "lines", "text", "off" }
-local mode = capabilities.diagnostics_expanded and "lines" or "off"
+local mode = capabilities.diagnostics_expanded and "lines" or (capabilities.diagnostics_text and "text") or "off"
 
 local function apply_diagnostic_mode()
 	vim.diagnostic.config(vim.tbl_extend("force", base, {

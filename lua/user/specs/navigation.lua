@@ -1,5 +1,6 @@
 local panels = require("user.core.panels")
 local float_style = require("user.core.float_style")
+local mode = require("user.core.mode")
 
 local function toggle_explorer()
 	local name = vim.api.nvim_buf_get_name(0)
@@ -133,7 +134,7 @@ return function(profile)
 			},
 		},
 	})
-	if profile.extra then
+	if mode.capabilities().workspace_tools then
 		table.insert(plugins, {
 			"hedyhli/outline.nvim",
 			cmd = { "Outline", "OutlineOpen" },

@@ -27,7 +27,7 @@
 
 所有配置组均包含 `minimal`。组只决定这次显式恢复哪些工具，不禁用其他语言配置，也不会卸载已有工具。正常启动与打开文件不会触发 Mason 安装；编辑器中的 `:MasonToolsInstall` 仍表示完整目录恢复。`--editor-mode fast` 未显式选择工具组时不恢复任何 Mason 工具，输出中会说明。
 
-standard 选中 47 个插件并保留完整 parser 目录，extra 选中 83 个插件，fast 默认 9 个插件和 13 个 parser（默认 VS Code 主题）。模式切换不卸载其他模式的已有资产。工具组独立于运行模式，`--editor-mode standard --profile full` 仍安装完整 Mason 工具清单。运行时 standard/fast 不下载插件；新主机先完成显式资源准备。完整取舍见[三档模式](editor-modes.md)。
+standard 选中 50 个插件并保留完整 parser 目录，extra 选中 83 个插件，fast 默认 9 个插件和 13 个 parser（默认 VS Code 主题）。模式切换不卸载其他模式的已有资产。工具组独立于运行模式，`--editor-mode standard --profile full` 仍安装完整 Mason 工具清单。运行时 standard/fast 不下载插件；新主机先完成显式资源准备。完整取舍见[三档模式](editor-modes.md)。
 
 ```sh
 ./scripts/deploy.sh --dry-run --editor-mode standard --profile python
