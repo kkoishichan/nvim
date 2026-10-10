@@ -10,6 +10,7 @@ local function client_supports(client, method, bufnr)
 end
 
 local function setup_lsp_keymaps()
+	local capabilities = require("user.core.mode").capabilities()
 	vim.api.nvim_create_autocmd("LspAttach", {
 		group = vim.api.nvim_create_augroup("user_lsp_attach", { clear = true }),
 		callback = function(event)
@@ -39,7 +40,15 @@ local function setup_lsp_keymaps()
 			map("n", "<leader>cs", "<cmd>FzfLua lsp_document_symbols<cr>", "Document symbols")
 			map("n", "<leader>cS", "<cmd>FzfLua lsp_workspace_symbols<cr>", "Workspace symbols")
 
+			local allowed = require("user.core.buffer_policy").allow(bufnr)
+			if capabilities.codelens and allowed and client_supports(client, "textDocument/codeLens", bufnr) then
+				vim.lsp.codelens.enable(true, { bufnr = bufnr })
+				map("n", "<leader>cL", vim.lsp.codelens.run, "Run code lens")
+			end
 			if client_supports(client, "textDocument/inlayHint", bufnr) then
+				if capabilities.inlay_hints_auto and allowed then
+					vim.lsp.inlay_hint.enable(true, { bufnr = bufnr })
+				end
 				map("n", "<leader>uh", function()
 					vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled({ bufnr = bufnr }), { bufnr = bufnr })
 				end, "Toggle inlay hints")

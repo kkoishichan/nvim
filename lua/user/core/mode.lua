@@ -20,6 +20,7 @@ end
 -- and Tree-sitter highlighting, and drops the work that would otherwise run
 -- while a file is opened, typed into, saved or scrolled.
 local optional_capabilities = {
+	"codelens", -- inline LSP code lenses, refreshed as the buffer changes
 	"completion", -- Blink, snippets, automatic candidate menus
 	"conflicts", -- automatic Git conflict scanning and highlighting
 	"cursorline", -- full-width current line colouring
@@ -33,6 +34,7 @@ local optional_capabilities = {
 	"format_on_save",
 	"git", -- Gitsigns, blame, diff watchers, Git statusline segments
 	"icons", -- Nerd Font glyphs in the interface
+	"inlay_hints_auto", -- inlay hints on attach
 	"lint", -- standalone linter available on request
 	"lint_auto",
 	"lint_on_write", -- standalone linter runs after a save (BufWritePost only)

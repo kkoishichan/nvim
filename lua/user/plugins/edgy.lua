@@ -77,6 +77,7 @@ return {
 					ft = "Outline",
 					size = { height = 0.4 },
 				},
+				{ title = "Tests", ft = "neotest-summary", size = { height = 0.3 } },
 				-- Any other neo-tree source (buffers / git_status) opened on the left.
 				"neo-tree",
 			},
@@ -94,6 +95,7 @@ return {
 				{ title = "Problems", ft = "trouble", size = { height = dock_size("bottom") } },
 				{ title = "Tasks", ft = "OverseerList", size = { height = dock_size("bottom") } },
 				{ title = "Task Output", ft = "OverseerOutput", size = { height = dock_size("bottom") } },
+				{ title = "Test Output", ft = "neotest-output-panel", size = { height = dock_size("bottom") } },
 				{ title = "QuickFix", ft = "qf", size = { height = dock_size("bottom") } },
 			},
 			right = {

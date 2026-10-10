@@ -39,6 +39,63 @@ return function(tmp)
 			assert(lsp_keymaps[lhs] == "<Cmd>Glance " .. command .. "<CR>", lhs .. " no longer uses Glance")
 		end
 		vim.api.nvim_buf_delete(keymap_buffer, { force = true })
+
+		-- Attach enables IDE annotations; the document cost policy releases
+		-- both and prevents a later attachment from restoring them too early.
+		local annotation_buffer = vim.api.nvim_create_buf(false, false)
+		local get_client, lens_enable, hint_enable =
+			vim.lsp.get_client_by_id, vim.lsp.codelens.enable, vim.lsp.inlay_hint.enable
+		local annotations = { lens = {}, hint = {} }
+		local ok_annotations, annotation_error = pcall(function()
+			vim.lsp.get_client_by_id = function(id)
+				return id == -1 and {
+					supports_method = function()
+						return true
+					end,
+				} or get_client(id)
+			end
+			for name, module in pairs({ lens = vim.lsp.codelens, hint = vim.lsp.inlay_hint }) do
+				module.enable = function(enabled, opts)
+					if opts.bufnr == annotation_buffer then
+						annotations[name][#annotations[name] + 1] = enabled
+					end
+				end
+			end
+			local event = { buf = annotation_buffer, data = { client_id = -1 } }
+			attach.callback(event)
+			assert(annotations.lens[1] and annotations.hint[1], "Extra did not enable supported LSP annotations")
+			assert(
+				vim.api.nvim_buf_call(annotation_buffer, function()
+					return vim.fn.maparg("<leader>cL", "n", false, true).callback == vim.lsp.codelens.run
+				end),
+				"Code lens action is unavailable"
+			)
+			local policy = require("user.core.buffer_policy")
+			policy.set(annotation_buffer, "off")
+			assert(
+				vim.wait(1000, function()
+					return annotations.lens[#annotations.lens] == false and annotations.hint[#annotations.hint] == false
+				end),
+				"High-cost buffers retained LSP annotations"
+			)
+			local lenses, hints = #annotations.lens, #annotations.hint
+			attach.callback(event)
+			assert(
+				#annotations.lens == lenses and #annotations.hint == hints,
+				"Attach re-enabled high-cost annotations"
+			)
+			policy.set(annotation_buffer, "on")
+			vim.wait(20)
+			attach.callback(event)
+			assert(
+				annotations.lens[#annotations.lens] and annotations.hint[#annotations.hint],
+				"Ordinary buffers did not recover LSP annotations"
+			)
+		end)
+		vim.lsp.get_client_by_id, vim.lsp.codelens.enable, vim.lsp.inlay_hint.enable =
+			get_client, lens_enable, hint_enable
+		vim.api.nvim_buf_delete(annotation_buffer, { force = true })
+		assert(ok_annotations, "LSP annotation lifecycle failed: " .. tostring(annotation_error))
 		for _, server in ipairs(require("user.toolchain").lsp_servers) do
 			local config = vim.lsp.config[server]
 			assert(type(config) == "table", "missing LSP config: " .. server)

@@ -40,6 +40,8 @@ local function apply(bufnr)
 		vim.wo[win].foldmethod = "manual"
 	end
 	pcall(vim.treesitter.stop, bufnr)
+	vim.lsp.codelens.enable(false, { bufnr = bufnr })
+	vim.lsp.inlay_hint.enable(false, { bufnr = bufnr })
 	if capabilities.folding_provider then
 		loaded_call("ufo", "detach", bufnr)
 	end

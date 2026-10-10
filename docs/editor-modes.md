@@ -32,7 +32,7 @@ standard 与 extra 的边界用五个动词判定，功能满足任何一条就�
 | 独立 lint | `:Lint` / `<leader>cl` 手动 | 保存时自动运行，`<leader>cl` / `:Lint` 手动 | 另在读取和离开插入模式时运行 |
 | 文件浏览与搜索 | 精简 Oil / fzf，无默认预览 | Oil、Neo-tree、fzf 预览 | 保留全部 |
 | Git | 原生终端操作、fzf 按需查询 | Gitsigns、Lazygit、Diffview；行内 blame 默认关，`<leader>ghB` 开 | 保留全部，行内 blame 默认开 |
-| 折叠与代码查看 | 手动折叠 | UFO、Glance、Trouble、bqf | 保留全部 |
+| 折叠与代码查看 | 手动折叠 | UFO、Glance、Trouble、bqf | 另有 codelens 与默认开启的 inlay hints |
 | 编辑工具 | mini 基础编辑、Flash、Tree-sitter 文本对象 | surround、align、move、文本对象、Flash、多光标、grug-far、undotree、neogen | 保留全部 |
 | 常用界面 | 原生状态栏 | bufferline、lualine、sticky context、通知、Outline、scratch | 另有 dropbar、scrollview、Edgy、dashboard |
 | 键盘滚动动画 | 关闭 | 保留 | 保留 |

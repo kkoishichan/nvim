@@ -91,6 +91,8 @@ vim.api.nvim_create_autocmd("TextYankPost", {
 
 local panel_filetypes = {
 	["neo-tree"] = true,
+	["neotest-summary"] = true,
+	["neotest-output-panel"] = true,
 	Outline = true,
 	OverseerList = true,
 	OverseerOutput = true,

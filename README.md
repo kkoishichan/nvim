@@ -340,7 +340,7 @@ Claude 原生 IDE 集成在一个 Neovim 中只有一个终端：首次打开时
 搜索预览、折叠、sticky context、buffer 标签栏、状态栏、通知和键盘滚动动画，
 并提供 Outline、scratch、词典及 crates.nvim 的 Cargo.toml 检视与补全。
 独立 lint 在保存时自动运行，也可手动；会话手动保存和恢复。
-调试、测试、AI、媒体/文档预览、额外装饰和停靠布局由 `extra` 提供。
+调试、测试、AI、媒体/文档预览、额外装饰和停靠布局由 `extra` 提供；支持的语言服务默认开启 codelens 与 inlay hints，测试摘要和输出可停靠显示。
 `extra` 保留原完整功能，`fast` 面向 SSH、容器与资源有限的服务器，保留按需 Flash、Tree-sitter 文本对象、手动 lint、fzf Git 查询和原生终端开关，不自动启动语言服务或检查。
 旧 `full` 环境变量和偏好继续作为 extra 别名，不自动改写已有偏好。
 

@@ -473,6 +473,11 @@ report.extra.function_object = vim.fn.getreg('"')
 		)
 	end
 	assert(vim.tbl_contains(fast.disabled, "diagnostics_text"), "Fast mode does not report diagnostic text as disabled")
+	assert(vim.tbl_contains(fast.disabled, "codelens"), "Fast mode does not report code lenses as disabled")
+	assert(
+		vim.tbl_contains(fast.disabled, "inlay_hints_auto"),
+		"Fast mode does not report automatic inlay hints as disabled"
+	)
 	assert(not vim.tbl_contains(fast.disabled, "lint"), "Fast mode disabled manual lint")
 	assert(vim.tbl_contains(fast.disabled, "lint_on_write"), "Fast mode enabled lint on save")
 	for _, lhs in ipairs({ "<Leader>tt", "<Leader>cl", "<Leader>gs", "s" }) do

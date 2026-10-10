@@ -18,7 +18,11 @@ return function(tmp)
 		"Standard lost workspace inspection capabilities"
 	)
 	assert(
-		not cap.decorations and not cap.extended_workflows and not cap.auxiliary_lsp,
+		not cap.decorations
+			and not cap.extended_workflows
+			and not cap.auxiliary_lsp
+			and not cap.codelens
+			and not cap.inlay_hints_auto,
 		"Standard enabled extra capabilities"
 	)
 	local plugins = require("lazy.core.config").plugins
