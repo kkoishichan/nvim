@@ -14,11 +14,11 @@
 | 模式比较 | `python3 scripts/benchmark-mode.py` | PTY 中比较 fast、standard、extra 与原生 Neovim 的启动、输入、保存、滚轮和翻页延迟，以及空闲客户端、定时器、监听、子进程、内存和新增状态文件 |
 | 测量安全检查 | `python3 scripts/check-benchmark-mode.py` | 验证输入文件副本隔离、保存内容有效，以及缺少输入或重绘时拒绝生成成功结果；需要 Python msgpack |
 
-模式比较的每轮输入和保存都在独立临时副本上完成，`--file` 不会改写原文件。
+模式比较的每轮输入和保存都在独立临时副本上完成，`--file` 不会改写原文件。两个 PTY 基准在开始前核对输出路径长度：`vim.loader` 以百分号编码的源路径命名字节码缓存，路径过长时最深的插件模块无法缓存，会话会卡在 Press ENTER，因此脚本直接拒绝过长的 `--output`。
 `--keep-going` 在单项采样失败后继续其余样本，但最终仍返回失败状态并保留失败证据。
 `--runs 5 --startup-cache both --file /path/to/code.py --fast-lsp-sample diagnostics`
 可同时测冷/热编译缓存、真实代码和首次手动语言服务。生成的 Rust 样例带独立 Cargo 清单；
-真实文件仅复制自身，不复制整个项目。基准禁止 npm/Cargo 联网，避免后台下载干扰结果。
+真实文件只复制自身和同级的项目标记文件（`tsconfig.json`、`Cargo.toml`、`go.mod`、`compile_flags.txt` 等），不复制整个项目。基准禁止 npm/Cargo 联网，避免后台下载干扰结果。
 当前三档数据和测量边界见[三档模式实测](editor-mode-measurements.md)，历史 fast/full 数据见[早期实测](fast-mode-measurements.md)。
 
 原集成入口 `scripts/check.lua` 仅负责顺序运行 `scripts/checks/integration/` 下的主题模块；保持同进程插件加载互操作验证。其它行为组分别运行于独立进程，避免上一组的替身或缓存污染下一组。主题检查关注实际文字可读性；原集成中大量逐项复制调色常量的断言已移除。

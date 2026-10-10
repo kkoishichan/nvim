@@ -1,0 +1,4860 @@
+{
+  "scope": "Compare fast, standard, extra and plain Neovim on real input in a PTY.\n\nEvery target uses the same Neovim binary, independent copies of the same files,\nthe same 120x36 grid\nand the already-prepared dependencies. Runs alternate target order per sample so\na warming machine cannot favour whichever target happens to go first.\n\nLatency is measured inside Neovim: a key is timestamped when its decoding is\nobserved, and again at the end of the decoration pass that first reflects it.\nThat covers the editor's own work, not the terminal's display. The plain-Neovim\ntarget (-u NONE with syntax and line numbers) controls for Neovim's own work;\nterminal painting and network latency are outside this measurement.\n\nAlongside latency the report records what a session is running while idle:\nattached language clients, active libuv timers, file watchers and child\nprocesses, resident memory including subprocesses, and the files each session\nadds to its state directory.\n",
+  "benchmark_sha256": "ba319c91da6a5da033119a72c96f09c8231cc66ae22ca722c6820fe1c0049ed8",
+  "nvim": "NVIM v0.12.6",
+  "configuration": {
+    "commit": "cab683eaa227c6a95bf4f8477cf88e3593aca425",
+    "dirty": true,
+    "lock_sha256": "97c502f6f4bf71413fe43024ad257d1219eb7470360cb702965a79dfd6083a28"
+  },
+  "grid": [
+    120,
+    36
+  ],
+  "term": "xterm-kitty",
+  "targets": [
+    "extra"
+  ],
+  "runs": 3,
+  "typing": {
+    "chars": 30,
+    "interval_ms": 25
+  },
+  "wheel": {
+    "bursts": 2,
+    "events_per_burst": 20,
+    "interval_ms": 8
+  },
+  "paging": {
+    "events": 6,
+    "interval_ms": 80
+  },
+  "fast_lsp_samples": [],
+  "samples": {
+    "lua": {
+      "path": "/tmp/nvim-diag-483119/fixtures/sample.lua",
+      "bytes": 7247,
+      "lines": 484,
+      "sha256": "075e78608f84c1b891324721dc86066cf26c74fa8846c6ded0254b93db3f3fbf"
+    },
+    "inventory": {
+      "path": "/home/koishi/.config/nvim/scripts/fixtures/diagnostics/python/inventory.py",
+      "bytes": 13153,
+      "lines": 370,
+      "sha256": "784308a818ef97a950bb0fe6585a4927f5e81ecbd6fd479b9dfb3c35443de23e"
+    },
+    "scheduler": {
+      "path": "/home/koishi/.config/nvim/scripts/fixtures/diagnostics/typescript/scheduler.ts",
+      "bytes": 11014,
+      "lines": 360,
+      "sha256": "6095a0e933e3e3a0d4271dbaf072f60efab2ddff724d737cf2069a70ab9dadf8"
+    },
+    "lib": {
+      "path": "/home/koishi/.config/nvim/scripts/fixtures/diagnostics/rust/src/lib.rs",
+      "bytes": 9783,
+      "lines": 329,
+      "sha256": "50bf21e5103a663436e05af03845aff1c4c5358edcd6f0fab4b33d33f55362e0"
+    },
+    "logs": {
+      "path": "/home/koishi/.config/nvim/scripts/fixtures/diagnostics/go/logs.go",
+      "bytes": 8023,
+      "lines": 320,
+      "sha256": "ff1013ab5cef4a3ded5e08dd36652d76834a6cc2424ae90b6512a09dcea3079a"
+    },
+    "matrix": {
+      "path": "/home/koishi/.config/nvim/scripts/fixtures/diagnostics/c/matrix.c",
+      "bytes": 9237,
+      "lines": 355,
+      "sha256": "b0efe89f0577bb97523595f8b8e50c3aa0c1ae835ef04c8b9b15eed348327a1d"
+    },
+    "graph": {
+      "path": "/home/koishi/.config/nvim/scripts/fixtures/diagnostics/cpp/graph.cpp",
+      "bytes": 10030,
+      "lines": 350,
+      "sha256": "415555ec58a9f3ad2dcd8eec86e399ca478ef3e506618c906907237d2a452548"
+    },
+    "build": {
+      "path": "/home/koishi/.config/nvim/scripts/fixtures/diagnostics/lua/build.lua",
+      "bytes": 7722,
+      "lines": 298,
+      "sha256": "6fad5fbdfdd02365968a42792b539180fd1c3d681596637022e952a3f0889629"
+    },
+    "deploy": {
+      "path": "/home/koishi/.config/nvim/scripts/fixtures/diagnostics/sh/deploy.sh",
+      "bytes": 4578,
+      "lines": 198,
+      "sha256": "9eb42e19c37f3ca6d9350354972be04392e0cd8272913e23dd2e69f51734efd6"
+    },
+    "handbook": {
+      "path": "/home/koishi/.config/nvim/scripts/fixtures/diagnostics/markdown/handbook.md",
+      "bytes": 5435,
+      "lines": 184,
+      "sha256": "a26acbf0468b225f404430c8a88f29d5a93dda27126c4eac3523240cebfca8ed"
+    },
+    "analytics": {
+      "path": "/home/koishi/.config/nvim/scripts/fixtures/diagnostics/sql/analytics.sql",
+      "bytes": 5449,
+      "lines": 182,
+      "sha256": "e2b4ac42074cd7f3df05bef47aa0aeccdc1b5448ac64582b590ca5f811bfb667"
+    },
+    "ci": {
+      "path": "/home/koishi/.config/nvim/scripts/fixtures/diagnostics/yaml/ci.yaml",
+      "bytes": 4733,
+      "lines": 187,
+      "sha256": "0e3d2a39efa6d9f0debe9d68ce6ac6582be1267a3e0e7d7e15ac125f4cf448ed"
+    },
+    "config": {
+      "path": "/home/koishi/.config/nvim/scripts/fixtures/diagnostics/json/config.json",
+      "bytes": 4717,
+      "lines": 157,
+      "sha256": "7755f7d59ae634b29b4d1404eb85b16100edcc27d6fdbc0fa027f17d46927697"
+    }
+  },
+  "startup": [
+    {
+      "cache": "warm",
+      "scene": "empty",
+      "target": "extra",
+      "run": 1,
+      "ms": 35.53
+    },
+    {
+      "cache": "warm",
+      "scene": "empty",
+      "target": "extra",
+      "run": 2,
+      "ms": 34.358
+    },
+    {
+      "cache": "warm",
+      "scene": "empty",
+      "target": "extra",
+      "run": 3,
+      "ms": 36.521
+    },
+    {
+      "cache": "warm",
+      "scene": "first_open",
+      "target": "extra",
+      "run": 1,
+      "ms": 126.199
+    },
+    {
+      "cache": "warm",
+      "scene": "first_open",
+      "target": "extra",
+      "run": 2,
+      "ms": 109.362
+    },
+    {
+      "cache": "warm",
+      "scene": "first_open",
+      "target": "extra",
+      "run": 3,
+      "ms": 118.439
+    }
+  ],
+  "sessions": [
+    {
+      "target": "extra",
+      "sample": "sample.lua",
+      "ready": {
+        "clients": [
+          {
+            "initialized": true,
+            "name": "lua_ls"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "treesitter": true,
+        "lines": 484,
+        "handles": {
+          "idle": 0,
+          "fs_event": 2,
+          "process": 2,
+          "timer": 11,
+          "fs_poll": 0
+        },
+        "filetype": "lua",
+        "diagnostics": 0,
+        "lua_kb": 22026.26171875
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2201.5,
+      "idle_rss_kb": 266332,
+      "idle_children": [
+        "lua-language-se",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 19.304,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 3.169,
+        "p95_ms": 7.742,
+        "max_ms": 12.611,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 21.736,
+        "p95_ms": 22.996,
+        "max_ms": 22.996,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 1.795,
+        "p95_ms": 5.221,
+        "max_ms": 10.54,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 6,
+        "p50_ms": 7.284,
+        "p95_ms": 17.305,
+        "max_ms": 17.305,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 6,
+      "final": {
+        "clients": [
+          {
+            "initialized": true,
+            "name": "lua_ls"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "treesitter": true,
+        "lines": 484,
+        "handles": {
+          "idle": 0,
+          "fs_event": 2,
+          "process": 2,
+          "timer": 5,
+          "fs_poll": 0
+        },
+        "filetype": "lua",
+        "diagnostics": 0,
+        "lua_kb": 15615.396484375
+      },
+      "final_rss_kb": 284228,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%lua%extra%0%workspace%sample.lua"
+      ],
+      "disk": {
+        "cache": {
+          "files": 529,
+          "bytes": 2713832
+        },
+        "state": {
+          "files": 4,
+          "bytes": 29100
+        },
+        "workspace": {
+          "files": 3,
+          "bytes": 7360
+        }
+      },
+      "run": 0
+    },
+    {
+      "target": "extra",
+      "sample": "sample.lua",
+      "ready": {
+        "diagnostics": 0,
+        "lua_kb": 20234.0615234375,
+        "filetype": "lua",
+        "lines": 484,
+        "clients": [
+          {
+            "name": "lua_ls",
+            "initialized": true
+          },
+          {
+            "name": "typos_lsp",
+            "initialized": true
+          }
+        ],
+        "handles": {
+          "fs_poll": 0,
+          "process": 2,
+          "idle": 0,
+          "timer": 11,
+          "fs_event": 2
+        },
+        "treesitter": true
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2161.8,
+      "idle_rss_kb": 265804,
+      "idle_children": [
+        "lua-language-se",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 20.721,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 2.877,
+        "p95_ms": 10.625,
+        "max_ms": 23.582,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 38.784,
+        "p95_ms": 42.166,
+        "max_ms": 42.166,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 1.925,
+        "p95_ms": 4.015,
+        "max_ms": 10.046,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 6,
+        "p50_ms": 6.886,
+        "p95_ms": 14.667,
+        "max_ms": 14.667,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 6,
+      "final": {
+        "diagnostics": 0,
+        "lua_kb": 21165.9365234375,
+        "filetype": "lua",
+        "lines": 484,
+        "clients": [
+          {
+            "name": "lua_ls",
+            "initialized": true
+          },
+          {
+            "name": "typos_lsp",
+            "initialized": true
+          }
+        ],
+        "handles": {
+          "fs_poll": 0,
+          "process": 2,
+          "idle": 0,
+          "timer": 5,
+          "fs_event": 2
+        },
+        "treesitter": true
+      },
+      "final_rss_kb": 288224,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%lua%extra%1%workspace%sample.lua"
+      ],
+      "disk": {
+        "cache": {
+          "files": 529,
+          "bytes": 2713831
+        },
+        "state": {
+          "files": 4,
+          "bytes": 29404
+        },
+        "workspace": {
+          "files": 3,
+          "bytes": 7360
+        }
+      },
+      "run": 1
+    },
+    {
+      "target": "extra",
+      "sample": "sample.lua",
+      "ready": {
+        "treesitter": true,
+        "clients": [
+          {
+            "initialized": true,
+            "name": "lua_ls"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "lua_kb": 21787.080078125,
+        "lines": 484,
+        "filetype": "lua",
+        "diagnostics": 0,
+        "handles": {
+          "idle": 0,
+          "fs_event": 2,
+          "process": 2,
+          "timer": 11,
+          "fs_poll": 0
+        }
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2161.2,
+      "idle_rss_kb": 318208,
+      "idle_children": [
+        "lua-language-se",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 20.065,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 2.63,
+        "p95_ms": 6.31,
+        "max_ms": 11.684,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 20.74,
+        "p95_ms": 21.508,
+        "max_ms": 21.508,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 1.58,
+        "p95_ms": 4.432,
+        "max_ms": 7.569,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 6,
+        "p50_ms": 5.099,
+        "p95_ms": 17.654,
+        "max_ms": 17.654,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 6,
+      "final": {
+        "treesitter": true,
+        "clients": [
+          {
+            "initialized": true,
+            "name": "lua_ls"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "lua_kb": 14316.4208984375,
+        "lines": 484,
+        "filetype": "lua",
+        "diagnostics": 0,
+        "handles": {
+          "idle": 0,
+          "fs_event": 2,
+          "process": 2,
+          "timer": 5,
+          "fs_poll": 0
+        }
+      },
+      "final_rss_kb": 349520,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%lua%extra%2%workspace%sample.lua"
+      ],
+      "disk": {
+        "cache": {
+          "files": 529,
+          "bytes": 2713832
+        },
+        "state": {
+          "files": 4,
+          "bytes": 28797
+        },
+        "workspace": {
+          "files": 3,
+          "bytes": 7360
+        }
+      },
+      "run": 2
+    },
+    {
+      "target": "extra",
+      "sample": "inventory.py",
+      "ready": {
+        "treesitter": true,
+        "lines": 370,
+        "diagnostics": 60,
+        "handles": {
+          "timer": 6,
+          "fs_poll": 0,
+          "idle": 0,
+          "process": 3,
+          "fs_event": 2
+        },
+        "filetype": "python",
+        "lua_kb": 19859.771484375,
+        "clients": [
+          {
+            "name": "basedpyright",
+            "initialized": true
+          },
+          {
+            "name": "ruff",
+            "initialized": true
+          },
+          {
+            "name": "typos_lsp",
+            "initialized": true
+          }
+        ]
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2184.5,
+      "idle_rss_kb": 407964,
+      "idle_children": [
+        "MainThread",
+        "basedpyright-la",
+        "nvim",
+        "ruff",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 44.526,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 2.51,
+        "p95_ms": 6.688,
+        "max_ms": 8.642,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 64.332,
+        "p95_ms": 69.996,
+        "max_ms": 69.996,
+        "over_50ms": 2,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 3.356,
+        "p95_ms": 12.11,
+        "max_ms": 15.757,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 6,
+        "p50_ms": 4.157,
+        "p95_ms": 18.635,
+        "max_ms": 18.635,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 6,
+      "final": {
+        "treesitter": true,
+        "lines": 370,
+        "diagnostics": 60,
+        "handles": {
+          "timer": 5,
+          "fs_poll": 0,
+          "idle": 0,
+          "process": 3,
+          "fs_event": 2
+        },
+        "filetype": "python",
+        "lua_kb": 17606.28515625,
+        "clients": [
+          {
+            "name": "basedpyright",
+            "initialized": true
+          },
+          {
+            "name": "ruff",
+            "initialized": true
+          },
+          {
+            "name": "typos_lsp",
+            "initialized": true
+          }
+        ]
+      },
+      "final_rss_kb": 688844,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%inventory%extra%0%workspace%inventory.py"
+      ],
+      "disk": {
+        "cache": {
+          "files": 513,
+          "bytes": 2646481
+        },
+        "state": {
+          "files": 4,
+          "bytes": 48645
+        },
+        "workspace": {
+          "files": 4,
+          "bytes": 13468
+        }
+      },
+      "run": 0
+    },
+    {
+      "target": "extra",
+      "sample": "inventory.py",
+      "ready": {
+        "handles": {
+          "process": 3,
+          "timer": 6,
+          "fs_event": 2,
+          "fs_poll": 0,
+          "idle": 0
+        },
+        "diagnostics": 60,
+        "lua_kb": 20066.2998046875,
+        "lines": 370,
+        "treesitter": true,
+        "filetype": "python",
+        "clients": [
+          {
+            "name": "basedpyright",
+            "initialized": true
+          },
+          {
+            "name": "ruff",
+            "initialized": true
+          },
+          {
+            "name": "typos_lsp",
+            "initialized": true
+          }
+        ]
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2188.0,
+      "idle_rss_kb": 404596,
+      "idle_children": [
+        "MainThread",
+        "basedpyright-la",
+        "nvim",
+        "ruff",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 50.145,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 2.415,
+        "p95_ms": 9.404,
+        "max_ms": 10.772,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 67.299,
+        "p95_ms": 87.488,
+        "max_ms": 87.488,
+        "over_50ms": 1,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 3.109,
+        "p95_ms": 15.979,
+        "max_ms": 27.934,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 6,
+        "p50_ms": 7.236,
+        "p95_ms": 21.133,
+        "max_ms": 21.133,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 6,
+      "final": {
+        "handles": {
+          "process": 3,
+          "timer": 5,
+          "fs_event": 2,
+          "fs_poll": 0,
+          "idle": 0
+        },
+        "diagnostics": 60,
+        "lua_kb": 15895.5166015625,
+        "lines": 370,
+        "treesitter": true,
+        "filetype": "python",
+        "clients": [
+          {
+            "name": "basedpyright",
+            "initialized": true
+          },
+          {
+            "name": "ruff",
+            "initialized": true
+          },
+          {
+            "name": "typos_lsp",
+            "initialized": true
+          }
+        ]
+      },
+      "final_rss_kb": 674936,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%inventory%extra%1%workspace%inventory.py"
+      ],
+      "disk": {
+        "cache": {
+          "files": 513,
+          "bytes": 2646481
+        },
+        "state": {
+          "files": 4,
+          "bytes": 49048
+        },
+        "workspace": {
+          "files": 4,
+          "bytes": 13468
+        }
+      },
+      "run": 1
+    },
+    {
+      "target": "extra",
+      "sample": "inventory.py",
+      "ready": {
+        "handles": {
+          "fs_poll": 0,
+          "process": 3,
+          "idle": 0,
+          "timer": 7,
+          "fs_event": 2
+        },
+        "diagnostics": 60,
+        "clients": [
+          {
+            "initialized": true,
+            "name": "basedpyright"
+          },
+          {
+            "initialized": true,
+            "name": "ruff"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "filetype": "python",
+        "lines": 370,
+        "lua_kb": 19399.595703125,
+        "treesitter": true
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2183.9,
+      "idle_rss_kb": 405352,
+      "idle_children": [
+        "MainThread",
+        "basedpyright-la",
+        "nvim",
+        "ruff",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 42.418,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 3.21,
+        "p95_ms": 7.592,
+        "max_ms": 11.619,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 66.81,
+        "p95_ms": 96.216,
+        "max_ms": 96.216,
+        "over_50ms": 1,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 3.058,
+        "p95_ms": 15.156,
+        "max_ms": 26.397,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 6,
+        "p50_ms": 6.202,
+        "p95_ms": 17.62,
+        "max_ms": 17.62,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 6,
+      "final": {
+        "handles": {
+          "fs_poll": 0,
+          "process": 3,
+          "idle": 0,
+          "timer": 5,
+          "fs_event": 2
+        },
+        "diagnostics": 60,
+        "clients": [
+          {
+            "initialized": true,
+            "name": "basedpyright"
+          },
+          {
+            "initialized": true,
+            "name": "ruff"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "filetype": "python",
+        "lines": 370,
+        "lua_kb": 16013.3408203125,
+        "treesitter": true
+      },
+      "final_rss_kb": 680128,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%inventory%extra%2%workspace%inventory.py"
+      ],
+      "disk": {
+        "cache": {
+          "files": 513,
+          "bytes": 2646479
+        },
+        "state": {
+          "files": 4,
+          "bytes": 49332
+        },
+        "workspace": {
+          "files": 4,
+          "bytes": 13468
+        }
+      },
+      "run": 2
+    },
+    {
+      "target": "extra",
+      "sample": "scheduler.ts",
+      "ready": {
+        "handles": {
+          "fs_event": 2,
+          "process": 4,
+          "fs_poll": 0,
+          "timer": 7,
+          "idle": 0
+        },
+        "clients": [
+          {
+            "initialized": true,
+            "name": "tailwindcss"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          },
+          {
+            "initialized": true,
+            "name": "vtsls"
+          }
+        ],
+        "diagnostics": 16,
+        "lua_kb": 21912.517578125,
+        "lines": 360,
+        "treesitter": true,
+        "filetype": "typescript"
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2272.9,
+      "idle_rss_kb": 720852,
+      "idle_children": [
+        "MainThread",
+        "MainThread",
+        "MainThread",
+        "MainThread",
+        "MainThread",
+        "inotifywait",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 69.027,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 4.174,
+        "p95_ms": 13.311,
+        "max_ms": 20.896,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 225.059,
+        "p95_ms": 229.32,
+        "max_ms": 229.32,
+        "over_50ms": 2,
+        "over_100ms": 2
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 3.125,
+        "p95_ms": 6.467,
+        "max_ms": 18.4,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 6,
+        "p50_ms": 5.476,
+        "p95_ms": 14.41,
+        "max_ms": 14.41,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 6,
+      "final": {
+        "handles": {
+          "fs_event": 2,
+          "process": 4,
+          "fs_poll": 0,
+          "timer": 5,
+          "idle": 0
+        },
+        "clients": [
+          {
+            "initialized": true,
+            "name": "tailwindcss"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          },
+          {
+            "initialized": true,
+            "name": "vtsls"
+          }
+        ],
+        "diagnostics": 16,
+        "lua_kb": 17999.1396484375,
+        "lines": 360,
+        "treesitter": true,
+        "filetype": "typescript"
+      },
+      "final_rss_kb": 898596,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%scheduler%extra%0%workspace%scheduler.ts"
+      ],
+      "disk": {
+        "cache": {
+          "files": 526,
+          "bytes": 2714645
+        },
+        "state": {
+          "files": 4,
+          "bytes": 46782
+        },
+        "workspace": {
+          "files": 5,
+          "bytes": 11980
+        }
+      },
+      "run": 0
+    },
+    {
+      "target": "extra",
+      "sample": "scheduler.ts",
+      "ready": {
+        "lines": 360,
+        "diagnostics": 16,
+        "handles": {
+          "fs_poll": 0,
+          "timer": 7,
+          "process": 4,
+          "fs_event": 2,
+          "idle": 0
+        },
+        "treesitter": true,
+        "filetype": "typescript",
+        "lua_kb": 12457.40234375,
+        "clients": [
+          {
+            "initialized": true,
+            "name": "tailwindcss"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          },
+          {
+            "initialized": true,
+            "name": "vtsls"
+          }
+        ]
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2247.6,
+      "idle_rss_kb": 720492,
+      "idle_children": [
+        "MainThread",
+        "MainThread",
+        "MainThread",
+        "MainThread",
+        "MainThread",
+        "inotifywait",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 50.82,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 4.052,
+        "p95_ms": 17.13,
+        "max_ms": 21.242,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 249.421,
+        "p95_ms": 251.756,
+        "max_ms": 251.756,
+        "over_50ms": 2,
+        "over_100ms": 2
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 2.483,
+        "p95_ms": 6.315,
+        "max_ms": 9.491,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 6,
+        "p50_ms": 4.959,
+        "p95_ms": 16.304,
+        "max_ms": 16.304,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 6,
+      "final": {
+        "lines": 360,
+        "diagnostics": 16,
+        "handles": {
+          "fs_poll": 0,
+          "timer": 5,
+          "process": 4,
+          "fs_event": 2,
+          "idle": 0
+        },
+        "treesitter": true,
+        "filetype": "typescript",
+        "lua_kb": 19621.6005859375,
+        "clients": [
+          {
+            "initialized": true,
+            "name": "tailwindcss"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          },
+          {
+            "initialized": true,
+            "name": "vtsls"
+          }
+        ]
+      },
+      "final_rss_kb": 897556,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%scheduler%extra%1%workspace%scheduler.ts"
+      ],
+      "disk": {
+        "cache": {
+          "files": 526,
+          "bytes": 2714644
+        },
+        "state": {
+          "files": 4,
+          "bytes": 46631
+        },
+        "workspace": {
+          "files": 5,
+          "bytes": 11980
+        }
+      },
+      "run": 1
+    },
+    {
+      "target": "extra",
+      "sample": "scheduler.ts",
+      "ready": {
+        "filetype": "typescript",
+        "lines": 360,
+        "clients": [
+          {
+            "initialized": true,
+            "name": "tailwindcss"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          },
+          {
+            "initialized": true,
+            "name": "vtsls"
+          }
+        ],
+        "lua_kb": 21969.69140625,
+        "handles": {
+          "process": 4,
+          "timer": 7,
+          "idle": 0,
+          "fs_event": 2,
+          "fs_poll": 0
+        },
+        "treesitter": true,
+        "diagnostics": 16
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2242.0,
+      "idle_rss_kb": 719472,
+      "idle_children": [
+        "MainThread",
+        "MainThread",
+        "MainThread",
+        "MainThread",
+        "MainThread",
+        "inotifywait",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 57.585,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 3.626,
+        "p95_ms": 19.978,
+        "max_ms": 21.576,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 204.449,
+        "p95_ms": 212.125,
+        "max_ms": 212.125,
+        "over_50ms": 2,
+        "over_100ms": 2
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 3.143,
+        "p95_ms": 8.201,
+        "max_ms": 13.573,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 6,
+        "p50_ms": 2.952,
+        "p95_ms": 11.772,
+        "max_ms": 11.772,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 6,
+      "final": {
+        "filetype": "typescript",
+        "lines": 360,
+        "clients": [
+          {
+            "initialized": true,
+            "name": "tailwindcss"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          },
+          {
+            "initialized": true,
+            "name": "vtsls"
+          }
+        ],
+        "lua_kb": 14914.5791015625,
+        "handles": {
+          "process": 4,
+          "timer": 5,
+          "idle": 0,
+          "fs_event": 2,
+          "fs_poll": 0
+        },
+        "treesitter": true,
+        "diagnostics": 16
+      },
+      "final_rss_kb": 893380,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%scheduler%extra%2%workspace%scheduler.ts"
+      ],
+      "disk": {
+        "cache": {
+          "files": 526,
+          "bytes": 2714645
+        },
+        "state": {
+          "files": 4,
+          "bytes": 46631
+        },
+        "workspace": {
+          "files": 5,
+          "bytes": 11980
+        }
+      },
+      "run": 2
+    },
+    {
+      "target": "extra",
+      "sample": "lib.rs",
+      "ready": {
+        "lua_kb": 16699.345703125,
+        "filetype": "rust",
+        "clients": [
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          },
+          {
+            "initialized": true,
+            "name": "rust-analyzer"
+          }
+        ],
+        "diagnostics": 14,
+        "treesitter": true,
+        "lines": 329,
+        "handles": {
+          "fs_event": 2,
+          "idle": 0,
+          "fs_poll": 0,
+          "process": 2,
+          "timer": 10
+        }
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2179.4,
+      "idle_rss_kb": 667560,
+      "idle_children": [
+        "nvim",
+        "rust-analyzer",
+        "rust-analyzer-p",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 55.009,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 4.473,
+        "p95_ms": 17.985,
+        "max_ms": 23.372,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 57.908,
+        "p95_ms": 61.447,
+        "max_ms": 61.447,
+        "over_50ms": 2,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 3.473,
+        "p95_ms": 8.708,
+        "max_ms": 11.006,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 6,
+        "p50_ms": 6.349,
+        "p95_ms": 17.691,
+        "max_ms": 17.691,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 6,
+      "final": {
+        "lua_kb": 14560.4248046875,
+        "filetype": "rust",
+        "clients": [
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          },
+          {
+            "initialized": true,
+            "name": "rust-analyzer"
+          }
+        ],
+        "diagnostics": 16,
+        "treesitter": true,
+        "lines": 329,
+        "handles": {
+          "fs_event": 2,
+          "idle": 0,
+          "fs_poll": 0,
+          "process": 2,
+          "timer": 5
+        }
+      },
+      "final_rss_kb": 738096,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%lib%extra%0%workspace%src%lib.rs"
+      ],
+      "disk": {
+        "cache": {
+          "files": 536,
+          "bytes": 2722927
+        },
+        "state": {
+          "files": 4,
+          "bytes": 42698
+        },
+        "workspace": {
+          "files": 24,
+          "bytes": 6797080
+        }
+      },
+      "run": 0
+    },
+    {
+      "target": "extra",
+      "sample": "lib.rs",
+      "ready": {
+        "treesitter": true,
+        "clients": [
+          {
+            "name": "typos_lsp",
+            "initialized": true
+          },
+          {
+            "name": "rust-analyzer",
+            "initialized": true
+          }
+        ],
+        "lines": 329,
+        "handles": {
+          "idle": 0,
+          "fs_event": 2,
+          "fs_poll": 0,
+          "process": 2,
+          "timer": 13
+        },
+        "filetype": "rust",
+        "diagnostics": 14,
+        "lua_kb": 19272.2939453125
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2220.8,
+      "idle_rss_kb": 636716,
+      "idle_children": [
+        "nvim",
+        "rust-analyzer",
+        "rust-analyzer-p",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 59.481,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 3.198,
+        "p95_ms": 9.642,
+        "max_ms": 13.69,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 29.741,
+        "p95_ms": 30.028,
+        "max_ms": 30.028,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 3.279,
+        "p95_ms": 7.301,
+        "max_ms": 15.312,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 6,
+        "p50_ms": 3.795,
+        "p95_ms": 6.353,
+        "max_ms": 6.353,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 6,
+      "final": {
+        "treesitter": true,
+        "clients": [
+          {
+            "name": "typos_lsp",
+            "initialized": true
+          },
+          {
+            "name": "rust-analyzer",
+            "initialized": true
+          }
+        ],
+        "lines": 329,
+        "handles": {
+          "idle": 0,
+          "fs_event": 2,
+          "fs_poll": 0,
+          "process": 2,
+          "timer": 5
+        },
+        "filetype": "rust",
+        "diagnostics": 16,
+        "lua_kb": 21076.38671875
+      },
+      "final_rss_kb": 789952,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%lib%extra%1%workspace%src%lib.rs"
+      ],
+      "disk": {
+        "cache": {
+          "files": 536,
+          "bytes": 2722927
+        },
+        "state": {
+          "files": 4,
+          "bytes": 42699
+        },
+        "workspace": {
+          "files": 24,
+          "bytes": 6797080
+        }
+      },
+      "run": 1
+    },
+    {
+      "target": "extra",
+      "sample": "lib.rs",
+      "ready": {
+        "treesitter": true,
+        "clients": [
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          },
+          {
+            "initialized": true,
+            "name": "rust-analyzer"
+          }
+        ],
+        "lines": 329,
+        "filetype": "rust",
+        "diagnostics": 14,
+        "lua_kb": 16945.09765625,
+        "handles": {
+          "fs_event": 2,
+          "idle": 0,
+          "fs_poll": 0,
+          "process": 2,
+          "timer": 10
+        }
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2200.8,
+      "idle_rss_kb": 679828,
+      "idle_children": [
+        "nvim",
+        "rust-analyzer",
+        "rust-analyzer-p",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 49.749,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 3.92,
+        "p95_ms": 12.823,
+        "max_ms": 13.189,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 40.192,
+        "p95_ms": 42.401,
+        "max_ms": 42.401,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 3.193,
+        "p95_ms": 8.836,
+        "max_ms": 10.495,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 6,
+        "p50_ms": 6.154,
+        "p95_ms": 11.115,
+        "max_ms": 11.115,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 6,
+      "final": {
+        "treesitter": true,
+        "clients": [
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          },
+          {
+            "initialized": true,
+            "name": "rust-analyzer"
+          }
+        ],
+        "lines": 329,
+        "filetype": "rust",
+        "diagnostics": 16,
+        "lua_kb": 19988.65234375,
+        "handles": {
+          "fs_event": 2,
+          "idle": 0,
+          "fs_poll": 0,
+          "process": 2,
+          "timer": 5
+        }
+      },
+      "final_rss_kb": 780152,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%lib%extra%2%workspace%src%lib.rs"
+      ],
+      "disk": {
+        "cache": {
+          "files": 536,
+          "bytes": 2722926
+        },
+        "state": {
+          "files": 4,
+          "bytes": 42857
+        },
+        "workspace": {
+          "files": 24,
+          "bytes": 6797080
+        }
+      },
+      "run": 2
+    },
+    {
+      "target": "extra",
+      "sample": "logs.go",
+      "ready": {
+        "filetype": "go",
+        "clients": [
+          {
+            "name": "gopls",
+            "initialized": true
+          },
+          {
+            "name": "typos_lsp",
+            "initialized": true
+          }
+        ],
+        "lua_kb": 17732.640625,
+        "diagnostics": 4,
+        "handles": {
+          "process": 2,
+          "timer": 6,
+          "fs_poll": 0,
+          "idle": 0,
+          "fs_event": 2
+        },
+        "lines": 320,
+        "treesitter": true
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2165.4,
+      "idle_rss_kb": 579640,
+      "idle_children": [
+        "gopls",
+        "gopls",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 62.628,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 3.053,
+        "p95_ms": 13.183,
+        "max_ms": 21.35,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 92.672,
+        "p95_ms": 117.782,
+        "max_ms": 117.782,
+        "over_50ms": 2,
+        "over_100ms": 1
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 2.42,
+        "p95_ms": 11.852,
+        "max_ms": 14.705,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 6,
+        "p50_ms": 2.784,
+        "p95_ms": 8.536,
+        "max_ms": 8.536,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 6,
+      "final": {
+        "filetype": "go",
+        "clients": [
+          {
+            "name": "gopls",
+            "initialized": true
+          },
+          {
+            "name": "typos_lsp",
+            "initialized": true
+          }
+        ],
+        "lua_kb": 14085.3330078125,
+        "diagnostics": 5,
+        "handles": {
+          "process": 2,
+          "timer": 5,
+          "fs_poll": 0,
+          "idle": 0,
+          "fs_event": 2
+        },
+        "lines": 320,
+        "treesitter": true
+      },
+      "final_rss_kb": 574568,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%logs%extra%0%workspace%logs.go"
+      ],
+      "disk": {
+        "cache": {
+          "files": 2084,
+          "bytes": 7327438
+        },
+        "state": {
+          "files": 4,
+          "bytes": 42569
+        },
+        "workspace": {
+          "files": 4,
+          "bytes": 8176
+        }
+      },
+      "run": 0
+    },
+    {
+      "target": "extra",
+      "sample": "logs.go",
+      "ready": {
+        "handles": {
+          "fs_poll": 0,
+          "timer": 6,
+          "fs_event": 2,
+          "idle": 0,
+          "process": 2
+        },
+        "lines": 320,
+        "treesitter": true,
+        "clients": [
+          {
+            "initialized": true,
+            "name": "gopls"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "lua_kb": 17900.181640625,
+        "diagnostics": 4,
+        "filetype": "go"
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2166.7,
+      "idle_rss_kb": 595696,
+      "idle_children": [
+        "gopls",
+        "gopls",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 60.794,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 3.751,
+        "p95_ms": 15.548,
+        "max_ms": 16.743,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 76.255,
+        "p95_ms": 84.266,
+        "max_ms": 84.266,
+        "over_50ms": 2,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 2.411,
+        "p95_ms": 6.165,
+        "max_ms": 13.668,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 6,
+        "p50_ms": 6.593,
+        "p95_ms": 24.502,
+        "max_ms": 24.502,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 6,
+      "final": {
+        "handles": {
+          "fs_poll": 0,
+          "timer": 5,
+          "fs_event": 2,
+          "idle": 0,
+          "process": 2
+        },
+        "lines": 320,
+        "treesitter": true,
+        "clients": [
+          {
+            "initialized": true,
+            "name": "gopls"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "lua_kb": 26485.884765625,
+        "diagnostics": 5,
+        "filetype": "go"
+      },
+      "final_rss_kb": 549104,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%logs%extra%1%workspace%logs.go"
+      ],
+      "disk": {
+        "cache": {
+          "files": 2089,
+          "bytes": 7329600
+        },
+        "state": {
+          "files": 4,
+          "bytes": 43024
+        },
+        "workspace": {
+          "files": 4,
+          "bytes": 8176
+        }
+      },
+      "run": 1
+    },
+    {
+      "target": "extra",
+      "sample": "logs.go",
+      "ready": {
+        "handles": {
+          "fs_event": 2,
+          "fs_poll": 0,
+          "idle": 0,
+          "timer": 6,
+          "process": 2
+        },
+        "lines": 320,
+        "lua_kb": 17114.0166015625,
+        "treesitter": true,
+        "diagnostics": 4,
+        "clients": [
+          {
+            "initialized": true,
+            "name": "gopls"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "filetype": "go"
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2134.2,
+      "idle_rss_kb": 732432,
+      "idle_children": [
+        "gopls",
+        "gopls",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 59.337,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 4.214,
+        "p95_ms": 13.023,
+        "max_ms": 13.177,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 74.799,
+        "p95_ms": 82.386,
+        "max_ms": 82.386,
+        "over_50ms": 2,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 2.287,
+        "p95_ms": 8.73,
+        "max_ms": 16.082,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 6,
+        "p50_ms": 6.971,
+        "p95_ms": 20.769,
+        "max_ms": 20.769,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 6,
+      "final": {
+        "handles": {
+          "fs_event": 2,
+          "fs_poll": 0,
+          "idle": 0,
+          "timer": 5,
+          "process": 2
+        },
+        "lines": 320,
+        "lua_kb": 24138.9384765625,
+        "treesitter": true,
+        "diagnostics": 5,
+        "clients": [
+          {
+            "initialized": true,
+            "name": "gopls"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "filetype": "go"
+      },
+      "final_rss_kb": 749996,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%logs%extra%2%workspace%logs.go"
+      ],
+      "disk": {
+        "cache": {
+          "files": 2091,
+          "bytes": 7328123
+        },
+        "state": {
+          "files": 4,
+          "bytes": 43175
+        },
+        "workspace": {
+          "files": 4,
+          "bytes": 8176
+        }
+      },
+      "run": 2
+    },
+    {
+      "target": "extra",
+      "sample": "matrix.c",
+      "ready": {
+        "treesitter": true,
+        "lines": 355,
+        "diagnostics": 7,
+        "clients": [
+          {
+            "name": "clangd",
+            "initialized": true
+          },
+          {
+            "name": "typos_lsp",
+            "initialized": true
+          }
+        ],
+        "filetype": "c",
+        "handles": {
+          "idle": 0,
+          "fs_event": 2,
+          "process": 2,
+          "fs_poll": 0,
+          "timer": 6
+        },
+        "lua_kb": 16264.1591796875
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2147.7,
+      "idle_rss_kb": 161920,
+      "idle_children": [
+        "clangd.main",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 62.477,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 3.769,
+        "p95_ms": 13.376,
+        "max_ms": 13.57,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 33.526,
+        "p95_ms": 34.113,
+        "max_ms": 34.113,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 2.042,
+        "p95_ms": 5.908,
+        "max_ms": 26.908,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 6,
+        "p50_ms": 5.419,
+        "p95_ms": 15.632,
+        "max_ms": 15.632,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 6,
+      "final": {
+        "treesitter": true,
+        "lines": 355,
+        "diagnostics": 7,
+        "clients": [
+          {
+            "name": "clangd",
+            "initialized": true
+          },
+          {
+            "name": "typos_lsp",
+            "initialized": true
+          }
+        ],
+        "filetype": "c",
+        "handles": {
+          "idle": 0,
+          "fs_event": 2,
+          "process": 2,
+          "fs_poll": 0,
+          "timer": 5
+        },
+        "lua_kb": 27240.6787109375
+      },
+      "final_rss_kb": 187592,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%matrix%extra%0%workspace%matrix.c"
+      ],
+      "disk": {
+        "cache": {
+          "files": 511,
+          "bytes": 2686571
+        },
+        "state": {
+          "files": 4,
+          "bytes": 61806
+        },
+        "workspace": {
+          "files": 5,
+          "bytes": 8854
+        }
+      },
+      "run": 0
+    },
+    {
+      "target": "extra",
+      "sample": "matrix.c",
+      "ready": {
+        "lines": 355,
+        "lua_kb": 14624.0419921875,
+        "diagnostics": 7,
+        "handles": {
+          "fs_event": 2,
+          "fs_poll": 0,
+          "timer": 6,
+          "process": 2,
+          "idle": 0
+        },
+        "treesitter": true,
+        "filetype": "c",
+        "clients": [
+          {
+            "name": "clangd",
+            "initialized": true
+          },
+          {
+            "name": "typos_lsp",
+            "initialized": true
+          }
+        ]
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2145.4,
+      "idle_rss_kb": 162672,
+      "idle_children": [
+        "clangd.main",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 52.481,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 3.135,
+        "p95_ms": 8.979,
+        "max_ms": 12.198,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 34.753,
+        "p95_ms": 35.984,
+        "max_ms": 35.984,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 2.333,
+        "p95_ms": 6.73,
+        "max_ms": 16.29,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 6,
+        "p50_ms": 6.447,
+        "p95_ms": 18.985,
+        "max_ms": 18.985,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 6,
+      "final": {
+        "lines": 355,
+        "lua_kb": 25394.728515625,
+        "diagnostics": 7,
+        "handles": {
+          "fs_event": 2,
+          "fs_poll": 0,
+          "timer": 5,
+          "process": 2,
+          "idle": 0
+        },
+        "treesitter": true,
+        "filetype": "c",
+        "clients": [
+          {
+            "name": "clangd",
+            "initialized": true
+          },
+          {
+            "name": "typos_lsp",
+            "initialized": true
+          }
+        ]
+      },
+      "final_rss_kb": 187984,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%matrix%extra%1%workspace%matrix.c"
+      ],
+      "disk": {
+        "cache": {
+          "files": 511,
+          "bytes": 2686570
+        },
+        "state": {
+          "files": 4,
+          "bytes": 61876
+        },
+        "workspace": {
+          "files": 5,
+          "bytes": 8854
+        }
+      },
+      "run": 1
+    },
+    {
+      "target": "extra",
+      "sample": "matrix.c",
+      "ready": {
+        "lines": 355,
+        "treesitter": true,
+        "filetype": "c",
+        "handles": {
+          "fs_event": 2,
+          "process": 2,
+          "timer": 6,
+          "idle": 0,
+          "fs_poll": 0
+        },
+        "diagnostics": 7,
+        "lua_kb": 16262.0234375,
+        "clients": [
+          {
+            "initialized": true,
+            "name": "clangd"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ]
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2140.5,
+      "idle_rss_kb": 161700,
+      "idle_children": [
+        "clangd.main",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 68.518,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 3.639,
+        "p95_ms": 13.84,
+        "max_ms": 16.672,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 35.808,
+        "p95_ms": 36.171,
+        "max_ms": 36.171,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 1.894,
+        "p95_ms": 6.644,
+        "max_ms": 21.936,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 6,
+        "p50_ms": 6.74,
+        "p95_ms": 17.232,
+        "max_ms": 17.232,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 6,
+      "final": {
+        "lines": 355,
+        "treesitter": true,
+        "filetype": "c",
+        "handles": {
+          "fs_event": 2,
+          "process": 2,
+          "timer": 5,
+          "idle": 0,
+          "fs_poll": 0
+        },
+        "diagnostics": 7,
+        "lua_kb": 27805.951171875,
+        "clients": [
+          {
+            "initialized": true,
+            "name": "clangd"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ]
+      },
+      "final_rss_kb": 187560,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%matrix%extra%2%workspace%matrix.c"
+      ],
+      "disk": {
+        "cache": {
+          "files": 511,
+          "bytes": 2686571
+        },
+        "state": {
+          "files": 4,
+          "bytes": 61350
+        },
+        "workspace": {
+          "files": 5,
+          "bytes": 8854
+        }
+      },
+      "run": 2
+    },
+    {
+      "target": "extra",
+      "sample": "graph.cpp",
+      "ready": {
+        "treesitter": true,
+        "lines": 350,
+        "handles": {
+          "fs_event": 2,
+          "timer": 6,
+          "fs_poll": 0,
+          "process": 2,
+          "idle": 0
+        },
+        "filetype": "cpp",
+        "lua_kb": 15954.701171875,
+        "clients": [
+          {
+            "initialized": true,
+            "name": "clangd"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "diagnostics": 14
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2281.9,
+      "idle_rss_kb": 404144,
+      "idle_children": [
+        "clangd.main",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 92.082,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 3.506,
+        "p95_ms": 10.611,
+        "max_ms": 13.316,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 36.135,
+        "p95_ms": 36.464,
+        "max_ms": 36.464,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 2.355,
+        "p95_ms": 6.961,
+        "max_ms": 11.401,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 6,
+        "p50_ms": 4.556,
+        "p95_ms": 13.116,
+        "max_ms": 13.116,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 6,
+      "final": {
+        "treesitter": true,
+        "lines": 350,
+        "handles": {
+          "fs_event": 2,
+          "timer": 5,
+          "fs_poll": 0,
+          "process": 2,
+          "idle": 0
+        },
+        "filetype": "cpp",
+        "lua_kb": 26987.072265625,
+        "clients": [
+          {
+            "initialized": true,
+            "name": "clangd"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "diagnostics": 14
+      },
+      "final_rss_kb": 501880,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%graph%extra%0%workspace%graph.cpp"
+      ],
+      "disk": {
+        "cache": {
+          "files": 512,
+          "bytes": 2686389
+        },
+        "state": {
+          "files": 4,
+          "bytes": 65747
+        },
+        "workspace": {
+          "files": 5,
+          "bytes": 9566
+        }
+      },
+      "run": 0
+    },
+    {
+      "target": "extra",
+      "sample": "graph.cpp",
+      "ready": {
+        "handles": {
+          "timer": 6,
+          "idle": 0,
+          "process": 2,
+          "fs_event": 2,
+          "fs_poll": 0
+        },
+        "treesitter": true,
+        "lines": 350,
+        "filetype": "cpp",
+        "clients": [
+          {
+            "initialized": true,
+            "name": "clangd"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "diagnostics": 14,
+        "lua_kb": 14810.6328125
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2281.4,
+      "idle_rss_kb": 404516,
+      "idle_children": [
+        "clangd.main",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 76.259,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 3.236,
+        "p95_ms": 10.522,
+        "max_ms": 18.91,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 44.55,
+        "p95_ms": 49.474,
+        "max_ms": 49.474,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 2.515,
+        "p95_ms": 5.786,
+        "max_ms": 16.085,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 6,
+        "p50_ms": 6.736,
+        "p95_ms": 8.335,
+        "max_ms": 8.335,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 6,
+      "final": {
+        "handles": {
+          "timer": 5,
+          "idle": 0,
+          "process": 2,
+          "fs_event": 2,
+          "fs_poll": 0
+        },
+        "treesitter": true,
+        "lines": 350,
+        "filetype": "cpp",
+        "clients": [
+          {
+            "initialized": true,
+            "name": "clangd"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "diagnostics": 14,
+        "lua_kb": 25350.7353515625
+      },
+      "final_rss_kb": 499332,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%graph%extra%1%workspace%graph.cpp"
+      ],
+      "disk": {
+        "cache": {
+          "files": 512,
+          "bytes": 2686389
+        },
+        "state": {
+          "files": 4,
+          "bytes": 65970
+        },
+        "workspace": {
+          "files": 5,
+          "bytes": 9566
+        }
+      },
+      "run": 1
+    },
+    {
+      "target": "extra",
+      "sample": "graph.cpp",
+      "ready": {
+        "lua_kb": 15503.359375,
+        "diagnostics": 14,
+        "filetype": "cpp",
+        "handles": {
+          "process": 2,
+          "timer": 6,
+          "fs_poll": 0,
+          "idle": 0,
+          "fs_event": 2
+        },
+        "clients": [
+          {
+            "initialized": true,
+            "name": "clangd"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "treesitter": true,
+        "lines": 350
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2282.8,
+      "idle_rss_kb": 404436,
+      "idle_children": [
+        "clangd.main",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 82.663,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 2.678,
+        "p95_ms": 8.993,
+        "max_ms": 11.432,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 40.33,
+        "p95_ms": 44.173,
+        "max_ms": 44.173,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 2.167,
+        "p95_ms": 4.427,
+        "max_ms": 8.824,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 6,
+        "p50_ms": 5.993,
+        "p95_ms": 15.002,
+        "max_ms": 15.002,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 6,
+      "final": {
+        "lua_kb": 27847.7490234375,
+        "diagnostics": 14,
+        "filetype": "cpp",
+        "handles": {
+          "process": 2,
+          "timer": 5,
+          "fs_poll": 0,
+          "idle": 0,
+          "fs_event": 2
+        },
+        "clients": [
+          {
+            "initialized": true,
+            "name": "clangd"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "treesitter": true,
+        "lines": 350
+      },
+      "final_rss_kb": 500404,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%graph%extra%2%workspace%graph.cpp"
+      ],
+      "disk": {
+        "cache": {
+          "files": 512,
+          "bytes": 2686389
+        },
+        "state": {
+          "files": 4,
+          "bytes": 65899
+        },
+        "workspace": {
+          "files": 5,
+          "bytes": 9566
+        }
+      },
+      "run": 2
+    },
+    {
+      "target": "extra",
+      "sample": "build.lua",
+      "ready": {
+        "diagnostics": 14,
+        "treesitter": true,
+        "filetype": "lua",
+        "clients": [
+          {
+            "name": "lua_ls",
+            "initialized": true
+          },
+          {
+            "name": "typos_lsp",
+            "initialized": true
+          }
+        ],
+        "lines": 298,
+        "handles": {
+          "process": 2,
+          "fs_event": 2,
+          "idle": 0,
+          "fs_poll": 0,
+          "timer": 11
+        },
+        "lua_kb": 12788.1591796875
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2140.3,
+      "idle_rss_kb": 351588,
+      "idle_children": [
+        "lua-language-se",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 37.037,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 4.417,
+        "p95_ms": 9.027,
+        "max_ms": 22.705,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 27.263,
+        "p95_ms": 34.894,
+        "max_ms": 34.894,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 2.957,
+        "p95_ms": 7.449,
+        "max_ms": 13.777,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 6,
+        "p50_ms": 5.387,
+        "p95_ms": 10.832,
+        "max_ms": 10.832,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 6,
+      "final": {
+        "diagnostics": 14,
+        "treesitter": true,
+        "filetype": "lua",
+        "clients": [
+          {
+            "name": "lua_ls",
+            "initialized": true
+          },
+          {
+            "name": "typos_lsp",
+            "initialized": true
+          }
+        ],
+        "lines": 298,
+        "handles": {
+          "process": 2,
+          "fs_event": 2,
+          "idle": 0,
+          "fs_poll": 0,
+          "timer": 5
+        },
+        "lua_kb": 26865.8359375
+      },
+      "final_rss_kb": 388408,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%build%extra%0%workspace%build.lua"
+      ],
+      "disk": {
+        "cache": {
+          "files": 529,
+          "bytes": 2714777
+        },
+        "state": {
+          "files": 4,
+          "bytes": 29008
+        },
+        "workspace": {
+          "files": 3,
+          "bytes": 7835
+        }
+      },
+      "run": 0
+    },
+    {
+      "target": "extra",
+      "sample": "build.lua",
+      "ready": {
+        "clients": [
+          {
+            "initialized": true,
+            "name": "lua_ls"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "filetype": "lua",
+        "lua_kb": 14026.4580078125,
+        "lines": 298,
+        "treesitter": true,
+        "diagnostics": 0,
+        "handles": {
+          "fs_poll": 0,
+          "process": 2,
+          "timer": 11,
+          "idle": 0,
+          "fs_event": 2
+        }
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2146.1,
+      "idle_rss_kb": 279784,
+      "idle_children": [
+        "lua-language-se",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 44.693,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 3.708,
+        "p95_ms": 9.322,
+        "max_ms": 36.734,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 23.612,
+        "p95_ms": 28.892,
+        "max_ms": 28.892,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 2.851,
+        "p95_ms": 9.298,
+        "max_ms": 13.887,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 6,
+        "p50_ms": 4.493,
+        "p95_ms": 10.198,
+        "max_ms": 10.198,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 6,
+      "final": {
+        "clients": [
+          {
+            "initialized": true,
+            "name": "lua_ls"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "filetype": "lua",
+        "lua_kb": 28860.8662109375,
+        "lines": 298,
+        "treesitter": true,
+        "diagnostics": 14,
+        "handles": {
+          "fs_poll": 0,
+          "process": 2,
+          "timer": 5,
+          "idle": 0,
+          "fs_event": 2
+        }
+      },
+      "final_rss_kb": 376544,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%build%extra%1%workspace%build.lua"
+      ],
+      "disk": {
+        "cache": {
+          "files": 529,
+          "bytes": 2714777
+        },
+        "state": {
+          "files": 4,
+          "bytes": 29008
+        },
+        "workspace": {
+          "files": 3,
+          "bytes": 7835
+        }
+      },
+      "run": 1
+    },
+    {
+      "target": "extra",
+      "sample": "build.lua",
+      "ready": {
+        "diagnostics": 0,
+        "filetype": "lua",
+        "lines": 298,
+        "treesitter": true,
+        "handles": {
+          "process": 2,
+          "timer": 11,
+          "fs_poll": 0,
+          "idle": 0,
+          "fs_event": 2
+        },
+        "lua_kb": 12007.873046875,
+        "clients": [
+          {
+            "name": "lua_ls",
+            "initialized": true
+          },
+          {
+            "name": "typos_lsp",
+            "initialized": true
+          }
+        ]
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2140.6,
+      "idle_rss_kb": 291156,
+      "idle_children": [
+        "lua-language-se",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 56.163,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 3.927,
+        "p95_ms": 8.873,
+        "max_ms": 13.091,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 24.785,
+        "p95_ms": 30.374,
+        "max_ms": 30.374,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 2.924,
+        "p95_ms": 7.002,
+        "max_ms": 14.114,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 6,
+        "p50_ms": 6.188,
+        "p95_ms": 11.115,
+        "max_ms": 11.115,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 6,
+      "final": {
+        "diagnostics": 14,
+        "filetype": "lua",
+        "lines": 298,
+        "treesitter": true,
+        "handles": {
+          "process": 2,
+          "timer": 5,
+          "fs_poll": 0,
+          "idle": 0,
+          "fs_event": 2
+        },
+        "lua_kb": 24851.76953125,
+        "clients": [
+          {
+            "name": "lua_ls",
+            "initialized": true
+          },
+          {
+            "name": "typos_lsp",
+            "initialized": true
+          }
+        ]
+      },
+      "final_rss_kb": 402164,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%build%extra%2%workspace%build.lua"
+      ],
+      "disk": {
+        "cache": {
+          "files": 529,
+          "bytes": 2714777
+        },
+        "state": {
+          "files": 4,
+          "bytes": 29160
+        },
+        "workspace": {
+          "files": 3,
+          "bytes": 7835
+        }
+      },
+      "run": 2
+    },
+    {
+      "target": "extra",
+      "sample": "deploy.sh",
+      "ready": {
+        "handles": {
+          "idle": 0,
+          "timer": 6,
+          "process": 2,
+          "fs_event": 2,
+          "fs_poll": 0
+        },
+        "clients": [
+          {
+            "initialized": true,
+            "name": "bashls"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "filetype": "sh",
+        "diagnostics": 94,
+        "lines": 198,
+        "lua_kb": 20704.9501953125,
+        "treesitter": true
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2170.3,
+      "idle_rss_kb": 220808,
+      "idle_children": [
+        "MainThread",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 50.35,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 5.009,
+        "p95_ms": 20.018,
+        "max_ms": 25.121,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 35.916,
+        "p95_ms": 44.948,
+        "max_ms": 44.948,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 1.77,
+        "p95_ms": 4.785,
+        "max_ms": 17.189,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 4,
+        "p50_ms": 8.015,
+        "p95_ms": 24.685,
+        "max_ms": 24.685,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 4,
+      "final": {
+        "handles": {
+          "idle": 0,
+          "timer": 8,
+          "process": 2,
+          "fs_event": 2,
+          "fs_poll": 0
+        },
+        "clients": [
+          {
+            "initialized": true,
+            "name": "bashls"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "filetype": "sh",
+        "diagnostics": 47,
+        "lines": 198,
+        "lua_kb": 13192.7265625,
+        "treesitter": true
+      },
+      "final_rss_kb": 236496,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/conform.log",
+        "nvim/undo/%tmp%nvim-diag-483119%session%deploy%extra%0%workspace%deploy.sh"
+      ],
+      "disk": {
+        "cache": {
+          "files": 518,
+          "bytes": 2714772
+        },
+        "state": {
+          "files": 5,
+          "bytes": 20779
+        },
+        "workspace": {
+          "files": 3,
+          "bytes": 4691
+        }
+      },
+      "run": 0
+    },
+    {
+      "target": "extra",
+      "sample": "deploy.sh",
+      "ready": {
+        "diagnostics": 94,
+        "clients": [
+          {
+            "initialized": true,
+            "name": "bashls"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "lua_kb": 20680.9423828125,
+        "lines": 198,
+        "filetype": "sh",
+        "treesitter": true,
+        "handles": {
+          "idle": 0,
+          "fs_event": 2,
+          "fs_poll": 0,
+          "timer": 6,
+          "process": 2
+        }
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2167.2,
+      "idle_rss_kb": 220028,
+      "idle_children": [
+        "MainThread",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 52.062,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 3.654,
+        "p95_ms": 16.817,
+        "max_ms": 25.012,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 17.419,
+        "p95_ms": 23.034,
+        "max_ms": 23.034,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 2.005,
+        "p95_ms": 4.388,
+        "max_ms": 15.806,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 4,
+        "p50_ms": 7.68,
+        "p95_ms": 22.753,
+        "max_ms": 22.753,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 4,
+      "final": {
+        "diagnostics": 47,
+        "clients": [
+          {
+            "initialized": true,
+            "name": "bashls"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "lua_kb": 13312.8076171875,
+        "lines": 198,
+        "filetype": "sh",
+        "treesitter": true,
+        "handles": {
+          "idle": 0,
+          "fs_event": 2,
+          "fs_poll": 0,
+          "timer": 8,
+          "process": 2
+        }
+      },
+      "final_rss_kb": 236488,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/conform.log",
+        "nvim/undo/%tmp%nvim-diag-483119%session%deploy%extra%1%workspace%deploy.sh"
+      ],
+      "disk": {
+        "cache": {
+          "files": 518,
+          "bytes": 2714772
+        },
+        "state": {
+          "files": 5,
+          "bytes": 20779
+        },
+        "workspace": {
+          "files": 3,
+          "bytes": 4691
+        }
+      },
+      "run": 1
+    },
+    {
+      "target": "extra",
+      "sample": "deploy.sh",
+      "ready": {
+        "treesitter": true,
+        "lines": 198,
+        "diagnostics": 94,
+        "filetype": "sh",
+        "clients": [
+          {
+            "initialized": true,
+            "name": "bashls"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "handles": {
+          "fs_poll": 0,
+          "process": 2,
+          "idle": 0,
+          "timer": 6,
+          "fs_event": 2
+        },
+        "lua_kb": 20037.705078125
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2166.3,
+      "idle_rss_kb": 220576,
+      "idle_children": [
+        "MainThread",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 61.574,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 6.25,
+        "p95_ms": 16.816,
+        "max_ms": 19.413,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 19.615,
+        "p95_ms": 22.301,
+        "max_ms": 22.301,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 1.739,
+        "p95_ms": 4.729,
+        "max_ms": 9.1,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 4,
+        "p50_ms": 8.242,
+        "p95_ms": 25.384,
+        "max_ms": 25.384,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 4,
+      "final": {
+        "treesitter": true,
+        "lines": 198,
+        "diagnostics": 47,
+        "filetype": "sh",
+        "clients": [
+          {
+            "initialized": true,
+            "name": "bashls"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "handles": {
+          "fs_poll": 0,
+          "process": 2,
+          "idle": 0,
+          "timer": 8,
+          "fs_event": 2
+        },
+        "lua_kb": 26175.3603515625
+      },
+      "final_rss_kb": 234900,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/conform.log",
+        "nvim/undo/%tmp%nvim-diag-483119%session%deploy%extra%2%workspace%deploy.sh"
+      ],
+      "disk": {
+        "cache": {
+          "files": 518,
+          "bytes": 2714772
+        },
+        "state": {
+          "files": 5,
+          "bytes": 20072
+        },
+        "workspace": {
+          "files": 3,
+          "bytes": 4691
+        }
+      },
+      "run": 2
+    },
+    {
+      "target": "extra",
+      "sample": "handbook.md",
+      "ready": {
+        "filetype": "markdown",
+        "clients": [
+          {
+            "name": "marksman",
+            "initialized": true
+          }
+        ],
+        "lines": 184,
+        "diagnostics": 45,
+        "handles": {
+          "process": 1,
+          "timer": 6,
+          "fs_event": 2,
+          "idle": 0,
+          "fs_poll": 0
+        },
+        "treesitter": true,
+        "lua_kb": 26764.0263671875
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2264.7,
+      "idle_rss_kb": 156896,
+      "idle_children": [
+        "marksman",
+        "nvim"
+      ],
+      "first_edit_ms": 54.756,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 5.156,
+        "p95_ms": 11.949,
+        "max_ms": 12.193,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 127.09,
+        "p95_ms": 140.013,
+        "max_ms": 140.013,
+        "over_50ms": 2,
+        "over_100ms": 2
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 2.418,
+        "p95_ms": 6.16,
+        "max_ms": 21.194,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 4,
+        "p50_ms": 6.525,
+        "p95_ms": 37.486,
+        "max_ms": 37.486,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 4,
+      "final": {
+        "filetype": "markdown",
+        "clients": [
+          {
+            "name": "marksman",
+            "initialized": true
+          }
+        ],
+        "lines": 184,
+        "diagnostics": 45,
+        "handles": {
+          "process": 1,
+          "timer": 5,
+          "fs_event": 2,
+          "idle": 0,
+          "fs_poll": 0
+        },
+        "treesitter": true,
+        "lua_kb": 30823.5146484375
+      },
+      "final_rss_kb": 186888,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%handbook%extra%0%workspace%handbook.md"
+      ],
+      "disk": {
+        "cache": {
+          "files": 593,
+          "bytes": 3511145
+        },
+        "state": {
+          "files": 4,
+          "bytes": 24532
+        },
+        "workspace": {
+          "files": 3,
+          "bytes": 5652
+        }
+      },
+      "run": 0
+    },
+    {
+      "target": "extra",
+      "sample": "handbook.md",
+      "ready": {
+        "lines": 184,
+        "treesitter": true,
+        "lua_kb": 26223.7080078125,
+        "clients": [
+          {
+            "name": "marksman",
+            "initialized": true
+          }
+        ],
+        "handles": {
+          "fs_event": 2,
+          "fs_poll": 0,
+          "process": 1,
+          "idle": 0,
+          "timer": 6
+        },
+        "filetype": "markdown",
+        "diagnostics": 45
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2239.9,
+      "idle_rss_kb": 156848,
+      "idle_children": [
+        "marksman",
+        "nvim"
+      ],
+      "first_edit_ms": 49.0,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 5.078,
+        "p95_ms": 12.008,
+        "max_ms": 12.848,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 121.972,
+        "p95_ms": 130.093,
+        "max_ms": 130.093,
+        "over_50ms": 2,
+        "over_100ms": 2
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 2.499,
+        "p95_ms": 6.004,
+        "max_ms": 20.89,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 4,
+        "p50_ms": 9.895,
+        "p95_ms": 27.59,
+        "max_ms": 27.59,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 4,
+      "final": {
+        "lines": 184,
+        "treesitter": true,
+        "lua_kb": 30698.2314453125,
+        "clients": [
+          {
+            "name": "marksman",
+            "initialized": true
+          }
+        ],
+        "handles": {
+          "fs_event": 2,
+          "fs_poll": 0,
+          "process": 1,
+          "idle": 0,
+          "timer": 5
+        },
+        "filetype": "markdown",
+        "diagnostics": 45
+      },
+      "final_rss_kb": 187520,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%handbook%extra%1%workspace%handbook.md"
+      ],
+      "disk": {
+        "cache": {
+          "files": 593,
+          "bytes": 3511145
+        },
+        "state": {
+          "files": 4,
+          "bytes": 24532
+        },
+        "workspace": {
+          "files": 3,
+          "bytes": 5652
+        }
+      },
+      "run": 1
+    },
+    {
+      "target": "extra",
+      "sample": "handbook.md",
+      "ready": {
+        "clients": [
+          {
+            "initialized": true,
+            "name": "marksman"
+          }
+        ],
+        "lines": 184,
+        "lua_kb": 14884.9638671875,
+        "filetype": "markdown",
+        "diagnostics": 45,
+        "treesitter": true,
+        "handles": {
+          "fs_event": 2,
+          "fs_poll": 0,
+          "process": 1,
+          "idle": 0,
+          "timer": 6
+        }
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2245.6,
+      "idle_rss_kb": 157216,
+      "idle_children": [
+        "marksman",
+        "nvim"
+      ],
+      "first_edit_ms": 35.271,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 4.363,
+        "p95_ms": 10.812,
+        "max_ms": 14.883,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 116.448,
+        "p95_ms": 120.808,
+        "max_ms": 120.808,
+        "over_50ms": 2,
+        "over_100ms": 2
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 2.619,
+        "p95_ms": 4.497,
+        "max_ms": 22.785,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 4,
+        "p50_ms": 7.47,
+        "p95_ms": 38.788,
+        "max_ms": 38.788,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 4,
+      "final": {
+        "clients": [
+          {
+            "initialized": true,
+            "name": "marksman"
+          }
+        ],
+        "lines": 184,
+        "lua_kb": 23634.9970703125,
+        "filetype": "markdown",
+        "diagnostics": 45,
+        "treesitter": true,
+        "handles": {
+          "fs_event": 2,
+          "fs_poll": 0,
+          "process": 1,
+          "idle": 0,
+          "timer": 5
+        }
+      },
+      "final_rss_kb": 188616,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/undo/%tmp%nvim-diag-483119%session%handbook%extra%2%workspace%handbook.md"
+      ],
+      "disk": {
+        "cache": {
+          "files": 593,
+          "bytes": 3511145
+        },
+        "state": {
+          "files": 4,
+          "bytes": 24532
+        },
+        "workspace": {
+          "files": 3,
+          "bytes": 5652
+        }
+      },
+      "run": 2
+    },
+    {
+      "target": "extra",
+      "sample": "analytics.sql",
+      "ready": {
+        "filetype": "sql",
+        "handles": {
+          "idle": 0,
+          "timer": 6,
+          "fs_poll": 0,
+          "process": 2,
+          "fs_event": 2
+        },
+        "lines": 182,
+        "lua_kb": 16733.8134765625,
+        "treesitter": true,
+        "clients": [
+          {
+            "initialized": true,
+            "name": "sqlls"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "diagnostics": 74
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2189.2,
+      "idle_rss_kb": 193636,
+      "idle_children": [
+        "MainThread",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 41.091,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 4.026,
+        "p95_ms": 11.119,
+        "max_ms": 14.127,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 126.692,
+        "p95_ms": 130.62,
+        "max_ms": 130.62,
+        "over_50ms": 2,
+        "over_100ms": 2
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 2.42,
+        "p95_ms": 8.048,
+        "max_ms": 10.341,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 4,
+        "p50_ms": 8.168,
+        "p95_ms": 40.782,
+        "max_ms": 40.782,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 4,
+      "final": {
+        "filetype": "sql",
+        "handles": {
+          "idle": 0,
+          "timer": 7,
+          "fs_poll": 0,
+          "process": 2,
+          "fs_event": 2
+        },
+        "lines": 182,
+        "lua_kb": 19552.7763671875,
+        "treesitter": true,
+        "clients": [
+          {
+            "initialized": true,
+            "name": "sqlls"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "diagnostics": 74
+      },
+      "final_rss_kb": 226160,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/conform.log",
+        "nvim/undo/%tmp%nvim-diag-483119%session%analytics%extra%0%workspace%analytics.sql"
+      ],
+      "disk": {
+        "cache": {
+          "files": 517,
+          "bytes": 2714512
+        },
+        "state": {
+          "files": 5,
+          "bytes": 36632
+        },
+        "workspace": {
+          "files": 3,
+          "bytes": 5562
+        }
+      },
+      "run": 0
+    },
+    {
+      "target": "extra",
+      "sample": "analytics.sql",
+      "ready": {
+        "treesitter": true,
+        "lua_kb": 16384.4609375,
+        "diagnostics": 74,
+        "filetype": "sql",
+        "lines": 182,
+        "handles": {
+          "fs_event": 2,
+          "fs_poll": 0,
+          "timer": 6,
+          "process": 2,
+          "idle": 0
+        },
+        "clients": [
+          {
+            "name": "sqlls",
+            "initialized": true
+          },
+          {
+            "name": "typos_lsp",
+            "initialized": true
+          }
+        ]
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2185.1,
+      "idle_rss_kb": 193188,
+      "idle_children": [
+        "MainThread",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 35.56,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 3.784,
+        "p95_ms": 9.115,
+        "max_ms": 11.207,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 125.824,
+        "p95_ms": 130.17,
+        "max_ms": 130.17,
+        "over_50ms": 2,
+        "over_100ms": 2
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 2.894,
+        "p95_ms": 6.582,
+        "max_ms": 16.729,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 4,
+        "p50_ms": 8.733,
+        "p95_ms": 22.759,
+        "max_ms": 22.759,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 4,
+      "final": {
+        "treesitter": true,
+        "lua_kb": 25416.8095703125,
+        "diagnostics": 74,
+        "filetype": "sql",
+        "lines": 182,
+        "handles": {
+          "fs_event": 2,
+          "fs_poll": 0,
+          "timer": 7,
+          "process": 2,
+          "idle": 0
+        },
+        "clients": [
+          {
+            "name": "sqlls",
+            "initialized": true
+          },
+          {
+            "name": "typos_lsp",
+            "initialized": true
+          }
+        ]
+      },
+      "final_rss_kb": 230308,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/conform.log",
+        "nvim/undo/%tmp%nvim-diag-483119%session%analytics%extra%1%workspace%analytics.sql"
+      ],
+      "disk": {
+        "cache": {
+          "files": 517,
+          "bytes": 2714512
+        },
+        "state": {
+          "files": 5,
+          "bytes": 36632
+        },
+        "workspace": {
+          "files": 3,
+          "bytes": 5562
+        }
+      },
+      "run": 1
+    },
+    {
+      "target": "extra",
+      "sample": "analytics.sql",
+      "ready": {
+        "diagnostics": 74,
+        "lua_kb": 16816.8427734375,
+        "lines": 182,
+        "treesitter": true,
+        "filetype": "sql",
+        "handles": {
+          "fs_poll": 0,
+          "timer": 6,
+          "process": 2,
+          "fs_event": 2,
+          "idle": 0
+        },
+        "clients": [
+          {
+            "name": "sqlls",
+            "initialized": true
+          },
+          {
+            "name": "typos_lsp",
+            "initialized": true
+          }
+        ]
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2185.6,
+      "idle_rss_kb": 192524,
+      "idle_children": [
+        "MainThread",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 35.465,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 4.066,
+        "p95_ms": 11.042,
+        "max_ms": 13.091,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 129.049,
+        "p95_ms": 131.837,
+        "max_ms": 131.837,
+        "over_50ms": 2,
+        "over_100ms": 2
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 2.951,
+        "p95_ms": 6.627,
+        "max_ms": 7.255,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 4,
+        "p50_ms": 7.612,
+        "p95_ms": 24.126,
+        "max_ms": 24.126,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 4,
+      "final": {
+        "diagnostics": 74,
+        "lua_kb": 24678.4169921875,
+        "lines": 182,
+        "treesitter": true,
+        "filetype": "sql",
+        "handles": {
+          "fs_poll": 0,
+          "timer": 6,
+          "process": 2,
+          "fs_event": 2,
+          "idle": 0
+        },
+        "clients": [
+          {
+            "name": "sqlls",
+            "initialized": true
+          },
+          {
+            "name": "typos_lsp",
+            "initialized": true
+          }
+        ]
+      },
+      "final_rss_kb": 227648,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/conform.log",
+        "nvim/undo/%tmp%nvim-diag-483119%session%analytics%extra%2%workspace%analytics.sql"
+      ],
+      "disk": {
+        "cache": {
+          "files": 517,
+          "bytes": 2714512
+        },
+        "state": {
+          "files": 5,
+          "bytes": 36632
+        },
+        "workspace": {
+          "files": 3,
+          "bytes": 5562
+        }
+      },
+      "run": 2
+    },
+    {
+      "target": "extra",
+      "sample": "ci.yaml",
+      "ready": {
+        "clients": [
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          },
+          {
+            "initialized": true,
+            "name": "yamlls"
+          }
+        ],
+        "lua_kb": 19383.994140625,
+        "handles": {
+          "idle": 0,
+          "fs_event": 2,
+          "fs_poll": 0,
+          "process": 2,
+          "timer": 6
+        },
+        "lines": 187,
+        "filetype": "yaml",
+        "diagnostics": 26,
+        "treesitter": true
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2148.4,
+      "idle_rss_kb": 180704,
+      "idle_children": [
+        "MainThread",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 52.658,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 4.331,
+        "p95_ms": 13.15,
+        "max_ms": 21.063,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 93.813,
+        "p95_ms": 102.815,
+        "max_ms": 102.815,
+        "over_50ms": 2,
+        "over_100ms": 1
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 2.645,
+        "p95_ms": 9.123,
+        "max_ms": 16.827,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 4,
+        "p50_ms": 11.18,
+        "p95_ms": 23.416,
+        "max_ms": 23.416,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 4,
+      "final": {
+        "clients": [
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          },
+          {
+            "initialized": true,
+            "name": "yamlls"
+          }
+        ],
+        "lua_kb": 27259.1982421875,
+        "handles": {
+          "idle": 0,
+          "fs_event": 2,
+          "fs_poll": 0,
+          "process": 2,
+          "timer": 7
+        },
+        "lines": 187,
+        "filetype": "yaml",
+        "diagnostics": 26,
+        "treesitter": true
+      },
+      "final_rss_kb": 233420,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/conform.log",
+        "nvim/undo/%tmp%nvim-diag-483119%session%ci%extra%0%workspace%ci.yaml"
+      ],
+      "disk": {
+        "cache": {
+          "files": 529,
+          "bytes": 2706773
+        },
+        "state": {
+          "files": 5,
+          "bytes": 26516
+        },
+        "workspace": {
+          "files": 3,
+          "bytes": 4846
+        }
+      },
+      "run": 0
+    },
+    {
+      "target": "extra",
+      "sample": "ci.yaml",
+      "ready": {
+        "clients": [
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          },
+          {
+            "initialized": true,
+            "name": "yamlls"
+          }
+        ],
+        "handles": {
+          "timer": 6,
+          "fs_event": 2,
+          "fs_poll": 0,
+          "idle": 0,
+          "process": 2
+        },
+        "filetype": "yaml",
+        "lines": 187,
+        "lua_kb": 19018.33203125,
+        "treesitter": true,
+        "diagnostics": 26
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2147.0,
+      "idle_rss_kb": 185364,
+      "idle_children": [
+        "MainThread",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 57.844,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 4.984,
+        "p95_ms": 10.822,
+        "max_ms": 15.973,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 87.059,
+        "p95_ms": 88.392,
+        "max_ms": 88.392,
+        "over_50ms": 2,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 2.536,
+        "p95_ms": 9.611,
+        "max_ms": 17.27,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 4,
+        "p50_ms": 13.414,
+        "p95_ms": 26.332,
+        "max_ms": 26.332,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 4,
+      "final": {
+        "clients": [
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          },
+          {
+            "initialized": true,
+            "name": "yamlls"
+          }
+        ],
+        "handles": {
+          "timer": 7,
+          "fs_event": 2,
+          "fs_poll": 0,
+          "idle": 0,
+          "process": 2
+        },
+        "filetype": "yaml",
+        "lines": 187,
+        "lua_kb": 24869.5615234375,
+        "treesitter": true,
+        "diagnostics": 26
+      },
+      "final_rss_kb": 235804,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/conform.log",
+        "nvim/undo/%tmp%nvim-diag-483119%session%ci%extra%1%workspace%ci.yaml"
+      ],
+      "disk": {
+        "cache": {
+          "files": 529,
+          "bytes": 2706773
+        },
+        "state": {
+          "files": 5,
+          "bytes": 26516
+        },
+        "workspace": {
+          "files": 3,
+          "bytes": 4846
+        }
+      },
+      "run": 1
+    },
+    {
+      "target": "extra",
+      "sample": "ci.yaml",
+      "ready": {
+        "treesitter": true,
+        "filetype": "yaml",
+        "lua_kb": 19051.1318359375,
+        "diagnostics": 26,
+        "lines": 187,
+        "handles": {
+          "timer": 6,
+          "fs_poll": 0,
+          "idle": 0,
+          "process": 2,
+          "fs_event": 2
+        },
+        "clients": [
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          },
+          {
+            "initialized": true,
+            "name": "yamlls"
+          }
+        ]
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2148.4,
+      "idle_rss_kb": 181296,
+      "idle_children": [
+        "MainThread",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 41.024,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 4.651,
+        "p95_ms": 10.184,
+        "max_ms": 13.97,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 87.331,
+        "p95_ms": 89.349,
+        "max_ms": 89.349,
+        "over_50ms": 2,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 2.55,
+        "p95_ms": 12.879,
+        "max_ms": 19.813,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 4,
+        "p50_ms": 10.891,
+        "p95_ms": 22.06,
+        "max_ms": 22.06,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 4,
+      "final": {
+        "treesitter": true,
+        "filetype": "yaml",
+        "lua_kb": 24913.7275390625,
+        "diagnostics": 26,
+        "lines": 187,
+        "handles": {
+          "timer": 8,
+          "fs_poll": 0,
+          "idle": 0,
+          "process": 2,
+          "fs_event": 2
+        },
+        "clients": [
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          },
+          {
+            "initialized": true,
+            "name": "yamlls"
+          }
+        ]
+      },
+      "final_rss_kb": 232628,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/conform.log",
+        "nvim/undo/%tmp%nvim-diag-483119%session%ci%extra%2%workspace%ci.yaml"
+      ],
+      "disk": {
+        "cache": {
+          "files": 529,
+          "bytes": 2706772
+        },
+        "state": {
+          "files": 5,
+          "bytes": 26516
+        },
+        "workspace": {
+          "files": 3,
+          "bytes": 4846
+        }
+      },
+      "run": 2
+    },
+    {
+      "target": "extra",
+      "sample": "config.json",
+      "ready": {
+        "diagnostics": 8,
+        "lines": 157,
+        "clients": [
+          {
+            "name": "jsonls",
+            "initialized": true
+          },
+          {
+            "name": "typos_lsp",
+            "initialized": true
+          }
+        ],
+        "filetype": "json",
+        "handles": {
+          "timer": 6,
+          "process": 2,
+          "idle": 0,
+          "fs_poll": 0,
+          "fs_event": 2
+        },
+        "lua_kb": 15614.4169921875,
+        "treesitter": true
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2124.7,
+      "idle_rss_kb": 149320,
+      "idle_children": [
+        "MainThread",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 33.581,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 2.993,
+        "p95_ms": 6.923,
+        "max_ms": 11.852,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 99.056,
+        "p95_ms": 107.328,
+        "max_ms": 107.328,
+        "over_50ms": 2,
+        "over_100ms": 1
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 2.017,
+        "p95_ms": 3.834,
+        "max_ms": 11.811,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 2,
+        "p50_ms": 7.143,
+        "p95_ms": 10.659,
+        "max_ms": 10.659,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 2,
+      "final": {
+        "diagnostics": 8,
+        "lines": 157,
+        "clients": [
+          {
+            "name": "jsonls",
+            "initialized": true
+          },
+          {
+            "name": "typos_lsp",
+            "initialized": true
+          }
+        ],
+        "filetype": "json",
+        "handles": {
+          "timer": 8,
+          "process": 2,
+          "idle": 0,
+          "fs_poll": 0,
+          "fs_event": 2
+        },
+        "lua_kb": 25905.9345703125,
+        "treesitter": true
+      },
+      "final_rss_kb": 164264,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/conform.log",
+        "nvim/undo/%tmp%nvim-diag-483119%session%config%extra%0%workspace%config.json"
+      ],
+      "disk": {
+        "cache": {
+          "files": 526,
+          "bytes": 2691395
+        },
+        "state": {
+          "files": 5,
+          "bytes": 20936
+        },
+        "workspace": {
+          "files": 3,
+          "bytes": 4830
+        }
+      },
+      "run": 0
+    },
+    {
+      "target": "extra",
+      "sample": "config.json",
+      "ready": {
+        "clients": [
+          {
+            "initialized": true,
+            "name": "jsonls"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "handles": {
+          "idle": 0,
+          "timer": 6,
+          "fs_event": 2,
+          "fs_poll": 0,
+          "process": 2
+        },
+        "lua_kb": 16754.556640625,
+        "filetype": "json",
+        "treesitter": true,
+        "lines": 157,
+        "diagnostics": 8
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2133.0,
+      "idle_rss_kb": 149680,
+      "idle_children": [
+        "MainThread",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 31.592,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 2.193,
+        "p95_ms": 5.813,
+        "max_ms": 11.658,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 91.038,
+        "p95_ms": 97.585,
+        "max_ms": 97.585,
+        "over_50ms": 2,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 1.541,
+        "p95_ms": 4.96,
+        "max_ms": 6.964,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 2,
+        "p50_ms": 3.19,
+        "p95_ms": 3.995,
+        "max_ms": 3.995,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 2,
+      "final": {
+        "clients": [
+          {
+            "initialized": true,
+            "name": "jsonls"
+          },
+          {
+            "initialized": true,
+            "name": "typos_lsp"
+          }
+        ],
+        "handles": {
+          "idle": 0,
+          "timer": 8,
+          "fs_event": 2,
+          "fs_poll": 0,
+          "process": 2
+        },
+        "lua_kb": 11884.775390625,
+        "filetype": "json",
+        "treesitter": true,
+        "lines": 157,
+        "diagnostics": 8
+      },
+      "final_rss_kb": 164736,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/conform.log",
+        "nvim/undo/%tmp%nvim-diag-483119%session%config%extra%1%workspace%config.json"
+      ],
+      "disk": {
+        "cache": {
+          "files": 526,
+          "bytes": 2691395
+        },
+        "state": {
+          "files": 5,
+          "bytes": 20936
+        },
+        "workspace": {
+          "files": 3,
+          "bytes": 4830
+        }
+      },
+      "run": 1
+    },
+    {
+      "target": "extra",
+      "sample": "config.json",
+      "ready": {
+        "diagnostics": 8,
+        "lua_kb": 15969.9775390625,
+        "treesitter": true,
+        "handles": {
+          "fs_poll": 0,
+          "idle": 0,
+          "process": 2,
+          "timer": 6,
+          "fs_event": 2
+        },
+        "lines": 157,
+        "clients": [
+          {
+            "name": "jsonls",
+            "initialized": true
+          },
+          {
+            "name": "typos_lsp",
+            "initialized": true
+          }
+        ],
+        "filetype": "json"
+      },
+      "startup_prompts_acknowledged": 0,
+      "settled_ms": 2130.0,
+      "idle_rss_kb": 149292,
+      "idle_children": [
+        "MainThread",
+        "nvim",
+        "typos-lsp"
+      ],
+      "first_edit_ms": 30.208,
+      "typing": {
+        "samples": 30,
+        "p50_ms": 2.84,
+        "p95_ms": 6.486,
+        "max_ms": 7.574,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "typing_keys": {
+        "sent": 30,
+        "decoded": 30
+      },
+      "save": {
+        "samples": 2,
+        "p50_ms": 95.708,
+        "p95_ms": 98.167,
+        "max_ms": 98.167,
+        "over_50ms": 2,
+        "over_100ms": 0
+      },
+      "wheel": {
+        "samples": 40,
+        "p50_ms": 1.778,
+        "p95_ms": 4.496,
+        "max_ms": 14.852,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "wheel_events": 40,
+      "paging": {
+        "samples": 2,
+        "p50_ms": 3.049,
+        "p95_ms": 3.836,
+        "max_ms": 3.836,
+        "over_50ms": 0,
+        "over_100ms": 0
+      },
+      "paging_events": 2,
+      "final": {
+        "diagnostics": 8,
+        "lua_kb": 20370.1064453125,
+        "treesitter": true,
+        "handles": {
+          "fs_poll": 0,
+          "idle": 0,
+          "process": 2,
+          "timer": 7,
+          "fs_event": 2
+        },
+        "lines": 157,
+        "clients": [
+          {
+            "name": "jsonls",
+            "initialized": true
+          },
+          {
+            "name": "typos_lsp",
+            "initialized": true
+          }
+        ],
+        "filetype": "json"
+      },
+      "final_rss_kb": 164136,
+      "new_state_files": [
+        "nvim/blink/cmp/frecency.dat",
+        "nvim/conform.log",
+        "nvim/undo/%tmp%nvim-diag-483119%session%config%extra%2%workspace%config.json"
+      ],
+      "disk": {
+        "cache": {
+          "files": 526,
+          "bytes": 2691395
+        },
+        "state": {
+          "files": 5,
+          "bytes": 20936
+        },
+        "workspace": {
+          "files": 3,
+          "bytes": 4830
+        }
+      },
+      "run": 2
+    }
+  ]
+}

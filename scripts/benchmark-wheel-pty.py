@@ -20,11 +20,43 @@ import signal
 import socket
 import statistics
 import struct
+import shutil
 import subprocess
 import tempfile
 import termios
 import time
+import urllib.parse
 from pathlib import Path
+
+# vim.loader names bytecode cache files after the percent-encoded source path.
+# A long output directory pushes the deepest plugin module past the file name
+# limit, and the affected session then fails behind a Press ENTER prompt.
+NAME_MAX = 255
+
+
+def longest_module_path(data_home):
+    """The longest Lua module path under the shared plugin directory, relative to it."""
+    lazy = data_home / "lazy"
+    longest = ""
+    if lazy.is_dir():
+        for path in lazy.rglob("*.lua"):
+            relative = str(path.relative_to(lazy))
+            if len(relative) > len(longest):
+                longest = relative
+    return longest
+
+
+def reject_long_output(parser, deepest_data_dir, data_home, cleanup=None):
+    """Refuse an output directory whose sessions could not cache the deepest module."""
+    source = deepest_data_dir / "nvim" / "lazy" / longest_module_path(data_home)
+    name = urllib.parse.quote(str(source), safe="") + ".luac"
+    if len(name.encode()) > NAME_MAX:
+        if cleanup:
+            cleanup()
+        parser.error(
+            f"output path is too long: a bytecode cache file name would be {len(name.encode())} bytes "
+            f"(limit {NAME_MAX}); choose a shorter --output such as /tmp/nvim-bench"
+        )
 
 try:
     import msgpack
@@ -72,6 +104,13 @@ if preparation and not preparation.is_file():
     parser.error("Preparation Lua file does not exist")
 targets = {"baseline": args.baseline.resolve()} if args.baseline else {}
 targets["current"] = root
+installed_data = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "nvim"
+reject_long_output(
+    parser,
+    base / max(targets, key=len) / str(args.runs - 1) / "data",
+    installed_data,
+    cleanup=lambda: args.output and shutil.rmtree(base, ignore_errors=True),
+)
 
 
 def revision(path):

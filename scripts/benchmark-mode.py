@@ -35,6 +35,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import urllib.parse
 import termios
 import time
 from pathlib import Path
@@ -269,6 +270,37 @@ def revision():
         "dirty": bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip()),
         "lock_sha256": hashlib.sha256((ROOT / "lazy-lock.json").read_bytes()).hexdigest(),
     }
+
+
+# vim.loader names bytecode cache files after the percent-encoded source path.
+# A long output directory pushes the deepest plugin module past the file name
+# limit, and the affected session then fails behind a Press ENTER prompt.
+NAME_MAX = 255
+
+
+def longest_module_path(data_home):
+    """The longest Lua module path under the shared plugin directory, relative to it."""
+    lazy = data_home / "lazy"
+    longest = ""
+    if lazy.is_dir():
+        for path in lazy.rglob("*.lua"):
+            relative = str(path.relative_to(lazy))
+            if len(relative) > len(longest):
+                longest = relative
+    return longest
+
+
+def reject_long_output(parser, deepest_data_dir, data_home, cleanup=None):
+    """Refuse an output directory whose sessions could not cache the deepest module."""
+    source = deepest_data_dir / "nvim" / "lazy" / longest_module_path(data_home)
+    name = urllib.parse.quote(str(source), safe="") + ".luac"
+    if len(name.encode()) > NAME_MAX:
+        if cleanup:
+            cleanup()
+        parser.error(
+            f"output path is too long: a bytecode cache file name would be {len(name.encode())} bytes "
+            f"(limit {NAME_MAX}); choose a shorter --output such as /tmp/nvim-bench"
+        )
 
 
 def initialize_project(directory):
@@ -514,16 +546,53 @@ def prepare_run(target, run, data_home):
                 (data / asset).symlink_to(data_home / asset, target_is_directory=True)
 
 
+# Tool settings that decide what a language server reports for a real file.
+# Only these travel with a --file sample: dependencies, other sources and build
+# output stay behind, so a server never indexes the project the file came from.
+PROJECT_MARKERS = (
+    "tsconfig.json",
+    "package.json",
+    "pyproject.toml",
+    "go.mod",
+    "Cargo.toml",
+    "compile_flags.txt",
+    ".clang-tidy",
+    ".luarc.json",
+)
+
+
+def project_root(sample):
+    """The nearest directory, at most three levels up, that holds a project marker."""
+    directory = sample.parent
+    for _ in range(3):
+        if any((directory / marker).is_file() for marker in PROJECT_MARKERS):
+            return directory
+        if directory.parent == directory:
+            break
+        directory = directory.parent
+    return None
+
+
 def copy_sample(sample, run, rust_project=False):
     """All editing and saves use a private file for this target and repetition."""
     workspace = run / "workspace"
     workspace.mkdir(parents=True, exist_ok=True)
     initialize_project(workspace)
-    destination = workspace / sample.name
+    root = None if rust_project else project_root(sample)
+    # A sample keeps its path relative to its markers (src/lib.rs under a
+    # Cargo.toml), so the copied manifest still points at it.
+    relative = sample.relative_to(root) if root else Path(sample.name)
+    destination = workspace / relative
+    destination.parent.mkdir(parents=True, exist_ok=True)
     # Copy bytes, not links or source permissions: even a read-only input can be
     # measured safely, and a formatter can never write back through a symlink.
     with destination.open("xb") as stream:
         stream.write(sample.read_bytes())
+    if root:
+        for marker in PROJECT_MARKERS:
+            source = root / marker
+            if source.is_file():
+                (workspace / marker).write_bytes(source.read_bytes())
     if rust_project:
         # The generated Rust library needs a real, dependency-free crate. A
         # detached file triggers rustaceanvim notices and cannot model Cargo
@@ -937,6 +1006,17 @@ def main():
         if path.stem in samples:
             parser.error(f"duplicate sample name: {path.stem}")
         samples[path.stem] = path
+
+    targets_selected = options.target or list(TARGETS)
+    deepest = (
+        base
+        / "session"
+        / max(samples, key=len)
+        / max(("full" if t == "full" else t for t in targets_selected), key=len)
+        / str(max(options.runs - 1, 0))
+        / "data"
+    )
+    reject_long_output(parser, deepest, data_home, cleanup=lambda: options.output and shutil.rmtree(base, ignore_errors=True))
 
     unknown = [name for name in options.fast_lsp_sample if name not in samples]
     if unknown:

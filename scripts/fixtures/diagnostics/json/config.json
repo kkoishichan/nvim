@@ -1,0 +1,157 @@
+{
+  "//": "Service configuration sample with deliberate diagnostics (vscode-json-language-server).",
+  "//intended": "comments are not permitted in .json, trailing commas, duplicate object keys, unexpected tokens",
+  "service": {
+    "name": "sample-api",
+    "version": "2.4.1",
+    "description": "Order processing API",
+    "listen": {
+      "host": "0.0.0.0",
+      "port": 8080,
+      "port": 8081,
+      "tls": {
+        "enabled": true,
+        "certificate": "/etc/sample/tls/cert.pem",
+        "key": "/etc/sample/tls/key.pem",
+        "minVersion": "1.2"
+      }
+    },
+    "timeouts": {
+      "read": "5s",
+      "write": "10s",
+      "idle": "120s",
+      "shutdown": "30s"
+    }
+  },
+  // diag: line comments are not allowed in .json
+  "database": {
+    "driver": "postgres",
+    "host": "db.internal",
+    "port": 5432,
+    "name": "sample",
+    "user": "sample",
+    "passwordFile": "/run/secrets/db-password",
+    "pool": {
+      "min": 2,
+      "max": 20,
+      "acquireTimeoutMs": 5000,
+      "idleTimeoutMs": 60000
+    },
+    "migrations": {
+      "directory": "./migrations",
+      "table": "schema_migrations",
+      "autoApply": false
+    }
+  },
+  "cache": {
+    "driver": "redis",
+    "url": "redis://cache.internal:6379/0",
+    "ttlSeconds": 300,
+    "prefix": "sample:",
+    "clusters": [
+      { "name": "primary", "nodes": ["cache-1.internal:6379", "cache-2.internal:6379"] },
+      { "name": "replica", "nodes": ["cache-3.internal:6379"], },
+    ]
+  },
+  "queue": {
+    "driver": "sqs",
+    "region": "eu-central-1",
+    "queues": {
+      "orders": "https://sqs.eu-central-1.amazonaws.com/123456789012/orders",
+      "notifications": "https://sqs.eu-central-1.amazonaws.com/123456789012/notifications",
+      "dead-letter": "https://sqs.eu-central-1.amazonaws.com/123456789012/dead-letter"
+    },
+    "visibilityTimeoutSeconds": 60,
+    "maxReceiveCount": 5,
+    "pollIntervalMs": 1000
+  },
+  "features": {
+    "newCheckout": true,
+    "recommendations": false,
+    "priceExperiments": {
+      "enabled": true,
+      "variants": ["control", "rounded", "psychological"],
+      "allocation": [0.5, 0.25, 0.25]
+    },
+    "newCheckout": false
+  },
+  "logging": {
+    "level": "info",
+    "format": "json",
+    "outputs": ["stdout", "/var/log/sample/api.log"],
+    "sampling": {
+      "initial": 100,
+      "thereafter": 1000
+    },
+    "redact": ["password", "token", "authorization"]
+  },
+  "metrics": {
+    "enabled": true,
+    "endpoint": "/metrics",
+    "namespace": "sample_api",
+    "histogramBuckets": [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
+    "labels": {
+      "service": "sample-api",
+      "environment": "production",
+      "region": "eu-central-1"
+    }
+  },
+  "tracing": {
+    "enabled": true,
+    "exporter": "otlp",
+    "endpoint": "http://otel-collector.internal:4318",
+    "sampleRate": 0.1,
+    "propagators": ["tracecontext", "baggage"]
+  },
+  "auth": {
+    "issuer": "https://auth.example.com/",
+    "audience": "sample-api",
+    "jwksUrl": "https://auth.example.com/.well-known/jwks.json",
+    "cacheSeconds": 600,
+    "requiredScopes": {
+      "orders:read": ["GET /orders", "GET /orders/{id}"],
+      "orders:write": ["POST /orders", "PUT /orders/{id}", "DELETE /orders/{id}"],
+      "admin": ["*"]
+    }
+  },
+  "rateLimits": [
+    { "path": "/orders", "requestsPerMinute": 600, "burst": 100 },
+    { "path": "/search", "requestsPerMinute": 120, "burst": 20 },
+    { "path": "/export", "requestsPerMinute": 10, "burst": 2 }
+  ],
+  "cors": {
+    "allowedOrigins": ["https://shop.example.com", "https://admin.example.com"],
+    "allowedMethods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    "allowedHeaders": ["Authorization", "Content-Type", "X-Request-Id"],
+    "maxAgeSeconds": 86400
+  },
+  "shipping": {
+    "carriers": [
+      { "code": "dhl", "name": "DHL", "trackingUrl": "https://www.dhl.com/track?id={id}", "maxWeightGrams": 31500 },
+      { "code": "ups", "name": "UPS", "trackingUrl": "https://www.ups.com/track?tracknum={id}", "maxWeightGrams": 70000 },
+      { "code": "post", "name": "National Post", "trackingUrl": "https://post.example.com/{id}", "maxWeightGrams": 20000 }
+    ],
+    "freeShippingThresholdCents": 5000,
+    "defaultCarrier": "dhl"
+  },
+  "pricing": {
+    "currency": "EUR",
+    "taxRates": {
+      "DE": 0.19,
+      "AT": 0.20,
+      "FR": 0.20,
+      "NL": 0.21,
+      "CH": 0.081
+    },
+    "rounding": "half-even"
+    "discounts": {
+      "welcome": { "percent": 10, "maxUses": 1 },
+      "loyalty": { "percent": 5, "minOrders": 10 }
+    }
+  },
+  "maintenance": {
+    "enabled": false,
+    "message": "The shop is briefly unavailable for maintenance.",
+    "allowedIps": ["10.0.0.0/8", "192.168.0.0/16"]
+  }
+}

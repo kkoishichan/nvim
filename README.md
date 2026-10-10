@@ -241,6 +241,7 @@ Python 高亮使用原生查询，保留原有颜色和范围；已撤除收益�
 [配对提示与滚轮慢事件](docs/matchup-tail-latency.md)。
 引用高亮在光标停下后才请求一次 documentHighlight，离开高亮词仍立即清除；lightbulb 不再改写
 全局 `updatetime`。请求数对照与 extra 的剩余开销归因见[引用高亮请求合并](docs/reference-highlight-requests.md)。
+十二种语言的带诊断样例及其 extra 基准见[诊断样例基准](docs/diagnostic-samples.md)。
 
 右侧滚动条采用单轨概览设计：滑块、诊断、搜索、mark、TODO、冲突和 Git 改动始终
 共用一列，同一高度只显示优先级最高的标记。诊断沿用左列的 `E/W/I/H`，FIX、TODO、

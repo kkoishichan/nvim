@@ -1,4 +1,5 @@
 std = "neovim"
+exclude = ["**/fixtures/**"]
 
 [rules]
 mixed_table = "allow"

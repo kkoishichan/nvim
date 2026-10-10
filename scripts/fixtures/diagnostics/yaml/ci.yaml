@@ -1,0 +1,187 @@
+# CI pipeline sample with deliberate diagnostics (yaml-language-server + yamllint).
+#
+# Intended findings:
+#   duplicate mapping keys (yamlls error, yamllint key-duplicates),
+#   missing document start (yamllint document-start),
+#   line-length over 80 (yamllint), truthy values yes/no/on/off (yamllint truthy),
+#   trailing spaces, comments without a leading space, bracket/brace spacing,
+#   inconsistent indentation, empty values, too many spaces after colon.
+name: sample pipeline
+version: 2
+
+defaults:
+  image: ubuntu-24.04
+  timeout_minutes: 30
+  retries: 1
+  env:
+    CI: "true"
+    NODE_OPTIONS: --max-old-space-size=4096
+    PYTHONDONTWRITEBYTECODE: 1
+    CARGO_TERM_COLOR: always
+    GOFLAGS: -mod=readonly -trimpath -buildvcs=false -ldflags=-s -ldflags=-w -tags=netgo,osusergo
+  cache:
+    paths: [ node_modules, .venv, target ]
+    key: "{{ checksum 'package-lock.json' }}-{{ checksum 'requirements.txt' }}"
+
+triggers:
+  push:
+    branches: [main, "release/*"]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * 1-5"
+    - cron: "0 12 * * 0"
+  manual: yes
+
+stages:
+  - name: prepare
+    jobs:
+      - name: checkout
+        steps:
+          - run: git fetch --prune --tags
+          - run: git submodule update --init --recursive
+      - name: toolchain
+        steps:
+          - run: ./scripts/prepare-checks.sh /opt/check-env
+          - run: ./scripts/deploy.sh --dry-run --editor-mode extra --profile full --profile docs
+        env:
+          NVIM_MODE: extra
+          NVIM_CHECK_ONLY: 1
+
+  - name: verify
+    depends_on: [prepare]
+    jobs:
+      - name: static
+        steps:
+          - run: ./scripts/check.sh static
+      - name: integration
+        matrix:
+          mode: [fast, standard, extra]
+          os: [ubuntu-24.04, debian-12, fedora-40]
+        steps:
+          - run: NVIM_MODE=${{ matrix.mode }} ./scripts/check.sh integration
+          - run: NVIM_MODE=${{ matrix.mode }} ./scripts/check.sh performance
+        continue_on_error: no
+      - name: workflows
+        steps:
+          - run: ./scripts/check-workflows.sh
+        when: on
+      - name: benchmarks
+        steps:
+          -   run: python3 scripts/benchmark.py --output /tmp/bench
+          - run:    python3 scripts/benchmark-mode.py --output /tmp/modes --runs 3 --startup-cache both
+        artifacts:
+          paths:
+            - /tmp/bench
+            - /tmp/modes
+        timeout_minutes: 90
+        timeout_minutes: 120
+
+  - name: package
+    depends_on: [verify]
+    jobs:
+      - name: archive
+        steps:
+          - run: tar czf release.tgz lua scripts docs init.lua lazy-lock.json
+        artifacts:
+          paths: [release.tgz]
+          expire_in: 30 days
+      - name: checksum
+        steps:
+          - run: sha256sum release.tgz > release.sha256
+        artifacts:
+          paths: [release.sha256]
+      - name: notes
+        steps:
+          - run: git log --oneline -20 > notes.txt
+        artifacts:
+          paths : [notes.txt]
+
+  - name: deploy
+    depends_on: [package]
+    environment: production
+    approval: required
+    jobs:
+      - name: staging
+        steps:
+          - run: ./scripts/deploy.sh --ref ${CI_COMMIT_SHA} --editor-mode standard --profile minimal
+        env:
+          RELEASE_ROOT: /srv/releases
+          webhook_url:
+      - name: production
+        needs: staging
+        steps:
+          - run: ./scripts/deploy.sh --ref ${CI_COMMIT_SHA} --editor-mode extra --profile full --with-extras --dict
+        env:
+          RELEASE_ROOT: /srv/releases
+          KEEP_RELEASES: 5
+        when: off
+
+notifications:
+  chat:
+    channel: "#platform"
+    on_failure: true
+    on_success: false
+  email:
+    recipients:
+      - platform@example.com
+      - oncall@example.com
+    on_failure: True
+  pager:
+    service: platform
+    severity: {critical: true,high: false}
+
+services:
+  postgres:
+    image: postgres:16
+    env:
+      POSTGRES_PASSWORD: example
+      POSTGRES_DB: sample
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      retries: 5
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+  minio:
+    image: minio/minio
+    command: server /data
+    ports:
+      - "9000:9000"
+    env:
+      MINIO_ROOT_USER: sample
+      MINIO_ROOT_PASSWORD: sample-secret
+  postgres:
+    image: postgres:15
+
+resources:
+  small:
+    cpu: 1
+    memory: 2Gi
+  medium:
+    cpu: 2
+    memory: 4Gi
+  large:
+    cpu: 4
+    memory: 8Gi
+    disk: 50Gi
+  xlarge:
+    cpu: 8
+    memory: 16Gi
+    disk: 200Gi
+    gpu: false
+
+retention:
+  artifacts_days: 30
+  logs_days: 90
+  reports_days: 365
+
+feature_flags:
+  parallel_tests: on
+  flaky_retry: yes
+  slow_group_split: true
+  experimental_cache: off
