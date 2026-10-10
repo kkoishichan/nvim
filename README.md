@@ -341,7 +341,7 @@ Claude 原生 IDE 集成在一个 Neovim 中只有一个终端：首次打开时
 并提供 Outline、scratch、词典及 crates.nvim 的 Cargo.toml 检视与补全。
 独立 lint 在保存时自动运行，也可手动；会话手动保存和恢复。
 调试、测试、AI、媒体/文档预览、额外装饰和停靠布局由 `extra` 提供。
-`extra` 保留原完整功能，`fast` 面向 SSH、容器与资源有限的服务器。
+`extra` 保留原完整功能，`fast` 面向 SSH、容器与资源有限的服务器，保留按需 Flash、Tree-sitter 文本对象、手动 lint、fzf Git 查询和原生终端开关，不自动启动语言服务或检查。
 旧 `full` 环境变量和偏好继续作为 extra 别名，不自动改写已有偏好。
 
 | 操作 | 入口 |
@@ -384,7 +384,7 @@ Java / Rust 保留原有分析，调试和测试接入仅在 extra 中启用。
 快速模式需要语言服务时用 `:ManualLspStart [server]`：只为当前缓冲区选择并启动一个
 已安装的主要语言服务，复用现有工具路径和项目根规则；拼写服务和辅助检查器只在显式
 点名时出现。之后使用原生 hover、跳转、重命名、手动补全（`omnifunc`）和签名浮窗，
-诊断通过 `<leader>cd` 浮窗或 `<leader>cD` 位置列表查看，默认不画下划线和虚拟行。
+手动启动的服务显示诊断下划线和 E/W/I/H 标记，完整消息通过 `<leader>cd` 浮窗或 `<leader>cD` 位置列表查看；全局诊断显示仍关闭，不自动展开虚拟行。`<C-x><C-o>` 使用原生 LSP 补全，`runtime.manual_lsp_autocomplete = true` 可启用手动服务的原生自动补全，默认关闭。原生状态栏显示附着服务与 E/W 计数。
 `:FastLspStop` 只撤销本模式建立的附着，最后一个受管缓冲区退出后停止该客户端。
 缺少可执行文件时只提示安装要求，不启动 Mason、不下载 SDK。
 在 fast 中，Java / Rust 也可用 `:FastLspStart jdtls` / `:FastLspStart rust_analyzer`，不加载

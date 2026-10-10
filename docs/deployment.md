@@ -27,7 +27,7 @@
 
 所有配置组均包含 `minimal`。组只决定这次显式恢复哪些工具，不禁用其他语言配置，也不会卸载已有工具。正常启动与打开文件不会触发 Mason 安装；编辑器中的 `:MasonToolsInstall` 仍表示完整目录恢复。`--editor-mode fast` 未显式选择工具组时不恢复任何 Mason 工具，输出中会说明。
 
-standard 选中 50 个插件并保留完整 parser 目录，extra 选中 83 个插件，fast 默认 9 个插件和 13 个 parser（默认 VS Code 主题）。模式切换不卸载其他模式的已有资产。工具组独立于运行模式，`--editor-mode standard --profile full` 仍安装完整 Mason 工具清单。运行时 standard/fast 不下载插件；新主机先完成显式资源准备。完整取舍见[三档模式](editor-modes.md)。
+standard 选中 50 个插件并保留完整 parser 目录，extra 选中 83 个插件，fast 默认 12 个插件和 13 个 parser（默认 VS Code 主题）。模式切换不卸载其他模式的已有资产。工具组独立于运行模式，`--editor-mode standard --profile full` 仍安装完整 Mason 工具清单。运行时 standard/fast 不下载插件；新主机先完成显式资源准备。完整取舍见[三档模式](editor-modes.md)。
 
 ```sh
 ./scripts/deploy.sh --dry-run --editor-mode standard --profile python
@@ -44,7 +44,7 @@ standard 选中 50 个插件并保留完整 parser 目录，extra 选中 83 个�
 ./scripts/deploy.sh --ref <commit-sha> --editor-mode fast --parsers rust --profile native
 ```
 
-准备、恢复和校验三步共用运行时的模式选择规则。fast 的资产为：Lazy、当前主题、nvim-treesitter、mini.nvim、which-key、Oil、fzf-lua、Conform，以及作为显式语言能力扩展的 nvim-lspconfig；其余主题、Blink、预览二进制和整套 Mason 工具都不安装。默认 parser 为 Bash、Lua、Python、JSON、YAML、TOML、Markdown（含 `markdown_inline` 注入）、Vim、Vimdoc、query、comment 和 luadoc，其他语言通过 `--parsers` 显式加入；名称不在目录中时直接失败，不会静默少装。
+准备、恢复和校验三步共用运行时的模式选择规则。fast 的资产为：Lazy、当前主题、nvim-treesitter、nvim-treesitter-textobjects、mini.nvim、Flash、which-key、Oil、fzf-lua、Conform、手动 nvim-lint，以及作为显式语言能力扩展的 nvim-lspconfig；其余主题、Blink、预览二进制和整套 Mason 工具都不安装。默认 parser 为 Bash、Lua、Python、JSON、YAML、TOML、Markdown（含 `markdown_inline` 注入）、Vim、Vimdoc、query、comment 和 luadoc，其他语言通过 `--parsers` 显式加入；名称不在目录中时直接失败，不会静默少装。
 
 完整锁文件仍是唯一版本来源：精简安装只决定放多少东西到磁盘上，不会删除锁条目，也不会清理完整模式已安装的资产。因此 standard 和 fast 不提供会按当前子集执行 `clean/sync/update` 的入口，`:Lazy` 会说明管理操作应在 `NVIM_MODE=extra nvim +Lazy` 下运行。
 

@@ -16,6 +16,30 @@ local managed = {}
 local pending = {}
 local group
 
+local function configure_attachment(client, bufnr)
+	if require("user.core.mode").capabilities().completion then
+		return
+	end
+	local namespace = vim.lsp.diagnostic.get_namespace(client.id)
+	vim.diagnostic.config({
+		underline = true,
+		signs = {
+			text = {
+				[vim.diagnostic.severity.ERROR] = "E",
+				[vim.diagnostic.severity.WARN] = "W",
+				[vim.diagnostic.severity.INFO] = "I",
+				[vim.diagnostic.severity.HINT] = "H",
+			},
+		},
+	}, namespace)
+	if
+		require("user.core.preferences").get("runtime").manual_lsp_autocomplete
+		and client:supports_method("textDocument/completion", bufnr)
+	then
+		vim.lsp.completion.enable(true, client.id, bufnr, { autotrigger = true })
+	end
+end
+
 -- Settings that keep a server's analysis on the documents that are open, where
 -- the server offers the choice. Anything without such a switch simply keeps its
 -- own default; the command says what it started, not what it costs.
@@ -43,6 +67,17 @@ local function watch_buffers()
 		return
 	end
 	group = vim.api.nvim_create_augroup("user_fast_lsp", { clear = true })
+	vim.api.nvim_create_autocmd("LspAttach", {
+		group = group,
+		callback = function(event)
+			local id = event.data.client_id
+			local entry = managed[id]
+			local client = vim.lsp.get_client_by_id(id)
+			if entry and entry.buffers[event.buf] and client then
+				configure_attachment(client, event.buf)
+			end
+		end,
+	})
 	vim.api.nvim_create_autocmd({ "BufDelete", "BufUnload" }, {
 		group = group,
 		desc = "Release a manually started language server with its last buffer",
@@ -144,6 +179,10 @@ local function launch(name, bufnr, request)
 		-- Reusing a client gives us an attachment, not ownership of its process.
 		managed[id] = managed[id] or { name = name, owned = not existing[id], buffers = {} }
 		managed[id].buffers[bufnr] = true
+		local client = vim.lsp.get_client_by_id(id)
+		if client and client.initialized then
+			configure_attachment(client, bufnr)
+		end
 		notify(name .. " attached to " .. vim.fn.fnamemodify(vim.api.nvim_buf_get_name(bufnr), ":~:."))
 	end
 

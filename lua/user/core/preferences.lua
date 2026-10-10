@@ -5,7 +5,7 @@ local defaults = {
 	format = { timeout_ms = 800 },
 	-- An empty state_dir means "use the standard state path"; a server pointing
 	-- at local disk avoids writing recovery data to a network home.
-	runtime = { mode = "standard", state_dir = "", persistent_undo = false },
+	runtime = { mode = "standard", state_dir = "", persistent_undo = false, manual_lsp_autocomplete = false },
 }
 -- Settings whose value is one name out of a fixed set. Anything else is a
 -- configuration mistake and must not silently pick a neighbouring behaviour.

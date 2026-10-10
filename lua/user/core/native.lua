@@ -7,6 +7,36 @@ local M = {}
 
 local augroup = "user_native_explorer"
 
+---Toggle only our terminal windows in the current tab, retaining their jobs.
+function M.toggle_terminal()
+	for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+		if vim.b[vim.api.nvim_win_get_buf(winid)].user_native_terminal then
+			if #vim.api.nvim_tabpage_list_wins(0) == 1 then
+				vim.api.nvim_win_set_buf(winid, vim.api.nvim_create_buf(true, false))
+			else
+				vim.api.nvim_win_close(winid, false)
+			end
+			return
+		end
+	end
+	local terminal
+	for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+		local job = vim.b[bufnr].terminal_job_id
+		if vim.b[bufnr].user_native_terminal and job and vim.fn.jobwait({ job }, 0)[1] == -1 then
+			terminal = bufnr
+			break
+		end
+	end
+	vim.cmd("botright 12split")
+	if terminal then
+		vim.api.nvim_win_set_buf(0, terminal)
+	else
+		vim.cmd.terminal()
+		vim.b.user_native_terminal = true
+		vim.bo.bufhidden = "hide"
+	end
+end
+
 local function parent_of(path)
 	local parent = vim.fs.dirname(path)
 	return parent ~= path and parent or nil

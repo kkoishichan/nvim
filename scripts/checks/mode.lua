@@ -60,6 +60,10 @@ local report = {
 }
 for _, mapping in ipairs(vim.api.nvim_get_keymap("n")) do
   report.mappings[mapping.lhs] = true
+  local leader = vim.g.mapleader or "\\"
+  if mapping.lhs:sub(1, #leader) == leader then
+    report.mappings["<Leader>" .. mapping.lhs:sub(#leader + 1)] = true
+  end
 end
 for name in pairs(vim.api.nvim_get_commands({})) do
   report.commands[name] = true
@@ -394,6 +398,12 @@ report.extra.mini_before = package.loaded["mini.ai"] ~= nil
 vim.api.nvim_feedkeys(vim.keycode("diu"), "xt", false)
 report.extra.after_textobject = vim.api.nvim_buf_get_lines(scratch, 0, -1, false)[1]
 report.extra.mini_after = package.loaded["mini.ai"] ~= nil
+report.extra.autocomplete_default = require("user.core.preferences").get("runtime").manual_lsp_autocomplete
+vim.api.nvim_buf_set_lines(scratch, 0, -1, false, { "local function target()", "  return 1", "end", "local keep = 2" })
+vim.api.nvim_win_set_cursor(0, { 2, 2 })
+vim.treesitter.get_parser(scratch):parse()
+vim.api.nvim_feedkeys(vim.keycode("yaf"), "xt", false)
+report.extra.function_object = vim.fn.getreg('"')
 ]],
 	})
 	assert(fast.mode == "fast", "The fast case did not start in fast mode")
@@ -407,10 +417,16 @@ report.extra.mini_after = package.loaded["mini.ai"] ~= nil
 	assert(fast.extra.autocmds == 0, "Fast mode registered events for a disabled feature")
 	assert(not fast.extra.mini_before, "The editing library loaded before any of its keys was used")
 	assert(fast.extra.mini_after, "An editing key did not load the library it belongs to")
+	assert(fast.extra.autocomplete_default == false, "Manual LSP autocomplete is no longer opt-in")
 	assert(
 		fast.extra.after_textobject == "local value = compute()",
 		"The on-demand text object did not work: " .. tostring(fast.extra.after_textobject)
 	)
+	assert(
+		fast.extra.function_object:find("local function target()", 1, true),
+		"Fast lost Tree-sitter function objects"
+	)
+	assert(not fast.extra.function_object:find("local keep", 1, true), "Function object selected unrelated code")
 	local expected = {
 		"conform.nvim",
 		"fzf-lua",
@@ -418,6 +434,9 @@ report.extra.mini_after = package.loaded["mini.ai"] ~= nil
 		"mini.nvim",
 		"nvim-lspconfig",
 		"nvim-treesitter",
+		"nvim-treesitter-textobjects",
+		"flash.nvim",
+		"nvim-lint",
 		"oil.nvim",
 		"which-key.nvim",
 	}
@@ -437,8 +456,6 @@ report.extra.mini_after = package.loaded["mini.ai"] ~= nil
 		extended_workflows = "nvim-dap",
 		folding_provider = "nvim-ufo",
 		git = "gitsigns.nvim",
-		lint = "nvim-lint",
-		lint_on_write = "nvim-lint",
 		scroll_animation = "neoscroll.nvim",
 		session = "persistence.nvim",
 		signature = "blink.cmp",
@@ -456,10 +473,24 @@ report.extra.mini_after = package.loaded["mini.ai"] ~= nil
 		)
 	end
 	assert(vim.tbl_contains(fast.disabled, "diagnostics_text"), "Fast mode does not report diagnostic text as disabled")
+	assert(not vim.tbl_contains(fast.disabled, "lint"), "Fast mode disabled manual lint")
+	assert(vim.tbl_contains(fast.disabled, "lint_on_write"), "Fast mode enabled lint on save")
+	for _, lhs in ipairs({ "<Leader>tt", "<Leader>cl", "<Leader>gs", "s" }) do
+		assert(fast.mappings[lhs], "Fast mode lost its on-request mapping " .. lhs)
+	end
 
 	-- The language extension is installed but not started: only an explicit
 	-- request puts it on the runtimepath.
-	for _, name in ipairs({ "nvim-lspconfig", "conform.nvim", "fzf-lua", "mini.nvim", "oil.nvim" }) do
+	for _, name in ipairs({
+		"nvim-lspconfig",
+		"conform.nvim",
+		"fzf-lua",
+		"mini.nvim",
+		"oil.nvim",
+		"nvim-lint",
+		"flash.nvim",
+		"nvim-treesitter-textobjects",
+	}) do
 		assert(not fast.loaded[name], name .. " was loaded during a fast startup")
 	end
 	assert(#fast.plugins < #default.plugins, "Fast mode did not reduce the imported plugin set")
@@ -471,6 +502,57 @@ report.extra.mini_after = package.loaded["mini.ai"] ~= nil
 	assert(fast.commands.ModeInfo, ":ModeInfo is unavailable in fast mode")
 	assert(fast.commands.FastLspStart and fast.commands.FastLspStop, "The explicit language entries are unavailable")
 	assert(not fast.mappings["<Leader>aa"], "Fast mode kept a mapping for a workflow it does not load")
+
+	local tools = run("fast_manual_tools", {
+		mode = "fast",
+		code = [[
+local notices = {}
+vim.notify = function(message) notices[#notices + 1] = message end
+vim.bo.filetype = "text"
+vim.api.nvim_feedkeys(vim.keycode("<Space>cl"), "xt", false)
+report.extra.unconfigured = notices[#notices]
+local selected = false
+vim.keymap.set("x", "<leader>zz", function() selected = true end)
+vim.api.nvim_feedkeys(vim.keycode("v<Space>zz<Esc>"), "xt", false)
+report.extra.visual_leader = selected
+vim.api.nvim_feedkeys(vim.keycode("<Space><Esc>"), "xt", false)
+report.extra.leader_loaded = package.loaded["which-key"] ~= nil
+local toolchain = require("user.toolchain")
+toolchain.executable = function() return nil end
+vim.bo.filetype = "sql"
+vim.cmd.Lint()
+report.extra.missing = notices[#notices]
+report.extra.lint_events = 0
+for _, event in ipairs({ "BufReadPost", "BufWritePost", "InsertLeave" }) do
+ report.extra.lint_events = report.extra.lint_events + #vim.api.nvim_get_autocmds({ group = "user_lint", event = event })
+end
+local native = require("user.core.native")
+native.toggle_terminal()
+local terminal = vim.api.nvim_get_current_buf()
+local job = vim.b[terminal].terminal_job_id
+native.toggle_terminal()
+report.extra.hidden_alive = vim.api.nvim_buf_is_loaded(terminal) and vim.fn.jobwait({ job }, 0)[1] == -1
+native.toggle_terminal()
+report.extra.reused = vim.api.nvim_get_current_buf() == terminal
+vim.cmd.only()
+native.toggle_terminal()
+report.extra.last_window = vim.bo.buftype ~= "terminal" and vim.fn.jobwait({ job }, 0)[1] == -1
+vim.fn.jobstop(job)
+]],
+	})
+	assert(tools.extra.unconfigured:find("No linter configured", 1, true), "Manual lint hid its missing configuration")
+	assert(tools.extra.visual_leader, "Lazy leader help broke visual mappings")
+	assert(tools.extra.leader_loaded, "Leader help did not load on request")
+	assert(
+		tools.extra.missing:find("executable missing", 1, true)
+			and tools.extra.missing:find(":MasonToolsInstall", 1, true),
+		"Manual lint hid its missing executable"
+	)
+	assert(tools.extra.lint_events == 0, "Fast manual lint registered automatic lint events")
+	assert(
+		tools.extra.hidden_alive and tools.extra.reused and tools.extra.last_window,
+		"Native terminal toggle lost its buffer or process"
+	)
 
 	-- A host that asks for persistent undo gets it back without leaving fast mode.
 	local undo = run("fast_undo", { mode = "fast", preferences = { runtime = { persistent_undo = true } } })
@@ -597,12 +679,18 @@ report.extra.explorer = vim.bo.filetype
 	--    releases the client rather than hiding its output.
 	local manual = run("fast_lsp", {
 		mode = "fast",
+		preferences = { runtime = { manual_lsp_autocomplete = true } },
 		arguments = { vim.fs.joinpath(root, "lua", "user", "core", "mode.lua") },
 		code = [[
 local fast = require("user.core.fast_lsp")
 report.extra.primary = fast.candidates(0)
 report.extra.all = fast.candidates(0, true)
 report.extra.before = #vim.lsp.get_clients()
+local enable_completion = vim.lsp.completion.enable
+vim.lsp.completion.enable = function(enabled, id, bufnr, opts)
+ if enabled and opts and opts.autotrigger then report.extra.autocomplete = true end
+ return enable_completion(enabled, id, bufnr, opts)
+end
 vim.cmd("FastLspStart")
 vim.wait(20000, function()
   return #vim.lsp.get_clients({ bufnr = 0 }) > 0
@@ -612,6 +700,11 @@ report.extra.summary = fast.summary()
 report.extra.completion = package.loaded["blink.cmp"] ~= nil
 report.extra.lightbulb = package.loaded["nvim-lightbulb"] ~= nil
 report.extra.underline = vim.diagnostic.config().underline
+local client = vim.lsp.get_clients({ bufnr = 0 })[1]
+local namespace = client and vim.lsp.diagnostic.get_namespace(client.id)
+report.extra.namespace_underline = namespace and vim.diagnostic.config(nil, namespace).underline
+report.extra.namespace_signs = namespace and vim.diagnostic.config(nil, namespace).signs
+report.extra.status = require("user.core.statusline_basic").status()
 report.extra.omnifunc = vim.bo.omnifunc
 vim.cmd("FastLspStop")
 vim.wait(20000, function()
@@ -641,7 +734,13 @@ report.extra.summary_after = fast.summary()
 		not manual.extra.completion and not manual.extra.lightbulb,
 		"Starting a server pulled in the full-mode wiring"
 	)
-	assert(manual.extra.underline == false, "Diagnostics were drawn in a mode that reads them on request")
+	assert(manual.extra.underline == false, "Manual LSP changed the global diagnostic display")
+	assert(manual.extra.autocomplete, "Opt-in native LSP autocomplete was not enabled after initialization")
+	assert(
+		manual.extra.namespace_underline == true and manual.extra.namespace_signs,
+		"Manual LSP lost diagnostic markers"
+	)
+	assert(manual.extra.status:find("lua_ls", 1, true), "Native statusline lost the manually attached server")
 	assert(manual.extra.omnifunc:find("lsp", 1, true), "Manual completion was not wired to the started server")
 	assert(manual.extra.attached_after == 0, "Stopping left the client attached to the buffer")
 	assert(manual.extra.running_after == 0, "Stopping left the client running")

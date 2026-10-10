@@ -84,6 +84,9 @@ for _, name in ipairs({
 	standard[name] = true
 end
 
+-- Fast exposes only explicit tools that leave no work running at startup.
+local fast = { lint = true }
+
 local notices = {}
 local degradations = {}
 local state
@@ -214,7 +217,9 @@ local function resolve()
 	local name, source = select_mode(runtime, preferences.provided("runtime.mode"))
 	local values = {}
 	for _, capability in ipairs(optional_capabilities) do
-		values[capability] = name == "extra" or (name == "standard" and standard[capability] == true)
+		values[capability] = name == "extra"
+			or (name == "standard" and standard[capability] == true)
+			or (name == "fast" and fast[capability] == true)
 	end
 	-- Persistent undo is recovery data, not a cache. Fast mode leaves it off by
 	-- default and lets a host that wants it back say so.

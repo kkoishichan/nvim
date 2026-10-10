@@ -333,12 +333,5 @@ return function()
 			},
 		},
 	}
-	if not capabilities.git then
-		-- Without Git integration these keys would start a repository query the
-		-- mode does not otherwise support.
-		spec[1].keys = vim.tbl_filter(function(key)
-			return not vim.startswith(key[1], "<leader>g")
-		end, spec[1].keys)
-	end
 	return spec
 end

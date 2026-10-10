@@ -31,11 +31,17 @@ local function setup_modules(treesitter_textobjects)
 		U = ai.gen_spec.function_call({ name_pattern = "[%w_]" }),
 	}
 	if treesitter_textobjects then
-		-- These queries live in nvim-treesitter-textobjects, which a fast
-		-- installation does not ship; asking for them there would only fail later.
-		custom_textobjects.c = ai.gen_spec.treesitter({ a = "@class.outer", i = "@class.inner" })
-		custom_textobjects.f = ai.gen_spec.treesitter({ a = "@function.outer", i = "@function.inner" })
-		custom_textobjects.o = ai.gen_spec.treesitter({
+		local function treesitter_spec(captures)
+			local spec = ai.gen_spec.treesitter(captures)
+			return function(...)
+				-- Queries must be on runtimepath before mini.ai asks for them.
+				require("nvim-treesitter-textobjects")
+				return spec(...)
+			end
+		end
+		custom_textobjects.c = treesitter_spec({ a = "@class.outer", i = "@class.inner" })
+		custom_textobjects.f = treesitter_spec({ a = "@function.outer", i = "@function.inner" })
+		custom_textobjects.o = treesitter_spec({
 			a = { "@block.outer", "@conditional.outer", "@loop.outer" },
 			i = { "@block.inner", "@conditional.inner", "@loop.inner" },
 		})
@@ -76,7 +82,7 @@ return function()
 			event = fast and "InsertEnter" or "VeryLazy",
 			keys = fast and lazy_keys() or nil,
 			config = function()
-				setup_modules(not fast)
+				setup_modules(true)
 			end,
 		},
 	}

@@ -44,7 +44,19 @@ return function()
 	return {
 		{
 			"folke/which-key.nvim",
-			event = "VeryLazy",
+			event = not fast and "VeryLazy" or nil,
+			keys = fast and {
+				{
+					"<leader>",
+					function()
+						require("which-key").show({ keys = "<leader>", delay = vim.o.timeoutlen + 300 })
+					end,
+					mode = { "n", "x" },
+					nowait = true,
+					-- Recognized by which-key as a trigger, not an action to recurse into.
+					desc = "which-key-trigger",
+				},
+			} or nil,
 			opts = function()
 				-- Register every group label for normal AND visual mode, so the leader
 				-- popup shows names in visual mode too (which-key prunes groups that have

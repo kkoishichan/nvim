@@ -11,11 +11,13 @@ local factories = {
 	{ "user.specs.theme", { single = true } },
 	{ "user.specs.treesitter" },
 	{ "user.specs.editing" },
+	{ "user.specs.flash" },
 	{ "user.specs.which_key" },
 	{ "user.specs.explorer" },
 	{ "user.specs.picker" },
 	{ "user.specs.format" },
 	{ "user.specs.lsp" },
+	{ "user.specs.lint" },
 }
 
 ---The complete fast-mode spec, dependencies included by way of each plugin's

@@ -102,6 +102,14 @@ end, { desc = "Location window" })
 
 map("t", "<Esc><Esc>", "<C-\\><C-n>", { desc = "Leave terminal mode" })
 
+if not capabilities.terminal_manager then
+	for _, lhs in ipairs({ "<leader>tt", "<C-/>", "<C-_>" }) do
+		map("n", lhs, function()
+			require("user.core.native").toggle_terminal()
+		end, { desc = "Toggle terminal" })
+	end
+end
+
 -- Parse $TERMINAL into argv without invoking a shell. Supports the quoting and
 -- backslash escaping normally needed for terminal options, but intentionally
 -- performs no expansion or command substitution.

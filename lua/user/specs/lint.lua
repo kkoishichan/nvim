@@ -193,6 +193,7 @@ return function()
 					local names = {}
 					local roots = {}
 					local commands = {}
+					local missing = {}
 					for _, name in ipairs(lint.linters_by_ft[vim.bo[bufnr].filetype] or {}) do
 						local root_for = project_roots[name]
 						local root = root_for and root_for(bufnr) or nil
@@ -206,12 +207,15 @@ return function()
 							roots[name] = root
 							commands[name] = command
 						else
+							if configured then
+								missing[#missing + 1] = name
+							end
 							-- A removed/disabled project configuration must not leave its old
 							-- diagnostics behind in an already-open buffer.
 							vim.diagnostic.reset(lint.get_namespace(name), bufnr)
 						end
 					end
-					return names, roots, commands
+					return names, roots, commands, missing
 				end
 
 				local function is_empty_buffer(bufnr)
@@ -221,7 +225,7 @@ return function()
 					return vim.api.nvim_buf_get_lines(bufnr, 0, 1, false)[1] == ""
 				end
 
-				local function run_lint(bufnr, stdin_only)
+				local function run_lint(bufnr, stdin_only, manual)
 					if
 						not vim.api.nvim_buf_is_valid(bufnr)
 						or not vim.api.nvim_buf_is_loaded(bufnr)
@@ -231,8 +235,18 @@ return function()
 					end
 
 					vim.api.nvim_buf_call(bufnr, function()
-						local names, roots, commands = configured_linters(bufnr)
+						local names, roots, commands, missing = configured_linters(bufnr)
 						if #names == 0 then
+							if manual then
+								local reason = #missing > 0
+										and ("Linter executable missing: " .. table.concat(missing, ", ") .. "; use :MasonToolsInstall or install it on the system")
+									or "No linter configured for this filetype/project"
+								vim.notify(
+									reason .. " (" .. vim.bo[bufnr].filetype .. ")",
+									vim.log.levels.WARN,
+									{ title = "Lint" }
+								)
+							end
 							return
 						end
 
@@ -389,7 +403,7 @@ return function()
 
 				local function manual_lint()
 					reset_lookup_caches()
-					run_lint(vim.api.nvim_get_current_buf(), false)
+					run_lint(vim.api.nvim_get_current_buf(), false, true)
 				end
 				vim.api.nvim_create_user_command("Lint", manual_lint, { desc = "Lint current buffer" })
 				vim.keymap.set("n", "<leader>cl", manual_lint, { desc = "Lint" })
