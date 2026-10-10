@@ -17,6 +17,8 @@ assert(
 		"scrolling_colors",
 		"statusline_refresh",
 		"scrollview_refresh",
+		"illuminate_refresh",
+		"adapters",
 		"ai",
 		"languages",
 		"projects",

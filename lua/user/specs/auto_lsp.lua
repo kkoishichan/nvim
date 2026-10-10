@@ -80,7 +80,9 @@ return function(profile)
 			"kosayoda/nvim-lightbulb",
 			event = "LspAttach",
 			opts = {
-				autocmd = { enabled = true },
+				-- The plugin otherwise overwrites the global updatetime with its
+				-- own 200 ms default on first attach.
+				autocmd = { enabled = true, updatetime = -1 },
 				sign = { enabled = true, text = "󰌶", hl = "DiagnosticSignHint" },
 				virtual_text = { enabled = false },
 				float = { enabled = false },

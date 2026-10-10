@@ -17,7 +17,9 @@ end
 
 -- The pinned plugin exposes setup/toggle, but not refresh. Discover its own
 -- registered callbacks through Neovim's public autocmd API; do not inspect
--- closure upvalues or replace callbacks belonging to other plugins.
+-- closure upvalues or replace callbacks belonging to other plugins. Returns
+-- nil and a reason, without touching anything, when the plugin's registrations
+-- no longer look like the locked version.
 local function capture_callbacks()
 	local source = debug.getinfo(plugin.setup, "S").source
 	local result, ids = {}, {}
@@ -38,13 +40,12 @@ local function capture_callbacks()
 			end
 		end
 	end
-	assert(result.change and result.scroll, "Color preview adapter could not identify the locked plugin callbacks")
+	if not (result.change and result.scroll) then
+		return nil, "could not identify the plugin's text-change and scroll callbacks"
+	end
 	for _, registration in ipairs(registrations) do
-		if ids[registration.id] then
-			assert(
-				registration.event == "WinScrolled" or registration.event == "VimResized",
-				"Color preview adapter must preserve non-scroll plugin callbacks"
-			)
+		if ids[registration.id] and registration.event ~= "WinScrolled" and registration.event ~= "VimResized" then
+			return nil, "the plugin registers scroll callbacks for other events"
 		end
 	end
 	for id in pairs(ids) do
@@ -204,6 +205,7 @@ function M.shutdown()
 	end
 end
 
+---@return boolean active, string|nil reason
 function M.setup(opts)
 	local previous = vim._user_color_preview
 	if previous and previous ~= M then
@@ -213,7 +215,17 @@ function M.setup(opts)
 	plugin = require("nvim-highlight-colors")
 	-- Store the callbacks on their actual plugin instance, so reloading this
 	-- adapter reuses them, while a new plugin instance is captured afresh.
-	callbacks = plugin._user_color_preview_callbacks or capture_callbacks()
+	local reason
+	callbacks = plugin._user_color_preview_callbacks
+	if not callbacks then
+		callbacks, reason = capture_callbacks()
+	end
+	if not callbacks then
+		-- Unrecognised plugin: configure it as shipped and leave its own
+		-- immediate scroll refresh in place.
+		plugin.setup(opts)
+		return false, reason
+	end
 	plugin._user_color_preview_callbacks = callbacks
 	vim._user_color_preview = M
 	local group = api.nvim_create_augroup("user_color_preview", { clear = true })
@@ -249,6 +261,7 @@ function M.setup(opts)
 	api.nvim_create_autocmd("VimLeavePre", { group = group, callback = M.shutdown })
 	plugin.setup(opts)
 	queue_visible()
+	return true
 end
 
 return M

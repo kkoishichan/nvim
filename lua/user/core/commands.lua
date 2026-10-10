@@ -149,6 +149,7 @@ vim.api.nvim_create_user_command("ModeInfo", function()
 	local lsp = package.loaded["user.core.fast_lsp"]
 	local managed = lsp and lsp.summary() or "none"
 	table.insert(lines, { "  manual servers   " .. managed .. "\n" })
+	table.insert(lines, { "  adapters         " .. require("user.core.adapters").summary() .. "\n" })
 
 	vim.api.nvim_echo(lines, false, {})
 end, { desc = "Report the active editor mode, its capabilities and storage" })

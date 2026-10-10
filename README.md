@@ -239,6 +239,8 @@ Python 高亮使用原生查询，保留原有颜色和范围；已撤除收益�
 [vim-matchup 缓存验证](docs/matchup-scrolling.md)。
 自动配对搜索遇到待处理输入时让行，空闲后完整重算；进一步的慢事件对照见
 [配对提示与滚轮慢事件](docs/matchup-tail-latency.md)。
+引用高亮在光标停下后才请求一次 documentHighlight，离开高亮词仍立即清除；lightbulb 不再改写
+全局 `updatetime`。请求数对照与 extra 的剩余开销归因见[引用高亮请求合并](docs/reference-highlight-requests.md)。
 
 右侧滚动条采用单轨概览设计：滑块、诊断、搜索、mark、TODO、冲突和 Git 改动始终
 共用一列，同一高度只显示优先级最高的标记。诊断沿用左列的 `E/W/I/H`，FIX、TODO、

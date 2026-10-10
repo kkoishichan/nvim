@@ -121,6 +121,21 @@ function M.check()
 	for _, entry in ipairs(mode.degradations()) do
 		health.warn(entry.subject .. ": " .. entry.reason, "Run :ModeInfo for the full report")
 	end
+	-- Adapters register as their plugins load; an empty list only means none
+	-- has been needed yet in this session.
+	for _, adapter in ipairs(require("user.core.adapters").list()) do
+		local note = adapter.detail and (": " .. adapter.detail) or ""
+		if adapter.active then
+			health.ok("Adapter " .. adapter.name .. " active" .. note)
+		elseif adapter.quiet then
+			health.info("Adapter " .. adapter.name .. " inactive" .. note)
+		else
+			health.warn(
+				"Adapter " .. adapter.name .. " inactive" .. note,
+				"The locked plugin changed; re-validate the adapter or accept the plugin's native behaviour"
+			)
+		end
+	end
 	local storage = mode.storage()
 	if storage.writable then
 		health.ok("State directory: " .. storage.path .. (storage.volatile and " (temporary root)" or ""))

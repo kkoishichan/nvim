@@ -91,7 +91,9 @@ return function(profile)
 				end,
 			},
 			config = function(_, opts)
-				require("user.core.color_preview").setup(opts)
+				require("user.core.adapters").run("color_preview", function()
+					return require("user.core.color_preview").setup(opts)
+				end)
 			end,
 		})
 	end
@@ -130,7 +132,18 @@ return function(profile)
 				vim.g.matchup_treesitter_stopline = 300
 			end,
 			config = function()
-				require("user.core.matchup_cache").setup()
+				local adapters = require("user.core.adapters")
+				local cached = adapters.run("matchup_cache", function()
+					return require("user.core.matchup_cache").setup()
+				end)
+				local yields = cached and require("user.core.matchup_bridge").stats().automatic_yield == true
+				adapters.record(
+					"matchup_input",
+					yields,
+					not yields
+							and (cached and "match-up timer sources changed; automatic searches no longer yield to input" or "needs the match-up cache adapter")
+						or nil
+				)
 			end,
 		})
 	end
@@ -195,6 +208,15 @@ return function(profile)
 				disable_keymaps = true,
 			},
 			config = function(_, opts)
+				-- With the request already waiting for the cursor to rest (see
+				-- user.core.illuminate_refresh), only the remaining draw delay is
+				-- needed; without the adapter the plugin keeps its full delay.
+				local coalesced = require("user.core.adapters").run("illuminate_refresh", function()
+					return require("user.core.illuminate_refresh").setup()
+				end)
+				if coalesced then
+					opts = vim.tbl_extend("force", opts, { delay = 100 })
+				end
 				require("illuminate").configure(opts)
 				require("user.core.highlights").on_colorscheme("illuminate", function()
 					local p = require("user.core.palette").get()
@@ -257,7 +279,9 @@ return function(profile)
 			end,
 		},
 		config = function(_, opts)
-			require("user.core.sticky_context").setup()
+			require("user.core.adapters").run("sticky_context", function()
+				return require("user.core.sticky_context").setup()
+			end)
 			require("treesitter-context").setup(opts)
 			require("user.core.highlights").on_colorscheme("treesitter-context", function()
 				local p = require("user.core.palette").get()

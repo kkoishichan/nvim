@@ -397,7 +397,9 @@ return function(profile)
 			config = function(_, opts)
 				local scrollview = require("scrollview")
 				scrollview.setup(opts)
-				require("user.core.scrollview_refresh").setup()
+				require("user.core.adapters").run("scrollview_refresh", function()
+					return require("user.core.scrollview_refresh").setup()
+				end)
 				local cleanup_key = "_user_scrollview_git_cleanup"
 				local previous_cleanup = rawget(vim, cleanup_key)
 				if type(previous_cleanup) == "function" then
@@ -753,7 +755,16 @@ return function(profile)
 		config = function(_, opts)
 			local lualine = require("lualine")
 			lualine.setup(opts)
-			require("user.core.statusline_refresh").setup()
+			-- Zero repairs can mean the locked bug is gone upstream, so this
+			-- entry is informational rather than a degradation.
+			local repaired = require("user.core.statusline_refresh").setup()
+			require("user.core.adapters").record(
+				"statusline_refresh",
+				repaired > 0,
+				repaired > 0 and ("repaired " .. repaired .. " lualine registrations")
+					or "no recognised lualine registration to repair",
+				{ quiet = true }
+			)
 		end,
 	})
 	return plugins
