@@ -395,6 +395,32 @@ nvim_exact() {
 	output=$(nvim --version 2>/dev/null) || return 1
 	[ "${output%%$'\n'*}" = "NVIM $nvim_version" ]
 }
+# SHA-256 of the official release assets this script downloads, keyed by
+# "<asset file>@<version>". The same values guard CI. An asset without a pin
+# is still installed, with a warning that the download was not verified.
+checksum_for() {
+	case "$1" in
+	nvim-linux-x86_64.tar.gz@v0.12.5) printf '%s\n' bce0f56eda1f1b1db6eee8f4133d7a38813ea07933837dd1777411ca384c6875 ;;
+	tree-sitter-linux-x64.gz@0.26.9) printf '%s\n' 9ce82137caa65864e7ca8b869fd391cef88c9bd2a01c4371b9c4dd26c2585efb ;;
+	*) return 1 ;;
+	esac
+}
+verify_download() {
+	local file=$1 key=$2 expected actual
+	if ! expected=$(checksum_for "$key"); then
+		warn "No pinned checksum for $key; the download was not verified"
+		return 0
+	fi
+	if command -v sha256sum >/dev/null 2>&1; then
+		actual=$(sha256sum "$file" | cut -d' ' -f1)
+	elif command -v shasum >/dev/null 2>&1; then
+		actual=$(shasum -a 256 "$file" | cut -d' ' -f1)
+	else
+		warn "No sha256sum or shasum available; $key was not verified"
+		return 0
+	fi
+	[ "$actual" = "$expected" ]
+}
 install_nvim() {
 	case "$asset" in nvim-linux-x86_64 | nvim-linux-arm64 | nvim-macos-x86_64 | nvim-macos-arm64) ;;
 	*) fail 10 "Unsupported official Neovim asset: $asset" ;;
@@ -403,10 +429,17 @@ install_nvim() {
 	if [ ! -x "$release/bin/nvim" ]; then
 		mkdir -p "$local_opt" "$local_bin"
 		download=$(mktemp -d "$local_opt/.nvim-download.XXXXXX")
-		if ! curl -fL --retry 2 "https://github.com/neovim/neovim/releases/download/$nvim_version/$asset.tar.gz" -o "$download/nvim.tar.gz" ||
-			! tar -xzf "$download/nvim.tar.gz" -C "$download" || [ ! -x "$download/$asset/bin/nvim" ]; then
+		if ! curl -fL --retry 2 "https://github.com/neovim/neovim/releases/download/$nvim_version/$asset.tar.gz" -o "$download/nvim.tar.gz"; then
 			rm -rf -- "$download"
-			fail 10 'Pinned Neovim download/extraction failed; configuration unchanged'
+			fail 10 'Pinned Neovim download failed; configuration unchanged'
+		fi
+		if ! verify_download "$download/nvim.tar.gz" "$asset.tar.gz@$nvim_version"; then
+			rm -rf -- "$download"
+			fail 10 'Pinned Neovim download failed checksum verification; configuration unchanged'
+		fi
+		if ! tar -xzf "$download/nvim.tar.gz" -C "$download" || [ ! -x "$download/$asset/bin/nvim" ]; then
+			rm -rf -- "$download"
+			fail 10 'Pinned Neovim extraction failed; configuration unchanged'
 		fi
 		if [ -e "$release" ]; then
 			rm -rf -- "$download"
@@ -440,10 +473,17 @@ install_tree_sitter() {
 	if [ ! -x "$release/tree-sitter" ]; then
 		mkdir -p "$local_opt" "$local_bin"
 		download=$(mktemp -d "$local_opt/.tree-sitter-download.XXXXXX")
-		if ! curl -fL --retry 2 "https://github.com/tree-sitter/tree-sitter/releases/download/v$tree_sitter_version/$tree_asset.gz" -o "$download/cli.gz" ||
-			! gzip -dc "$download/cli.gz" >"$download/tree-sitter"; then
+		if ! curl -fL --retry 2 "https://github.com/tree-sitter/tree-sitter/releases/download/v$tree_sitter_version/$tree_asset.gz" -o "$download/cli.gz"; then
 			rm -rf -- "$download"
-			fail 10 'Pinned tree-sitter CLI download/extraction failed'
+			fail 10 'Pinned tree-sitter CLI download failed'
+		fi
+		if ! verify_download "$download/cli.gz" "$tree_asset.gz@$tree_sitter_version"; then
+			rm -rf -- "$download"
+			fail 10 'Pinned tree-sitter CLI download failed checksum verification'
+		fi
+		if ! gzip -dc "$download/cli.gz" >"$download/tree-sitter"; then
+			rm -rf -- "$download"
+			fail 10 'Pinned tree-sitter CLI extraction failed'
 		fi
 		chmod +x "$download/tree-sitter"
 		if [ -e "$release" ]; then

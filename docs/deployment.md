@@ -64,7 +64,7 @@ standard 选中 50 个插件并保留完整 parser 目录，extra 选中 83 个�
 | `docs` | Markdown、Typst、LaTeX 服务器、排版和拼写工具 | Node/npm、Perl、Typst、基础 TeX/latexmk、Poppler、ImageMagick；macOS 使用 BasicTeX。 |
 | `full` | `lua/user/toolchain.lua` 中全部固定版本，包括未归入某个语言组的工具 | 上述配置组依赖的合并。 |
 
-所有正常部署从锁定的 Tree-sitter 插件目录构建所选 parser；standard/extra 另准备、验证锁定 Blink 补全所需资产，fast 不需要 Blink。它们不随 Mason 配置组减少。tree-sitter CLI 使用官方 `0.26.9` 平台二进制，不要求为了安装 CLI 再安装 Rust。Neovim 和 tree-sitter 的发行资产来源分别为 [Neovim v0.12.5](https://github.com/neovim/neovim/releases/tag/v0.12.5) 与 [tree-sitter v0.26.9](https://github.com/tree-sitter/tree-sitter/releases/tag/v0.26.9)。改变 Neovim 版本会同时传给准备步骤；其他版本不因默认准备版本硬编码而被拒绝，实际兼容性仍由检查结果决定。
+所有正常部署从锁定的 Tree-sitter 插件目录构建所选 parser；standard/extra 另准备、验证锁定 Blink 补全所需资产，fast 不需要 Blink。它们不随 Mason 配置组减少。tree-sitter CLI 使用官方 `0.26.9` 平台二进制，不要求为了安装 CLI 再安装 Rust。Neovim 和 tree-sitter 的发行资产来源分别为 [Neovim v0.12.5](https://github.com/neovim/neovim/releases/tag/v0.12.5) 与 [tree-sitter v0.26.9](https://github.com/tree-sitter/tree-sitter/releases/tag/v0.26.9)。Linux x86_64 的这两个资产带固定 SHA-256，下载后先校验再解压，与 CI 使用同一组值；其他平台或版本没有固定值时照常安装，但会给出未校验的警告。改变 Neovim 版本会同时传给准备步骤；其他版本不因默认准备版本硬编码而被拒绝，实际兼容性仍由检查结果决定。
 
 ## 切换与失败恢复
 
