@@ -22,6 +22,7 @@ assert(
 		"projects",
 		"project_actions",
 		"toolchain",
+		"trust",
 		"terminals",
 		"workflow_actions",
 		"workflow_python_js",

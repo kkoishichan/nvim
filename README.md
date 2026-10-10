@@ -205,6 +205,8 @@ nvim
 :checkhealth          " 健康检查
 ```
 
+陌生项目首次使用 `node_modules/.bin` 内的语言服务、格式化器或 linter 时，会通过 Neovim 原生信任提示查看仓库根（无仓库则工作区根）的 `package.json`。确认后执行 `:ProjectTrust allow` 并重试；未允许时使用 Mason/系统工具，无头运行不弹窗。`:ProjectTrust deny|remove` 拒绝或清除记录，`:ProjectTrust status` 查看本会话状态；`NVIM_TRUST_PROJECTS=1` 或 `vim.g.user_trust_projects = true` 可显式旁路。检查和基准会设置旁路，项目 `.venv` 不在限制范围内。
+
 ## 性能策略
 
 日常默认 standard，完整功能用 extra，服务器用[快速模式](docs/fast-mode.md)，功能取舍、缓存策略与精简部署范围见设计文档；启用方式见下方「运行模式」。

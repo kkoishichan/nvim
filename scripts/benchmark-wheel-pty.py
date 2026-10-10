@@ -258,6 +258,7 @@ end,tonumber(vim.env.PTY_WHEEL_SETTLE_MS))
             "TERM": "xterm-kitty",
             "NVIM_APPNAME": "nvim",
             "NVIM_CHECK_ONLY": "1",
+            "NVIM_TRUST_PROJECTS": "1",
             "XDG_CONFIG_HOME": str(run / "config"),
             "XDG_DATA_HOME": str(run / "data"),
             "XDG_CACHE_HOME": str(run / "cache"),

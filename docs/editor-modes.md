@@ -78,6 +78,8 @@ standard 默认绘制诊断下划线、标记和行尾短消息，`<leader>cd` �
 
 standard 的独立检查在保存时自动运行，也可通过 `<leader>cl` / `:Lint` 手动启动；读取和离开插入模式不会触发检查，extra 另在这两个时机自动运行。**SQL 的 Sqruff 是唯一诊断来源，standard 保存时自动检查**；sql-language-server 继续提供补全等能力。Selene、Stylelint 和 golangci-lint 仍需项目配置。
 
+首次使用陌生项目的 `node_modules/.bin` 工具时，通过 Neovim 原生信任提示查看项目根的 `package.json`；确认后执行 `:ProjectTrust allow`，再重试工具。未允许时回退到 Mason/系统工具，无头运行不弹窗。信任以仓库根为范围，没有仓库时使用工作区根；`:ProjectTrust deny` 拒绝，`remove` 清除持久记录及解析缓存，`status` 仅显示本会话状态（`unasked`、`allowed`、`denied`、`bypassed`），不会触发确认。`NVIM_TRUST_PROJECTS=1` 或 `vim.g.user_trust_projects = true` 可显式旁路；检查与基准使用该环境开关。本阶段不限制项目 `.venv` 解释器。
+
 standard 会话键位为 `<leader>sw` / `:SessionSave` 保存，`<leader>ss` 恢复当前工作区，`<leader>sS` 选择，`<leader>sl` 恢复最近会话。extra 另保留退出自动保存及 `<leader>sd` 停止自动保存；两档共用原有会话格式和未保存文件保护。
 
 ## 部署、缓存与维护

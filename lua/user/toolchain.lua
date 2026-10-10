@@ -327,18 +327,30 @@ end
 function M.node_resolve(name, source, opts)
 	opts = opts or {}
 	local ctx = context(opts, source)
-	local key = cache_key("node", name, ctx, preference(opts))
-	local previous = cached(key)
+	local trust = require("user.core.trust")
+	local root = ctx.repository or ctx.root or ctx.directory
+	local function node_key()
+		return cache_key("node", name, ctx, preference(opts)) .. "\0" .. trust.status(root)
+	end
+	local previous = cached(node_key())
 	if previous then
 		return previous
 	end
+	local skipped = false
 	for _, directory in ipairs(project_directories(ctx)) do
 		local path = executable_in(vim.fs.joinpath(directory, "node_modules", ".bin"), name)
 		if path then
-			return remember(key, result(path, "project", "Project node_modules/.bin in " .. directory))
+			if trust.allows(root or directory) then
+				return remember(node_key(), result(path, "project", "Project node_modules/.bin in " .. directory))
+			end
+			skipped = true
 		end
 	end
-	return remember(key, M.resolve(name, vim.tbl_extend("force", opts, { context = ctx })))
+	local resolved = M.resolve(name, vim.tbl_extend("force", opts, { context = ctx }))
+	if skipped then
+		resolved.reason = "Project node_modules/.bin skipped: project not trusted"
+	end
+	return remember(node_key(), resolved)
 end
 
 function M.node_executable(name, source, opts)

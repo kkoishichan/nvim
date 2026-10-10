@@ -132,6 +132,7 @@ function M.check()
 	health.info("Workspace: " .. context.root)
 	health.info("Language project: " .. context.language_root)
 	health.info("Repository: " .. (context.repository or "none"))
+	health.info("Project trust: " .. require("user.core.trust").status(context.repository or context.root))
 	health.info("Working directory: " .. context.cwd)
 	health.info("File: " .. (context.file or "none"))
 	health.info(

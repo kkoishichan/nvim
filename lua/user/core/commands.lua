@@ -2,6 +2,31 @@ local project = require("user.core.project")
 local mode = require("user.core.mode")
 local capabilities = mode.capabilities()
 
+vim.api.nvim_create_user_command("ProjectTrust", function(command)
+	local context = project.context()
+	local root = context.repository or context.root
+	local trust = require("user.core.trust")
+	local action = command.args
+	if action == "status" then
+		vim.notify("Project trust: " .. trust.status(root) .. " (" .. root .. ")", vim.log.levels.INFO)
+		return
+	end
+	if not vim.tbl_contains({ "allow", "deny", "remove" }, action) then
+		vim.notify("Use :ProjectTrust allow|deny|remove|status", vim.log.levels.ERROR)
+		return
+	end
+	local ok, message = vim.secure.trust({ action = action, path = vim.fs.joinpath(root, "package.json") })
+	trust.forget(root)
+	require("user.toolchain").clear_executable_cache()
+	vim.notify("Project trust " .. action .. ": " .. message, ok and vim.log.levels.INFO or vim.log.levels.ERROR)
+end, {
+	nargs = 1,
+	complete = function()
+		return { "allow", "deny", "remove", "status" }
+	end,
+	desc = "Manage trust for project Node executables",
+})
+
 vim.api.nvim_create_user_command("TransparentToggle", function()
 	require("user.core.transparency").toggle()
 end, { desc = "Toggle and save transparent background" })

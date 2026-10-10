@@ -477,6 +477,7 @@ def environment(target, run):
         "TERM": "xterm-kitty",
         "NVIM_APPNAME": "nvim",
         "NVIM_CHECK_ONLY": "1",
+        "NVIM_TRUST_PROJECTS": "1",
         "NVIM_STATE_DIR": "",
         "XDG_CONFIG_HOME": str(run / "config"),
         "XDG_CACHE_HOME": str(run / "cache"),
