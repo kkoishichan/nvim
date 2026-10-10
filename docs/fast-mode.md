@@ -26,8 +26,8 @@
 
 ## 启动与切换
 
-按 `<leader>umf`（空格、u、m、f）直接选择快速模式；同组的 `ums`、`ume`、`uma` 分别选择 standard、extra、auto（均带 leader）。也可用 `:EditorMode fast`。
-兼容命令 `:FastModeToggle` 以及 `:FastMode on`、`:FastMode off`（standard）、`:FastMode auto` 仍可使用；不带参数的 `:FastMode`
+按 `<leader>umf`（空格、u、m、f）直接选择快速模式；同组的 `ums`、`ume` 分别选择 standard、extra（均带 leader）。也可用 `:EditorMode fast`。
+兼容命令 `:FastModeToggle` 以及 `:FastMode on`、`:FastMode off`（standard）仍可使用；不带参数的 `:FastMode`
 等同切换。设置写入 `preferences.json` 后自动原地重启；切换以当前运行模式为准。
 有未保存修改时显示原生确认框，取消会保留当前进程和已保存的选择，再次切换可重试。
 重启恢复文件、标签页、分屏和光标位置；不恢复旧模式的选项、插件映射及终端任务。
@@ -42,7 +42,7 @@ NVIM_MODE=fast nvim path/to/file.py
 NVIM_MODE=extra nvim path/to/file.py
 ```
 
-`preferences.json` 增加 `runtime.mode`，可设为 `fast`、`standard`、`extra` 或 `auto`，也兼容旧 `full`。显式环境变量优先，其次是主机偏好，未配置时使用 `standard`。`auto` 只是选择规则：检测到非空 `SSH_CONNECTION` 或 `SSH_TTY` 时选择 `fast`，否则选择 `standard`。服务器部署写入 `fast`，因此进入 tmux 后即使 SSH 环境信息丢失也不改变默认选择。
+`preferences.json` 增加 `runtime.mode`，可设为 `fast`、`standard`、`extra`，也兼容旧 `full`。显式环境变量优先，其次是主机偏好，未配置时使用 `standard`，与 SSH 环境无关。auto 已移除，旧 `runtime.mode=auto` 按 standard 读取；服务器需要 fast 时显式选择或部署为 fast，保存的选择不受 tmux 的 SSH 环境变量影响。
 
 不依赖 `TERM=...kitty` 判断机器性能、是否远程或能否显示图片；容器也可显式选择快速模式。非法模式值给出一次配置提示，并回退到有效主机偏好或 `standard`。
 

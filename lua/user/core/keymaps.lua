@@ -252,7 +252,6 @@ map("n", "<leader>up", "<cmd>FloatStyleToggle<cr>", { desc = "Toggle saved popup
 map("n", "<leader>umf", "<cmd>EditorMode fast<cr>", { desc = "Fast mode" })
 map("n", "<leader>ums", "<cmd>EditorMode standard<cr>", { desc = "Standard mode" })
 map("n", "<leader>ume", "<cmd>EditorMode extra<cr>", { desc = "Extra mode" })
-map("n", "<leader>uma", "<cmd>EditorMode auto<cr>", { desc = "Auto mode" })
 
 map("n", "<leader>L", "<cmd>Lazy<cr>", { desc = "Lazy" })
 

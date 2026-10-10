@@ -43,32 +43,32 @@ vim.api.nvim_create_user_command("FastModeToggle", function()
 end, { desc = "Toggle and save fast mode, then restart" })
 
 vim.api.nvim_create_user_command("FastMode", function(command)
-	local names = { on = "fast", off = "standard", auto = "auto" }
+	local names = { on = "fast", off = "standard" }
 	if command.args == "" then
 		mode.toggle()
 	elseif names[command.args] then
 		mode.set_default(names[command.args])
 	else
-		vim.notify("Use :FastMode on|off|auto", vim.log.levels.ERROR)
+		vim.notify("Use :FastMode on|off", vim.log.levels.ERROR)
 	end
 end, {
 	nargs = "?",
 	complete = function()
-		return { "on", "off", "auto" }
+		return { "on", "off" }
 	end,
 	desc = "Save editor mode and restart to apply",
 })
 
 vim.api.nvim_create_user_command("EditorMode", function(command)
-	if vim.tbl_contains({ "fast", "standard", "extra", "full", "auto" }, command.args) then
+	if vim.tbl_contains({ "fast", "standard", "extra", "full" }, command.args) then
 		mode.set_default(mode.canonical(command.args))
 	else
-		vim.notify("Use :EditorMode fast|standard|extra|auto", vim.log.levels.ERROR)
+		vim.notify("Use :EditorMode fast|standard|extra", vim.log.levels.ERROR)
 	end
 end, {
 	nargs = 1,
 	complete = function()
-		return { "fast", "standard", "extra", "auto" }
+		return { "fast", "standard", "extra" }
 	end,
 	desc = "Select and save an editor mode, then restart",
 })

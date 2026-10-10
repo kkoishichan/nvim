@@ -108,15 +108,6 @@ function M.degradations()
 	return vim.deepcopy(degradations)
 end
 
-local function automatic()
-	-- Only the connection facts Neovim can trust. Terminal names say nothing
-	-- about how fast the machine is, whether it is remote, or what it can draw.
-	if (vim.env.SSH_CONNECTION or "") ~= "" or (vim.env.SSH_TTY or "") ~= "" then
-		return "fast", "SSH session"
-	end
-	return "standard", "local session"
-end
-
 local function select_mode(runtime, configured_by_host)
 	local env = vim.env.NVIM_MODE
 	if env and env ~= "" then
@@ -124,20 +115,12 @@ local function select_mode(runtime, configured_by_host)
 		if runtime_modes[value] then
 			return value, "NVIM_MODE=" .. env:lower()
 		end
-		if value == "auto" then
-			local resolved, reason = automatic()
-			return resolved, "NVIM_MODE=auto selected " .. resolved .. " (" .. reason .. ")"
-		end
-		note(("NVIM_MODE=%s is not fast, standard, extra or auto; using the host preference"):format(env))
+		note(("NVIM_MODE=%s is not fast, standard or extra; using the host preference"):format(env))
 	end
 
 	local configured = configured_by_host and M.canonical(runtime.mode) or nil
 	if runtime_modes[configured] then
 		return configured, "preferences.json runtime.mode=" .. runtime.mode
-	end
-	if configured == "auto" then
-		local resolved, reason = automatic()
-		return resolved, "preferences.json runtime.mode=auto selected " .. resolved .. " (" .. reason .. ")"
 	end
 	return "standard", "default (no NVIM_MODE, no runtime.mode)"
 end
@@ -265,7 +248,7 @@ function M.set_default(name)
 		vim.notify(err, vim.log.levels.ERROR, { title = "Editor mode" })
 		return false
 	end
-	local target = name == "auto" and automatic() or M.canonical(name)
+	local target = M.canonical(name)
 	if target == M.name() then
 		vim.notify(
 			"Saved editor mode: " .. name .. " (already active).",

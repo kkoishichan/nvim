@@ -186,6 +186,12 @@ report.extra.current = mode.name()
 report.extra.requests = requests
 vim.cmd("EditorMode full")
 report.extra.alias = preferences.get("runtime").mode
+local before = requests
+pcall(function() vim.cmd("EditorMode auto") end)
+pcall(function() vim.cmd("FastMode auto") end)
+report.extra.rejected_auto = preferences.get("runtime").mode == "extra" and requests == before
+report.extra.editor_choices = vim.fn.getcompletion("EditorMode ", "cmdline")
+report.extra.fast_choices = vim.fn.getcompletion("FastMode ", "cmdline")
 ]],
 	})
 	assert(
@@ -193,6 +199,12 @@ report.extra.alias = preferences.get("runtime").mode
 		"Mode selection did not save/restart without changing the active session"
 	)
 	assert(selection.extra.alias == "extra", "EditorMode full was not canonicalized")
+	assert(selection.extra.rejected_auto, "Removed auto commands changed the saved mode or requested a restart")
+	assert(
+		not vim.tbl_contains(selection.extra.editor_choices, "auto")
+			and not vim.tbl_contains(selection.extra.fast_choices, "auto"),
+		"Removed auto mode is still offered by command completion"
+	)
 
 	local invalid = run("invalid", { mode = "turbo", preferences = { runtime = { mode = "fast" } } })
 	assert(invalid.mode == "fast", "An unknown NVIM_MODE did not fall back to the host preference")
@@ -202,18 +214,33 @@ report.extra.alias = preferences.get("runtime").mode
 	assert(invalid_preference.mode == "standard", "An unknown runtime.mode did not fall back to full mode")
 	assert(#invalid_preference.notices > 0, "An unknown runtime.mode was accepted silently")
 
-	-- 3. `auto` is a selection rule over the connection, not a guess about the
-	--    machine, the terminal or what it can draw.
-	local auto_remote = run("auto_remote", { mode = "auto", ssh_connection = "10.0.0.2 51000 10.0.0.9 22" })
-	assert(auto_remote.mode == "fast", "auto did not select fast for an SSH session")
-	local auto_tty = run("auto_tty", { mode = "auto", ssh_tty = "/dev/pts/3" })
-	assert(auto_tty.mode == "fast", "auto ignored SSH_TTY")
-	local auto_local = run("auto_local", { mode = "auto" })
-	assert(auto_local.mode == "standard", "auto did not select standard for a local session")
-	-- A server writes the preference, so a tmux shell that lost SSH_CONNECTION
-	-- still starts in fast mode.
-	local auto_detached = run("auto_detached", { preferences = { runtime = { mode = "fast" } } })
-	assert(auto_detached.mode == "fast", "A stored fast preference did not survive a lost SSH environment")
+	-- 3. Mode selection no longer depends on SSH; old auto preferences become
+	--    standard, while auto environment values are rejected like other typos.
+	local remote = run("remote_default", { ssh_connection = "10.0.0.2 51000 10.0.0.9 22", ssh_tty = "/dev/pts/3" })
+	assert(remote.mode == "standard", "SSH changed the default editor mode")
+	local retired_preference = run("retired_preference", {
+		preferences = { runtime = { mode = "auto" } },
+		ssh_tty = "/dev/pts/3",
+		code = [[
+report.extra.accepted_write = pcall(require("user.core.preferences").set, "runtime", "mode", "auto")
+]],
+	})
+	assert(
+		retired_preference.mode == "standard" and #retired_preference.notices == 0,
+		"Retired auto preference did not become standard cleanly"
+	)
+	assert(not retired_preference.extra.accepted_write, "Preferences still allow saving auto mode")
+	local retired_environment = run("retired_environment", {
+		mode = "auto",
+		preferences = { runtime = { mode = "extra" } },
+		ssh_tty = "/dev/pts/3",
+	})
+	assert(
+		retired_environment.mode == "extra" and #retired_environment.notices > 0,
+		"Retired auto environment value bypassed the host preference"
+	)
+	local saved_fast = run("saved_fast", { preferences = { runtime = { mode = "fast" } } })
+	assert(saved_fast.mode == "fast", "A stored fast preference did not survive a lost SSH environment")
 
 	local toggled = run("persistent_toggle", {
 		preferences = { tools = { prefer_mason = true }, format = { timeout_ms = 950 } },
@@ -223,11 +250,12 @@ vim.cmd("FastModeToggle")
 report.extra.saved = preferences.get()
 report.extra.current = mode.name()
 report.extra.mappings = {}
-for _, key in ipairs({ "f", "s", "e", "a" }) do
+for _, key in ipairs({ "f", "s", "e" }) do
  report.extra.mappings[key] = vim.fn.maparg("<leader>um" .. key, "n")
 end
 report.extra.removed_prefix = vim.fn.maparg("<leader>um", "n")
 report.extra.removed_mapping = vim.fn.maparg("<leader>uf", "n")
+report.extra.removed_auto = vim.fn.maparg("<leader>uma", "n")
 vim.cmd("FastModeToggle")
 report.extra.retried = preferences.get("runtime").mode
 vim.cmd("FastMode off")
@@ -248,11 +276,12 @@ vim.cmd("FastMode on")
 		toggled.extra.toggled_back == "standard",
 		"An explicit current-mode selection did not cancel the pending change"
 	)
-	for key, name in pairs({ f = "fast", s = "standard", e = "extra", a = "auto" }) do
+	for key, name in pairs({ f = "fast", s = "standard", e = "extra" }) do
 		assert(toggled.extra.mappings[key]:find("EditorMode " .. name, 1, true), "Mode mapping missing: um" .. key)
 	end
 	assert(toggled.extra.removed_prefix == "", "Mode prefix still opens a picker")
 	assert(toggled.extra.removed_mapping == "", "Removed fast mode toggle mapping is still present")
+	assert(toggled.extra.removed_auto == "", "Removed auto mode mapping is still present")
 	local restarted = run(
 		"persistent_toggle",
 		{ keep_preferences = true, code = [[
@@ -276,17 +305,15 @@ report.extra.saved = require("user.core.preferences").get("runtime").mode
 report.extra.requests = requests
 vim.cmd("FastMode on")
 report.extra.same_mode_requests = requests
-vim.env.SSH_CONNECTION = ""
-vim.env.SSH_TTY = ""
-vim.cmd("FastMode auto")
-report.extra.auto_requests = requests
+vim.cmd("EditorMode extra")
+report.extra.extra_requests = requests
 report.extra.current = mode.name()
 ]],
 	})
 	assert(switch_requests.extra.saved == "standard", "Toggle followed a stale preference instead of the active mode")
 	assert(switch_requests.extra.requests == 1, "Changing mode did not request a restart")
 	assert(switch_requests.extra.same_mode_requests == 1, "Selecting the active mode requested an unnecessary restart")
-	assert(switch_requests.extra.auto_requests == 2, "Auto mode did not restart when its resolved mode changed")
+	assert(switch_requests.extra.extra_requests == 2, "Selecting extra mode did not request a restart")
 	assert(switch_requests.extra.current == "fast", "The switch attempted to change capabilities in place")
 	run("canceled_restart", {
 		mode = "full",
@@ -1128,7 +1155,7 @@ report.extra.colorscheme = vim.g.colors_name
 	assert(not explorer[1].opts.skip_confirm_for_simple_edits, "The slim explorer dropped its edit confirmation")
 
 	print(
-		("Mode evidence: standard by default; NVIM_MODE > preference > default; auto follows SSH; fast imports %d plugins (full %d) and %d of %d parsers, with %d disabled capabilities; Python colon indent, autopairs, plain save and directory switching kept; one server on request then released (%s); native search, native entry, read-only state and read-only config handled; plugin management stayed an extra-mode operation; %d Tree-sitter captures identical to full mode with no semantic provider of its own."):format(
+		("Mode evidence: standard by default regardless of SSH; NVIM_MODE > preference > default; retired auto preferences become standard; fast imports %d plugins (full %d) and %d of %d parsers, with %d disabled capabilities; Python colon indent, autopairs, plain save and directory switching kept; one server on request then released (%s); native search, native entry, read-only state and read-only config handled; plugin management stayed an extra-mode operation; %d Tree-sitter captures identical to full mode with no semantic provider of its own."):format(
 			#fast.plugins,
 			#explicit_extra.plugins,
 			#base,

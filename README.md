@@ -325,7 +325,7 @@ Claude 原生 IDE 集成在一个 Neovim 中只有一个终端：首次打开时
   "tools": { "prefer_mason": false },
   "ui": { "float_style": true },
   "format": { "timeout_ms": 800 },
-  "runtime": { "mode": "auto", "state_dir": "", "persistent_undo": false }
+  "runtime": { "mode": "standard", "state_dir": "", "persistent_undo": false }
 }
 ```
 
@@ -343,7 +343,7 @@ Claude 原生 IDE 集成在一个 Neovim 中只有一个终端：首次打开时
 
 | 操作 | 入口 |
 | --- | --- |
-| 选择模式并持久保存、自动重启 | `<leader>umf` fast、`ums` standard、`ume` extra、`uma` auto（均带 leader）；`:EditorMode fast\|standard\|extra\|auto` |
+| 选择模式并持久保存、自动重启 | `<leader>umf` fast、`ums` standard、`ume` extra（均带 leader）；`:EditorMode fast\|standard\|extra` |
 | 明确开启、关闭 fast | `:FastMode on` / `:FastMode off`（关闭后为 standard） |
 | 查看实际模式、来源、关闭功能和降级 | `:ModeInfo` |
 | standard 手动独立 lint | `<leader>cl` / `:Lint`；SQL 的 Sqruff 诊断也需手动触发 |
@@ -361,7 +361,7 @@ NVIM_MODE=extra nvim path/to/file.py
 NVIM_MODE=fast nvim path/to/file.py
 ```
 
-优先级为 `NVIM_MODE` > 主机偏好 > standard。`auto` 在 SSH 环境选择 fast，本地选择 standard。
+优先级为 `NVIM_MODE` > 主机偏好 > standard，与 SSH 环境无关。旧 `runtime.mode=auto` 按 standard 读取。
 模式切换清除重启子进程的 `NVIM_MODE`，应用刚保存的选择；父 shell 不变。
 standard 默认显示诊断下划线和标记，消息按需通过 `<leader>cd` 查看，`<leader>ud` 循环消息样式。
 Biome / Tailwind 需项目配置或依赖，typos-lsp / Emmet 只通过 `:ManualLspStart <server>` 手动开启。

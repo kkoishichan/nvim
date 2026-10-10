@@ -10,7 +10,7 @@ local defaults = {
 -- Settings whose value is one name out of a fixed set. Anything else is a
 -- configuration mistake and must not silently pick a neighbouring behaviour.
 local choices = {
-	runtime = { mode = { "fast", "standard", "extra", "full", "auto" } },
+	runtime = { mode = { "fast", "standard", "extra", "full" } },
 }
 local cached
 local errors = {}
@@ -39,6 +39,11 @@ local function load()
 			table.insert(errors, "Unknown preference section: " .. section)
 		else
 			for key, value in pairs(settings) do
+				-- Retired auto preferences become the fixed default when read;
+				-- new writes must use one of the supported explicit modes.
+				if section == "runtime" and key == "mode" and value == "auto" then
+					value = defaults.runtime.mode
+				end
 				local expected = defaults[section][key]
 				local allowed = choices[section] and choices[section][key]
 				if expected == nil or type(expected) ~= type(value) or (type(value) == "number" and value < 1) then
