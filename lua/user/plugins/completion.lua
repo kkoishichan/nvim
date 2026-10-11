@@ -1,5 +1,20 @@
+-- Escape with the menu open: undo the auto-insert preview and hide the menu
+-- while still in Insert mode, then leave it. Blink schedules its cancel, and
+-- undoing the preview writes the dot-repeat register through complete(), an
+-- Insert-only call; letting the fallback leave Insert mode first raised E785.
+-- With no menu, close the other popups and let the fallback leave Insert mode.
 local function dismiss_popups(cmp)
-	require("user.core.popups").close({ blink = cmp })
+	local popups = require("user.core.popups")
+	if cmp.is_visible() then
+		cmp.cancel({
+			callback = function()
+				popups.close({ blink = cmp })
+				vim.api.nvim_feedkeys(vim.keycode("<Esc>"), "n", false)
+			end,
+		})
+		return true
+	end
+	popups.close({ blink = cmp })
 end
 
 local function cycle_overload()
@@ -21,8 +36,13 @@ return {
 			"rafamadriz/friendly-snippets",
 		},
 		opts = {
+			-- Prompt buffers (vim.ui.input, the DAP REPL) run their own
+			-- completion and Escape handling; Blink's buffer keymaps would
+			-- otherwise replace them. Heavy files stay without completion.
 			enabled = function()
-				return require("user.core.buffer_policy").allow(0)
+				return vim.bo.buftype ~= "prompt"
+					and vim.b.completion ~= false
+					and require("user.core.buffer_policy").allow(0)
 			end,
 			keymap = {
 				-- IDE-style completion: Tab accepts the selected (or first) item,

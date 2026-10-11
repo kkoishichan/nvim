@@ -24,7 +24,9 @@ Neovim 打磨成接近 IDE 的日常工作流。
 - 浮窗按角色统一：提示、对话框和应用浮窗都用全局 `winborder`（rounded），不读该选项的插件
   通过 `layout.float_border()` 拿到同一个值；Lazy / Mason 是唯一的无边框矩形，Glance 用 winbar 分区。
   应用浮窗一律 90% 居中，背景遮罩只有一种实现和一档透明度，`winblend` 一律 0。`Esc` 一次收起当前
-  标签页内重叠的补全、签名、文档、提示与预览。通知按超时自动消失（`<leader>un` 可立即
+  标签页内重叠的补全、签名、文档、提示与预览；补全菜单打开时先在插入模式内撤销预览并收起菜单，再离开插入模式，
+  因为 Blink 的撤销要写 dot-repeat 寄存器，只能在插入模式进行。Blink 不进入 prompt 类 buffer（`vim.ui.input`、DAP REPL），
+  它们的 Esc 和补全由各自的插件处理。通知按超时自动消失（`<leader>un` 可立即
   清空），Glance、Fzf、Lazy、Mason、Oil 等界面走各自关闭接口；终端、scratch、zen 等
   编辑工作区不会被误关。
 - `:Lazy` 与 `:Mason` 共用同一个 90% 纯无边框矩形，并校正两插件不同的高度计算方式。
