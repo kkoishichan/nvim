@@ -67,6 +67,10 @@ local function pdf_zoom()
 	return require("user.core.pdf").zoom()
 end
 
+local function not_dashboard()
+	return vim.bo.filetype ~= "snacks_dashboard"
+end
+
 local function bufferline_highlights(defaults)
 	local p = palette.get()
 	local transparent = require("user.core.transparency").is_enabled()
@@ -713,7 +717,7 @@ return function(profile)
 					},
 				},
 				lualine_c = {
-					{ "filename", path = 1 },
+					{ "filename", path = 1, cond = not_dashboard },
 				},
 				lualine_x = {
 					{
@@ -748,6 +752,7 @@ return function(profile)
 					{
 						"filetype",
 						icon_only = false,
+						cond = not_dashboard,
 					},
 				},
 				lualine_y = {
