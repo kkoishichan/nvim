@@ -48,29 +48,6 @@ local function dashboard_header()
 ]]
 end
 
-local function pdf_page()
-	if not require("user.core.mode").capabilities().render then
-		return ""
-	end
-	return require("user.core.pdf").page()
-end
-
-local function has_pdf_status()
-	return pdf_page() ~= ""
-end
-
-local function not_pdf_status()
-	return not has_pdf_status()
-end
-
-local function pdf_zoom()
-	return require("user.core.pdf").zoom()
-end
-
-local function not_dashboard()
-	return vim.bo.filetype ~= "snacks_dashboard"
-end
-
 local function bufferline_highlights(defaults)
 	local p = palette.get()
 	local transparent = require("user.core.transparency").is_enabled()
@@ -693,104 +670,6 @@ return function(profile)
 			{ "<leader>br", "<cmd>BufferLineCloseRight<cr>", desc = "Close buffers right" },
 		},
 	})
-	table.insert(plugins, {
-		"nvim-lualine/lualine.nvim",
-		event = "VeryLazy",
-		ft = "pdf",
-		dependencies = { "nvim-mini/mini.icons" },
-		opts = {
-			options = {
-				theme = "auto",
-				globalstatus = true,
-				component_separators = "",
-				section_separators = "",
-			},
-			sections = {
-				lualine_a = {
-					"mode",
-				},
-				lualine_b = {
-					"branch",
-					{
-						"diff",
-						symbols = { added = "+", modified = "~", removed = "-" },
-					},
-				},
-				lualine_c = {
-					{ "filename", path = 1, cond = not_dashboard },
-				},
-				lualine_x = {
-					{
-						function()
-							local quiet = package.loaded["user.core.quiet"]
-							return quiet and quiet.active() and "QUIET" or ""
-						end,
-					},
-					{
-						-- Project-wide counts, shown only while servers analyse the
-						-- whole workspace; the next component keeps the buffer's own.
-						"diagnostics",
-						sources = { "nvim_workspace_diagnostic" },
-						sections = { "error", "warn" },
-						update_in_insert = false,
-						fmt = function(text)
-							return text ~= "" and ("ws " .. text) or ""
-						end,
-						cond = function()
-							return require("user.core.mode").capabilities().workspace_diagnostics
-						end,
-					},
-					{
-						"diagnostics",
-						sources = { "nvim_diagnostic" },
-						update_in_insert = false,
-					},
-					{
-						"lsp_status",
-						ignore_lsp = { "null-ls" },
-					},
-					{
-						"filetype",
-						icon_only = false,
-						cond = not_dashboard,
-					},
-				},
-				lualine_y = {
-					{
-						"progress",
-						cond = not_pdf_status,
-					},
-					{
-						pdf_zoom,
-						cond = has_pdf_status,
-					},
-				},
-				lualine_z = {
-					{
-						"location",
-						cond = not_pdf_status,
-					},
-					{
-						pdf_page,
-						cond = has_pdf_status,
-					},
-				},
-			},
-		},
-		config = function(_, opts)
-			local lualine = require("lualine")
-			lualine.setup(opts)
-			-- Zero repairs can mean the locked bug is gone upstream, so this
-			-- entry is informational rather than a degradation.
-			local repaired = require("user.core.statusline_refresh").setup()
-			require("user.core.adapters").record(
-				"statusline_refresh",
-				repaired > 0,
-				repaired > 0 and ("repaired " .. repaired .. " lualine registrations")
-					or "no recognised lualine registration to repair",
-				{ quiet = true }
-			)
-		end,
-	})
+	vim.list_extend(plugins, require("user.specs.statusline")())
 	return plugins
 end

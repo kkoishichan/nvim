@@ -1,4 +1,4 @@
--- Native statusline for fast mode: the current mode, the file with its
+-- Native fallback when the shared statusline is unavailable: the mode, file with
 -- modified/readonly flags, attached servers, diagnostics and cursor position.
 -- Server status is computed in one call, without a timer or component pipeline.
 
@@ -64,14 +64,12 @@ end
 
 rawset(vim, "_user_statusline_status", M.status)
 
----Statusline expression, with an optional right-aligned badge such as FAST.
----@param badge string|nil
-function M.value(badge)
+---Native fallback statusline expression.
+function M.value()
 	return table.concat({
 		" %{v:lua.vim._user_statusline_mode()} ",
 		"%<%f %m%r%h%w",
 		"%=",
-		badge and ("%#StatusLineNC# " .. badge .. " %#StatusLine#") or "",
 		"%{%v:lua.vim._user_statusline_status()%}",
 		" %l:%-3c %P ",
 	})

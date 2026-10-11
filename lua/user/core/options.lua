@@ -71,10 +71,9 @@ if capabilities.git then
 	require("user.core.statuscolumn")
 	opt.statuscolumn = [[%s%=%l%C%{%v:lua.vim._user_statuscolumn_git()%}]]
 end
-if not capabilities.statusline_plugin then
-	-- Native statusline: mode, file, modified flag and position, plus the mode
-	-- badge so a fast session is obvious without running :ModeInfo.
-	opt.statusline = require("user.core.statusline_basic").value(mode.is_fast() and "FAST" or nil)
+if mode.is_fast() or not capabilities.statusline_plugin then
+	-- Native fallback until lualine loads, including when its assets are absent.
+	opt.statusline = require("user.core.statusline_basic").value()
 end
 opt.smartcase = true
 opt.smartindent = true

@@ -385,6 +385,13 @@ report.extra.current = mode.name()
 		mode = "fast",
 		arguments = { vim.fs.joinpath(root, "lua", "user", "core", "mode.lua") },
 		code = [[
+require("lazy").load({ plugins = { "lualine.nvim" } })
+local lualine = require("lualine")
+lualine.refresh({ place = { "statusline" }, scope = "window", force = true })
+report.statusline = vim.wo.statusline
+report.extra.global_statusline = vim.o.laststatus
+report.extra.icons = lualine.get_config().options.icons_enabled
+report.extra.branch_loaded = package.loaded["lualine.components.branch.git_branch"] ~= nil
 report.extra.treesitter = vim.treesitter.highlighter.active[vim.api.nvim_get_current_buf()] ~= nil
 report.extra.indentexpr = vim.bo.indentexpr
 local ok_group, events = pcall(vim.api.nvim_get_autocmds, { group = "user_prose_spell" })
@@ -410,7 +417,12 @@ report.extra.function_object = vim.fn.getreg('"')
 	})
 	assert(fast.mode == "fast", "The fast case did not start in fast mode")
 	assert(fast.clients == 0, "Fast mode started a language server on its own")
-	assert(fast.statusline:find("FAST", 1, true), "The native statusline did not show the mode badge")
+	assert(not fast.statusline:find("FAST", 1, true), "The shared statusline still shows the mode badge")
+	assert(fast.statusline:find("lualine_a_normal", 1, true), "Fast did not use the shared statusline style")
+	assert(fast.extra.global_statusline == 3, "Fast lost the global statusline")
+	assert(not fast.extra.icons, "Fast statusline requires Nerd Font icons")
+	assert(not fast.extra.branch_loaded, "Fast statusline initialized Git branch watching")
+	assert(not vim.tbl_contains(fast.disabled, "statusline_plugin"), "Shared statusline is reported as disabled")
 	assert(fast.clipboard == "", "Fast mode kept automatic system clipboard synchronisation")
 	assert(not fast.cursorline and fast.foldcolumn == "0", "Fast mode kept the full-mode gutter")
 	assert(not fast.undofile, "Fast mode enabled persistent undo by default")
@@ -433,6 +445,7 @@ report.extra.function_object = vim.fn.getreg('"')
 		"conform.nvim",
 		"fzf-lua",
 		"lazy.nvim",
+		"lualine.nvim",
 		"mini.nvim",
 		"nvim-lspconfig",
 		"nvim-treesitter",
@@ -445,7 +458,7 @@ report.extra.function_object = vim.fn.getreg('"')
 	for _, name in ipairs(expected) do
 		assert(vim.tbl_contains(fast.plugins, name), "The fast plugin set is missing " .. name)
 	end
-	for _, name in ipairs({ "blink.cmp", "gitsigns.nvim", "lualine.nvim", "neo-tree.nvim", "neoscroll.nvim" }) do
+	for _, name in ipairs({ "blink.cmp", "gitsigns.nvim", "neo-tree.nvim", "neoscroll.nvim" }) do
 		assert(not vim.tbl_contains(fast.plugins, name), "The fast plugin set still imported " .. name)
 	end
 	-- Every capability the mode reports as disabled must correspond to something
@@ -464,7 +477,6 @@ report.extra.function_object = vim.fn.getreg('"')
 		scroll_animation = "neoscroll.nvim",
 		session = "persistence.nvim",
 		signature = "blink.cmp",
-		statusline_plugin = "lualine.nvim",
 		terminal_manager = "toggleterm.nvim",
 		ui_panels = "bufferline.nvim",
 		workspace_tools = "outline.nvim",
@@ -731,7 +743,8 @@ local client = vim.lsp.get_clients({ bufnr = 0 })[1]
 local namespace = client and vim.lsp.diagnostic.get_namespace(client.id)
 report.extra.namespace_underline = namespace and vim.diagnostic.config(nil, namespace).underline
 report.extra.namespace_signs = namespace and vim.diagnostic.config(nil, namespace).signs
-report.extra.status = require("user.core.statusline_basic").status()
+require("lazy").load({ plugins = { "lualine.nvim" } })
+report.extra.status = require("lualine").statusline(true)
 report.extra.omnifunc = vim.bo.omnifunc
 vim.cmd("FastLspStop")
 vim.wait(20000, function()
@@ -767,7 +780,7 @@ report.extra.summary_after = fast.summary()
 		manual.extra.namespace_underline == true and manual.extra.namespace_signs,
 		"Manual LSP lost diagnostic markers"
 	)
-	assert(manual.extra.status:find("lua_ls", 1, true), "Native statusline lost the manually attached server")
+	assert(manual.extra.status:find("lua_ls", 1, true), "Shared statusline lost the manually attached server")
 	assert(manual.extra.omnifunc:find("lsp", 1, true), "Manual completion was not wired to the started server")
 	assert(manual.extra.attached_after == 0, "Stopping left the client attached to the buffer")
 	assert(manual.extra.running_after == 0, "Stopping left the client running")

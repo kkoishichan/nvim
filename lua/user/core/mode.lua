@@ -50,7 +50,7 @@ local optional_capabilities = {
 	"session", -- manual workspace save/restore
 	"signature", -- automatic signature rendering
 	"spell_auto",
-	"statusline_plugin", -- Lua statusline component pipeline
+	"statusline_plugin", -- shared lualine theme and layout
 	"system_clipboard", -- automatic unnamedplus synchronisation
 	"terminal_manager", -- terminal manager and task panels
 	"ui_panels", -- panel layout, bufferline, notify
@@ -90,8 +90,8 @@ for _, name in ipairs({
 	standard[name] = true
 end
 
--- Fast exposes only explicit tools that leave no work running at startup.
-local fast = { lint = true }
+-- Fast keeps the shared statusline; its tools are otherwise explicit requests.
+local fast = { lint = true, statusline_plugin = true }
 
 local notices = {}
 local degradations = {}

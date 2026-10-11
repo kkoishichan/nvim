@@ -9,6 +9,7 @@ local M = {}
 -- priority before anything else draws.
 local factories = {
 	{ "user.specs.theme", { single = true } },
+	{ "user.specs.statusline" },
 	{ "user.specs.treesitter" },
 	{ "user.specs.editing" },
 	{ "user.specs.flash" },

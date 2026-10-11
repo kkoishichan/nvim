@@ -390,7 +390,7 @@ Java / Rust 保留原有分析，调试和测试接入仅在 extra 中启用。
 快速模式需要语言服务时用 `:ManualLspStart [server]`：只为当前缓冲区选择并启动一个
 已安装的主要语言服务，复用现有工具路径和项目根规则；拼写服务和辅助检查器只在显式
 点名时出现。之后使用原生 hover、跳转、重命名、手动补全（`omnifunc`）和签名浮窗，
-手动启动的服务显示诊断下划线和 E/W/I/H 标记，完整消息通过 `<leader>cd` 浮窗或 `<leader>cD` 位置列表查看；全局诊断显示仍关闭，不自动展开虚拟行。`<C-x><C-o>` 使用原生 LSP 补全，`runtime.manual_lsp_autocomplete = true` 可启用手动服务的原生自动补全，默认关闭。原生状态栏显示附着服务与 E/W 计数。
+手动启动的服务显示诊断下划线和 E/W/I/H 标记，完整消息通过 `<leader>cd` 浮窗或 `<leader>cD` 位置列表查看；全局诊断显示仍关闭，不自动展开虚拟行。`<C-x><C-o>` 使用原生 LSP 补全，`runtime.manual_lsp_autocomplete = true` 可启用手动服务的原生自动补全，默认关闭。三档共用 lualine 的配色和布局，fast 使用 ASCII 标记，显示附着服务和诊断计数，不启用 Git 状态监听；缺少插件时回退到原生状态栏。
 `:FastLspStop` 只撤销本模式建立的附着，最后一个受管缓冲区退出后停止该客户端。
 缺少可执行文件时只提示安装要求，不启动 Mason、不下载 SDK。
 在 fast 中，Java / Rust 也可用 `:FastLspStart jdtls` / `:FastLspStart rust_analyzer`，不加载
