@@ -11,15 +11,17 @@ return function(tmp)
 	git("init", "--quiet")
 	local path = directory .. "/sample.txt"
 	local lines = {}
-	for i = 1, 24 do
+	for i = 1, 36 do
 		lines[i] = "stable " .. i
 	end
-	lines[4], lines[17] = "value = 41", "second = before"
+	lines[4], lines[17], lines[30] = "    removed = 旧值", "    value = 41", "    second = before"
+	lines[31], lines[32] = "    old_middle", "    third = before"
 	vim.fn.writefile(lines, path)
 	git("add", "sample.txt")
 	git("-c", "user.name=UI Check", "-c", "user.email=ui-check@example.invalid", "commit", "--quiet", "-m", "fixture")
-	lines[4], lines[17] = "value = 42", "second = after"
-	lines[18], lines[19] = "", "third = after"
+	lines[17], lines[30] = "    value = 42", "    second = after"
+	lines[31], lines[32] = "", "    third = after"
+	table.remove(lines, 4)
 	vim.fn.writefile(lines, path)
 
 	require("lazy").load({ plugins = { "gitsigns.nvim" } })
@@ -28,61 +30,72 @@ return function(tmp)
 	local gs = require("gitsigns")
 	assert(
 		vim.wait(3000, function()
-			return #(gs.get_hunks(bufnr) or {}) == 2
+			return #(gs.get_hunks(bufnr) or {}) == 3
 		end, 20),
 		"Git preview fixture did not attach"
 	)
 	local namespace
-	local function added_line()
-		for _, mark in
-			ipairs(api.nvim_buf_get_extmarks(bufnr, namespace or -1, 0, -1, { details = true, type = "highlight" }))
-		do
-			if mark[4].hl_group == "GitSignsAddPreview" then
-				namespace = mark[4].ns_id
-				return mark
+	local function removed_lines()
+		local result = {}
+		for _, mark in ipairs(api.nvim_buf_get_extmarks(bufnr, namespace or -1, 0, -1, { details = true })) do
+			for _, line in ipairs(mark[4].virt_lines or {}) do
+				local text, removed = {}, false
+				for _, chunk in ipairs(line) do
+					text[#text + 1] = chunk[1]
+					local groups = type(chunk[2]) == "table" and chunk[2] or { chunk[2] }
+					removed = removed or vim.list_contains(groups, "GitSignsDeleteVirtLn")
+				end
+				if removed then
+					namespace = mark[4].ns_id
+					result[#result + 1] = { text = table.concat(text), leftcol = mark[4].virt_lines_leftcol }
+				end
 			end
 		end
+		return result
 	end
-	local function number_line(row)
+	local function check_preview(expected_added, expected_removed)
+		expected_removed = type(expected_removed) == "table" and expected_removed or { expected_removed }
+		assert(
+			vim.wait(2000, function()
+				local removed = removed_lines()
+				if #removed ~= #expected_removed then
+					return false
+				end
+				for i, expected in ipairs(expected_removed) do
+					if removed[i].leftcol or not vim.startswith(removed[i].text, expected) then
+						return false
+					end
+				end
+				return true
+			end, 20),
+			"Removed preview does not start at the code column: " .. vim.inspect(expected_removed)
+		)
+		for i, removed in ipairs(removed_lines()) do
+			assert(
+				removed.text:sub(#expected_removed[i] + 1):match("^ *$"),
+				"Removed code gained an extra gutter or indentation"
+			)
+		end
+		local count = 0
 		for _, mark in ipairs(api.nvim_buf_get_extmarks(bufnr, namespace, 0, -1, { details = true })) do
-			if mark[2] == row and mark[4].number_hl_group == "UserGitPreviewNumber" then
-				return mark
-			end
-		end
-	end
-	local function check_number_rows(expected)
-		local added, count = {}, 0
-		local marks = api.nvim_buf_get_extmarks(bufnr, namespace, 0, -1, { details = true })
-		for _, mark in ipairs(marks) do
 			if mark[4].hl_group == "GitSignsAddPreview" then
-				added[mark[2]] = true
-				assert(number_line(mark[2]), "Added line lost its number background")
-			end
-		end
-		for _, mark in ipairs(marks) do
-			if mark[4].number_hl_group == "UserGitPreviewNumber" then
 				count = count + 1
-				assert(added[mark[2]], "Unchanged line received an added-line number background")
-				assert(mark[4].end_row == nil, "Number background extends into the following line")
+				assert(mark[4].hl_eol, "Added code lost its full-line diff background")
 			end
+			assert(not mark[4].number_hl_group and not mark[4].sign_hl_group, "Inline preview painted the gutter")
 		end
-		assert(count == expected, "Inline gutter background count differs from the added lines")
+		assert(count == expected_added, "Inline preview lost added lines")
 	end
 	local function invoke(lhs)
 		local mapping = vim.fn.maparg(lhs, "n", false, true)
 		assert(type(mapping.callback) == "function", "Missing Git mapping: " .. lhs)
 		mapping.callback()
 	end
-	api.nvim_win_set_cursor(0, { 4, 0 })
+	api.nvim_win_set_cursor(0, { 3, 0 })
 	invoke("<leader>ghi")
-	assert(
-		vim.wait(2000, function()
-			local mark = added_line()
-			return mark and number_line(mark[2]) ~= nil
-		end, 20),
-		"Inline preview did not colour its number column"
-	)
-	check_number_rows(1)
+	-- A pure deletion must work on the first preview, before any added-line
+	-- highlight has exposed Gitsigns' preview namespace.
+	check_preview(0, "    removed = 旧值")
 	assert(vim.deep_equal(api.nvim_buf_get_lines(bufnr, 0, -1, false), lines), "Preview modified the source text")
 	-- The current-line blame text would sit on the previewed line and cut
 	-- its fill short; it pauses with the preview and returns when it clears.
@@ -105,31 +118,14 @@ return function(tmp)
 		end, 20),
 		"Blame virtual text is still drawn during the inline preview"
 	)
-	local removed = false
-	for _, mark in ipairs(api.nvim_buf_get_extmarks(bufnr, namespace, 0, -1, { details = true, type = "virt_lines" })) do
-		for _, line in ipairs(mark[4].virt_lines or {}) do
-			local chunks = {}
-			for _, chunk in ipairs(line) do
-				chunks[#chunks + 1] = chunk[1]
-			end
-			removed = removed or table.concat(chunks):find("value = 41", 1, true) ~= nil
-		end
-	end
-	assert(removed, "Inline preview lost the removed source line")
-
 	invoke("]h")
-	assert(
-		vim.wait(2000, function()
-			local mark = added_line()
-			return mark and mark[2] == 16 and number_line(mark[2]) ~= nil
-		end, 20),
-		"Hunk navigation lost the inline number background"
-	)
-	check_number_rows(3)
+	check_preview(1, "    value = 41")
+	invoke("]h")
+	check_preview(3, { "    second = before", "    old_middle", "    third = before" })
 	api.nvim_exec_autocmds("InsertEnter", { buffer = bufnr })
 	assert(
 		#api.nvim_buf_get_extmarks(bufnr, namespace, 0, -1, {}) == 0,
-		"Inline gutter background survived preview cleanup"
+		"Inline diff background survived preview cleanup"
 	)
 	assert(
 		vim.wait(1000, function()

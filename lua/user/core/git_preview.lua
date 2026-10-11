@@ -1,6 +1,6 @@
--- Extend Gitsigns' inline added-line background into the number column.
--- Place row-only gutter marks in its preview namespace after an explicit
--- preview; Gitsigns clears both together, including its window-local scope.
+-- Keep inline diff backgrounds inside the code area, like Diffview.
+-- Gitsigns renders deleted lines with a synthetic, coloured number column;
+-- remove that prefix and let Neovim reserve the normal gutter instead.
 -- The current-line blame text is paused while the preview is shown: its
 -- end-of-line virtual text sits on the previewed line and cuts the added-line
 -- fill short, and "Not Committed Yet" says nothing the preview does not.
@@ -33,10 +33,40 @@ local function pause_blame(bufnr)
 	})
 end
 
-require("user.core.highlights").on_colorscheme("git_preview", function()
-	local value = require("user.core.palette").highlight("GitSignsAddPreview")
-	vim.api.nvim_set_hl(0, "UserGitPreviewNumber", { bg = value.bg, ctermbg = value.ctermbg })
-end)
+local function has_group(groups, name)
+	return groups == name or (type(groups) == "table" and vim.list_contains(groups, name))
+end
+
+local function code_lines(lines)
+	local result = {}
+	for _, line in ipairs(lines) do
+		local chunks, prefix = {}, true
+		for _, chunk in ipairs(line) do
+			-- Prefix chunks carry this documented group even when stacked
+			-- with number/sign colours. Keep code indentation and syntax intact.
+			if not prefix or not has_group(chunk[2], "GitSignsVirtLnum") then
+				prefix = false
+				chunks[#chunks + 1] = chunk
+			end
+		end
+		result[#result + 1] = chunks
+	end
+	return result
+end
+
+local function is_removed_preview(details)
+	if not details.virt_lines or not details.virt_lines_leftcol then
+		return false
+	end
+	for _, line in ipairs(details.virt_lines) do
+		for _, chunk in ipairs(line) do
+			if has_group(chunk[2], "GitSignsDeleteVirtLn") then
+				return true
+			end
+		end
+	end
+	return false
+end
 
 local function finish(bufnr)
 	return function(err)
@@ -52,21 +82,24 @@ local function finish(bufnr)
 		-- found, only that namespace is queried on subsequent requests.
 		local marks = vim.api.nvim_buf_get_extmarks(bufnr, namespace or -1, 0, -1, {
 			details = true,
-			type = "highlight",
 		})
 		local shown = false
 		for _, mark in ipairs(marks) do
 			local details = mark[4]
-			if details.hl_group == "GitSignsAddPreview" then
+			if details.hl_group == "GitSignsAddPreview" or is_removed_preview(details) then
 				shown = true
 				namespace = details.ns_id
-				-- The text mark ends at the next row's column zero. Number
-				-- highlights include that row, so attaching one to the text
-				-- range would also paint the following unchanged line's gutter.
-				vim.api.nvim_buf_set_extmark(bufnr, namespace, mark[2], 0, {
-					number_hl_group = "UserGitPreviewNumber",
-					priority = details.priority,
-				})
+				if details.virt_lines then
+					-- Update the native mark so its window scope and automatic
+					-- cleanup remain owned by Gitsigns, including pure deletions.
+					vim.api.nvim_buf_set_extmark(bufnr, namespace, mark[2], mark[3], {
+						id = mark[1],
+						virt_lines = code_lines(details.virt_lines),
+						virt_lines_above = details.virt_lines_above,
+						virt_lines_leftcol = false,
+						virt_lines_overflow = details.virt_lines_overflow,
+					})
+				end
 			end
 		end
 		if shown then

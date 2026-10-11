@@ -16,7 +16,6 @@ return function(tmp)
 			"gitsigns.nvim",
 		},
 	})
-	require("user.core.git_preview")
 	-- Two listed buffers, so the tab bar has a gap between tabs to inspect.
 	for _, file in ipairs({ "first.lua", "second.lua" }) do
 		local bufnr = vim.api.nvim_create_buf(true, false)
@@ -260,10 +259,6 @@ return function(tmp)
 		for group, value in pairs(diff_colours) do
 			assert(vim.deep_equal(palette.highlight(group), value), name .. " " .. group .. " lost its diff colours")
 		end
-		assert(
-			palette.highlight("UserGitPreviewNumber").bg == palette.highlight("GitSignsAddPreview").bg,
-			name .. " inline preview number column differs from its added lines"
-		)
 		assert(transparency.background() == normal.bg, name .. " saved the popup's background as the editor colour")
 		for _, group in ipairs({
 			"NormalFloat",
