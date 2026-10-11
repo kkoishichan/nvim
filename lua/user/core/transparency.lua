@@ -2,7 +2,8 @@
 --   * editor, gutters, panels, splits, tab bar, winbars, framed floats and
 --     notifications lose their fill;
 --   * the native completion menu and the statusline keep theirs, anchoring
---     the picture;
+--     the picture; the Glance peek drops its fill and is marked by its lines
+--     instead (its owner in auto_lsp.lua reads the state from the palette);
 --   * every line that only read against the old fill (window separators,
 --     float borders, tab underlines) is redrawn in the palette's line colour,
 --     so the same rule holds for all themes.
@@ -27,8 +28,13 @@ local surfaces = {
 		"LineNr",
 		"LineNrAbove",
 		"LineNrBelow",
+		"CursorLine",
+		"CursorLineNr",
+		"CursorLineSign",
+		"CursorLineFold",
 		"NormalSB",
 		"SignColumnSB",
+		"LspInlayHint",
 		"TreesitterContext",
 		"TreesitterContextLineNumber",
 		"TreesitterContextBottom",
@@ -45,6 +51,11 @@ local surfaces = {
 		"TabLineSel",
 	},
 	panel = {
+		"DiffviewNormal",
+		"DiffviewNonText",
+		"DiffviewSignColumn",
+		"DiffviewEndOfBuffer",
+		"DiffviewWinSeparator",
 		"TroubleNormal",
 		"TroubleNormalNC",
 		"NeoTreeNormal",
@@ -64,16 +75,6 @@ local surfaces = {
 		"EdgyNormal",
 		"EdgyWinBar",
 		"EdgyWinBarNC",
-		"GlanceListNormal",
-		"GlancePreviewNormal",
-		"GlanceListEndOfBuffer",
-		"GlancePreviewEndOfBuffer",
-		"GlanceWinBarFilename",
-		"GlanceWinBarFilepath",
-		"GlanceWinBarTitle",
-		"GlanceBorderTop",
-		"GlanceListBorderBottom",
-		"GlancePreviewBorderBottom",
 	},
 	float = {
 		"NormalFloat",
@@ -128,6 +129,7 @@ local separators = {
 	"VertSplit",
 	"NeoTreeWinSeparator",
 	"NeoTreeVertSplit",
+	"DiffviewWinSeparator",
 	"BufferLineOffsetSeparator",
 }
 local borders = {

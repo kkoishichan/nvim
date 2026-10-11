@@ -46,6 +46,8 @@ M.git = {
 }
 
 M.modified = "●"
+-- nf-md-pin: a pinned tab.
+M.pinned = M.enabled and glyph(0xF0403) or "P"
 -- nf-md-lightbulb_on: an available code action, distinct from a hint.
 M.code_action = M.enabled and glyph(0xF06E8) or "A"
 M.fold = {

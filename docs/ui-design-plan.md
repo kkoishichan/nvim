@@ -86,8 +86,8 @@
 
 按角色而不是按组名清理：
 
-1. **清底色**：编辑区、行号 / 标记 / 折叠列、文件树与所有侧栏、Edgy、TabLine、WinBar、sticky context、Trouble、所有带边框浮窗及其边框和标题、fzf 全部表面、通知正文与边框。现有列表（`transparency.lua:9-111`）保留作为实现，但新增表面时按角色归类，并在检查里以角色断言。
-2. **保持实底**：`Pmenu*`（原生候选菜单）、`PmenuSel` / `CursorLine` 类选中行、状态栏。
+1. **清底色**：编辑区及当前行背景、行号 / 标记 / 折叠列、行内提示、文件树与所有侧栏、Edgy、TabLine、WinBar、sticky context、Trouble、Diffview 面板、所有带边框浮窗及其边框和标题、fzf 全部表面、通知正文与边框。编辑区保留主题原来的当前行号颜色作为定位提示。现有列表（`transparency.lua:9-111`）保留作为实现，但新增表面时按角色归类，并在检查里以角色断言。
+2. **保持实底**：`Pmenu*`（原生候选菜单）、`PmenuSel` 类候选与侧栏选中行、状态栏，以及有语义的差异高亮。Git 原地预览的绿色背景延伸到行号区，与红色旧行一致；预览收起时一并清除。
 3. **线条可见**：透明后主题的分隔线和 `FloatBorder.fg` 往往接近原底色而看不见。统一把 `WinSeparator`、`NeoTreeWinSeparator`、`BufferLineOffsetSeparator`、`FloatBorder`、`FloatTitle`（fg）、`FzfLuaBorder`、`BlinkCmp*Border`、`WhichKeyBorder` 的 fg 设为 `line`（标题用 `dim`）。这替代现在只对 tokyonight / catppuccin 的硬编码（`transparency.lua:153-173`）。
 4. **遮罩**：透明时没有底色可压暗，`user.core.backdrop` 跳过（现有行为），fzf / Lazy / Mason 的自带遮罩在透明时同样关闭，避免只有它们带黑幕。
 5. **通知**：正文、空行、标题留白一起清底（现有 `notify_style` 做法），边框 `muted`，图标与标题保留严重度色。
@@ -175,4 +175,7 @@ README 的 UI 段落、`docs/editor-modes.md`、`docs/ui-validation.md`、`docs/
 - `user.core.icons` 定义诊断、Git、折叠和代码操作图形；私有区字形以码点书写，避免被工具静默丢弃。
 - 27 处无标题的 `vim.notify` 补上标题；`scripts/lint-ui.py` 进入静态检查组。
 - 偏离方案的两点：TreesitterContext 直接链接到 Normal，而不是设底色后再清；`gray` 键并入 `muted`。
+- 修正：Glance peek 没有边框，透明后曾与编辑区融为一体；实底压在壁纸上又不好看。现在透明时画上下分界线和预览与列表之间的竖线（`line`，竖线画在列表的折叠列和 winbar 开头，不改插件几何），不透明时只有列表（`raised`，为此加入色板）与预览（`bg`）两阶实底、不画线；线条开关由高亮链随透明状态翻转，两种模式互不影响。
+- sticky context：不透明时正文和行号列统一用 `sunken`（比编辑区低一阶，为此加入色板），不再受主题集成各自的配色影响；透明时无底色，只留底部线。
+- 原则补充：透明与不透明的样式互不影响。所有依赖透明状态的决定都在运行时读取（高亮链、Glance 开关、各插件遮罩的自判断），不在启动时定死；`ui_themes` 对两种状态做整表快照往返对比。
 - 未做：真实终端截图（需交互终端）；`docs/improvement-roadmap.md` 与 `docs/standard-boundary-plan.md` 作为历史记录保留对 `float_style.lua` 的引用。

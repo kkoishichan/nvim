@@ -18,7 +18,20 @@ local function replacement(winid, closing)
 		return alternate
 	end
 	local candidates = vim.fn.getbufinfo({ buflisted = 1 })
+	-- Stay inside the window's workspace when it has other files open; the tab
+	-- bar lists exactly those, so the replacement is one the user can see.
+	local project = require("user.core.project")
+	local root = api.nvim_win_call(winid, function()
+		return project.root()
+	end)
+	local function local_to_workspace(info)
+		return info.name ~= "" and project.contains(root, info.name)
+	end
 	table.sort(candidates, function(left, right)
+		local left_local, right_local = local_to_workspace(left), local_to_workspace(right)
+		if left_local ~= right_local then
+			return left_local
+		end
 		if left.lastused == right.lastused then
 			return left.bufnr > right.bufnr
 		end

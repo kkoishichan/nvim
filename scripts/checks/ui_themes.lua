@@ -12,8 +12,16 @@ return function(tmp)
 			"nvim-ufo",
 			"glance.nvim",
 			"trouble.nvim",
+			"diffview.nvim",
+			"gitsigns.nvim",
 		},
 	})
+	require("user.core.git_preview")
+	-- Two listed buffers, so the tab bar has a gap between tabs to inspect.
+	for _, file in ipairs({ "first.lua", "second.lua" }) do
+		local bufnr = vim.api.nvim_create_buf(true, false)
+		vim.api.nvim_buf_set_name(bufnr, tmp .. "/" .. file)
+	end
 	local solid_surfaces = {
 		"Pmenu",
 		"PmenuBorder",
@@ -41,18 +49,22 @@ return function(tmp)
 		"DapUIFloatNormal",
 		"DapUIFloatBorder",
 		"UfoPreviewWinBar",
-		"GlanceListNormal",
-		"GlancePreviewNormal",
-		"GlanceListEndOfBuffer",
-		"GlancePreviewEndOfBuffer",
-		"GlanceWinBarFilename",
-		"GlanceWinBarFilepath",
-		"GlanceWinBarTitle",
 	}
+	-- The peek overlay: two shades when opaque, lines only when transparent.
+	local peek_surfaces = { "GlanceListNormal", "GlancePreviewNormal", "GlanceWinBarTitle", "GlanceBorderTop" }
 	local surfaces = {
 		"TroubleNormal",
 		"TroubleNormalNC",
+		"CursorLineNr",
+		"CursorLine",
+		"LspInlayHint",
+		"DiffviewNormal",
+		"DiffviewNonText",
+		"DiffviewSignColumn",
+		"DiffviewEndOfBuffer",
+		"DiffviewWinSeparator",
 		"TreesitterContext",
+		"TreesitterContextLineNumber",
 		"TreesitterContextBottom",
 		"TabLine",
 		"TabLineFill",
@@ -105,9 +117,66 @@ return function(tmp)
 		assert(contrast(normal.fg, normal.bg) >= 4.5, name .. " normal text has insufficient contrast")
 		local result = { normal = contrast(normal.fg, normal.bg), popup = {} }
 		assert(palette.highlight("NormalFloat").bg == float_bg, name .. " replaced the theme's float background")
-		assert(palette.highlight("TreesitterContext").bg == normal.bg, name .. " context adopted the popup background")
+		assert(
+			palette.highlight("TreesitterContext").bg == palette.get().sunken,
+			name .. " context rows are not one step below the editor"
+		)
+		assert(
+			palette.highlight("TreesitterContextLineNumber").bg == palette.highlight("TreesitterContext").bg,
+			name .. " context gutter differs from the context rows"
+		)
 		local menu_selection = palette.highlight("PmenuSel")
+		local diff_colours = {}
+		for _, group in ipairs({
+			"DiffAdd",
+			"DiffDelete",
+			"DiffChange",
+			"DiffText",
+			"GitSignsAddPreview",
+			"GitSignsDeleteVirtLn",
+		}) do
+			diff_colours[group] = palette.highlight(group)
+		end
 		local opaque_statusline = palette.highlight("StatusLine")
+		assert(
+			palette.highlight("GlanceListNormal").bg and palette.highlight("GlancePreviewNormal").bg,
+			name .. " opaque peek lost its fill"
+		)
+		do
+			-- The Explorer title heads the sidebar and its divider continues the
+			-- window separator: no tab-bar shade of their own when opaque.
+			local function resolved(group, fallback)
+				local value = palette.highlight(group)
+				return next(value) and value or palette.highlight(fallback)
+			end
+			assert(
+				palette.highlight("UserBufferlineOffset").bg == (resolved("NeoTreeNormal", "Normal").bg or normal.bg),
+				name .. " Explorer title is not on the sidebar colour"
+			)
+			local divider = resolved("NeoTreeWinSeparator", "WinSeparator")
+			local offset_separator = palette.highlight("BufferLineOffsetSeparator")
+			assert(
+				offset_separator.bg == (divider.bg or normal.bg) and offset_separator.fg == divider.fg,
+				name .. " Explorer divider breaks the window separator below it"
+			)
+		end
+		assert(
+			palette.highlight("GlanceListNormal").bg ~= palette.highlight("GlancePreviewNormal").bg,
+			name .. " opaque peek list and preview share one shade"
+		)
+		assert(require("glance.config").options.border.enable == false, name .. " opaque peek draws lines")
+		-- Opaque tab bar: one step below the editor, the current tab cut out in
+		-- the editor colour, no underline and no separator anywhere.
+		vim.cmd.redrawtabline()
+		local opaque_bar = vim.api.nvim_eval_statusline(vim.o.tabline, { use_tabline = true }).str
+		assert(not opaque_bar:find("│", 1, true), name .. " opaque tab bar draws separators: " .. opaque_bar)
+		assert(palette.highlight("BufferLineFill").bg == palette.get().sunken, name .. " tab bar is not sunken")
+		assert(
+			palette.highlight("BufferLineBackground").bg == palette.get().sunken,
+			name .. " inactive tab left the bar"
+		)
+		assert(palette.highlight("BufferLineBufferSelected").bg == normal.bg, name .. " current tab is not cut out")
+		assert(not palette.highlight("BufferLineBufferSelected").underline, name .. " opaque tab bar draws lines")
 		local directory = palette.highlight("Directory")
 		local tree_selection = palette.highlight("NeoTreeCursorLine")
 		local opaque = {}
@@ -144,8 +213,53 @@ return function(tmp)
 		assert(palette.get().surface == float_bg, name .. " focused popup changed the float palette")
 		local notify = vim.notify
 		vim.notify = function() end
+		-- Neither state may leak into the other: every highlight group must be
+		-- identical after a round trip, in both directions.
+		-- Rendering creates groups lazily (tab bar areas, icons), so compare
+		-- the groups a snapshot had; a group gaining a different value is a leak.
+		-- Evaluating the tab bar is the draw that recreates its lazy groups.
+		local function draw_bar()
+			return vim.api.nvim_eval_statusline(vim.o.tabline, { use_tabline = true }).str
+		end
+		local function unchanged(snapshot, label)
+			-- A theme reload drops the lazily created groups until the next draw.
+			draw_bar()
+			local now = vim.api.nvim_get_hl(0, {})
+			for group, value in pairs(snapshot) do
+				-- Per-icon tab groups are created by whichever tabs a draw shows
+				-- and dropped by every theme reload; their colours come from the
+				-- state groups compared here, so they carry no information.
+				if not group:match("^BufferLine.*Icons") then
+					assert(
+						vim.deep_equal(now[group], value),
+						("%s %s changed after %s: %s -> %s"):format(
+							name,
+							group,
+							label,
+							vim.inspect(value),
+							vim.inspect(now[group])
+						)
+					)
+				end
+			end
+		end
+		draw_bar()
+		local opaque_table = vim.api.nvim_get_hl(0, {})
 		transparency.toggle()
+		draw_bar()
+		local transparent_table = vim.api.nvim_get_hl(0, {})
+		transparency.toggle()
+		unchanged(opaque_table, "a transparency round trip")
+		transparency.toggle()
+		unchanged(transparent_table, "a round trip back to transparent")
 		assert(palette.highlight("Normal").bg == nil, name .. " editor stayed opaque")
+		for group, value in pairs(diff_colours) do
+			assert(vim.deep_equal(palette.highlight(group), value), name .. " " .. group .. " lost its diff colours")
+		end
+		assert(
+			palette.highlight("UserGitPreviewNumber").bg == palette.highlight("GitSignsAddPreview").bg,
+			name .. " inline preview number column differs from its added lines"
+		)
 		assert(transparency.background() == normal.bg, name .. " saved the popup's background as the editor colour")
 		for _, group in ipairs({
 			"NormalFloat",
@@ -175,11 +289,12 @@ return function(tmp)
 				not value.reverse and not (value.cterm and value.cterm.reverse),
 				name .. " " .. group .. " retained an inverse-video background"
 			)
-			if group:match("^BufferLine") or group == "UserBufferlineOffset" then
-				assert(
-					value.underline and value.sp == palette.get().line,
-					name .. " " .. group .. " lost its separator"
-				)
+			if group == "UserBufferlineOffset" or group == "BufferLineOffsetSeparator" then
+				-- The sidebar title heads the sidebar, not the tab list: no line.
+				assert(not value.underline, name .. " " .. group .. " underlines the sidebar title")
+			elseif group:match("^BufferLine") then
+				-- One underline colour for the whole bar, the current tab included.
+				assert(value.underline and value.sp == palette.get().line, name .. " " .. group .. " lost its baseline")
 			end
 		end
 		-- Lines keep reading without a fill behind them, in every theme: the
@@ -208,10 +323,20 @@ return function(tmp)
 				assert(value.fg == p.dim, name .. " " .. group .. " title does not use the palette dim colour")
 			end
 		end
+		-- No separator glyphs in the transparent bar either.
+		assert(not draw_bar():find("│", 1, true), name .. " transparent tab bar draws separators")
 		-- The statusline anchors the picture and keeps its fill.
 		if opaque_statusline.bg then
 			assert(palette.highlight("StatusLine").bg == opaque_statusline.bg, name .. " statusline lost its fill")
 		end
+		for _, group in ipairs(peek_surfaces) do
+			assert(
+				palette.highlight(group).bg == nil,
+				name .. " " .. group .. " kept a fill over the transparent editor"
+			)
+		end
+		assert(palette.highlight("GlanceBorderTop").fg == p.line, name .. " peek lines are not in the line colour")
+		assert(require("glance.config").options.border.enable == true, name .. " transparent peek has no lines")
 		assert(vim.deep_equal(palette.highlight("Directory"), directory), name .. " changed Directory globally")
 		assert(
 			vim.deep_equal(palette.highlight("NeoTreeCursorLine"), tree_selection),

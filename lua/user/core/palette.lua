@@ -59,7 +59,7 @@ M.shade = 0x000000
 
 ---Snapshot of theme colours. Cheap; call it fresh each time the highlights are
 ---applied (startup + every ColorScheme) so it always reflects the live theme.
----@return { fg: integer, bg: integer, surface: integer?, line: integer, muted: integer, dim: integer, subtle: integer, strong: integer, accent: integer, accent_soft: integer, warn_soft: integer, error: integer, warn: integer, info: integer, hint: integer }
+---@return { fg: integer, bg: integer, surface: integer?, raised: integer, sunken: integer, line: integer, muted: integer, dim: integer, subtle: integer, strong: integer, accent: integer, accent_soft: integer, warn_soft: integer, error: integer, warn: integer, info: integer, hint: integer }
 function M.get()
 	local transparency = require("user.core.transparency")
 	local fg = attr("Normal", "fg") or fallback.fg
@@ -72,6 +72,10 @@ function M.get()
 		-- Floats and notifications keep the theme's own popup fill when opaque
 		-- and have no fill at all when the background is transparent.
 		surface = not transparency.is_enabled() and (attr("NormalFloat", "bg") or bg) or nil,
+		-- One step above the editor: the peek list beside its preview.
+		raised = M.blend(fg, bg, 0.06),
+		-- One step below the editor: the sticky context rows pinned on top.
+		sunken = M.blend(M.shade, bg, 0.22),
 		-- Lines: window separators, tab underlines, transparent float borders.
 		line = M.blend(fg, bg, 0.20),
 		-- Secondary text: inactive tabs, hidden entries, overload markers.

@@ -8,6 +8,7 @@ for _, topic in ipairs({
 	"treesitter",
 	"sensitive",
 	"plugin_ui",
+	"git_ui",
 	"signature_ui",
 	"navigation_ui",
 	"floats",

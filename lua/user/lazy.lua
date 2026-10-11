@@ -47,8 +47,7 @@ require("lazy").setup({
 	ui = {
 		size = { width = layout.float_scale, height = layout.float_scale },
 		border = layout.manager_border,
-		-- 100 is "no backdrop" for Lazy and Mason.
-		backdrop = layout.backdrop() or 100,
+		backdrop = layout.backdrop_blend,
 	},
 	performance = {
 		rtp = {

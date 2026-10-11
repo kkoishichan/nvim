@@ -125,12 +125,20 @@ return {
 				local map = function(mode, lhs, rhs, desc)
 					vim.keymap.set(mode, lhs, rhs, { buffer = bufnr, desc = desc })
 				end
+				local function navigate(direction)
+					local preview = package.loaded["user.core.git_preview"]
+					if preview then
+						preview.navigate(direction)
+					else
+						gs.nav_hunk(direction)
+					end
+				end
 
 				map("n", "]h", function()
-					gs.nav_hunk("next")
+					navigate("next")
 				end, "Next hunk")
 				map("n", "[h", function()
-					gs.nav_hunk("prev")
+					navigate("prev")
 				end, "Previous hunk")
 				map("n", "<leader>ghs", gs.stage_hunk, "Stage/unstage hunk")
 				map("n", "<leader>ghr", gs.reset_hunk, "Reset hunk")
@@ -143,6 +151,9 @@ return {
 				map("n", "<leader>ghS", gs.stage_buffer, "Stage buffer")
 				-- No undo_stage_hunk map: deprecated upstream; stage_hunk toggles.
 				map("n", "<leader>ghp", gs.preview_hunk, "Preview hunk")
+				map("n", "<leader>ghi", function()
+					require("user.core.git_preview").inline()
+				end, "Preview hunk inline")
 				map("n", "<leader>ghb", function()
 					gs.blame_line({ full = true })
 				end, "Blame line")

@@ -43,82 +43,77 @@ local function dashboard_header()
 ]]
 end
 
+-- Two designs, one per background. Opaque is built from layers: the bar is
+-- one step below the editor, the current tab is cut out of it in the editor
+-- colour, nothing is drawn as a line. Transparent is built from lines and
+-- type: no fill anywhere, the whole bar underlined in one line colour, the
+-- current tab told apart by its text alone. Both read the palette, so a theme
+-- or transparency switch rebuilds them through bufferline's own refresh.
 local function bufferline_highlights(defaults)
 	local p = palette.get()
-	local transparent = require("user.core.transparency").is_enabled()
-	-- Bufferline rebuilds these defaults on ColorScheme, including transparency
-	-- toggles. Use blank separators so the underline remains continuous.
-	defaults.options.separator_style = transparent and { " ", " " } or "thin"
-	local inactive = p.muted
-	local visible = p.dim
+	local transparent = p.surface == nil
+	-- No separator glyphs in either design: fills (opaque) or the shared
+	-- underline (transparent) are enough. Decided here so a user option
+	-- cannot override it.
+	defaults.options.separator_style = { " ", " " }
 	local highlights = {}
-
-	-- Bufferline normally derives these foregrounds from Comment, which can be
-	-- a saturated syntax colour. Derive neutral greys from the active theme,
-	-- while keeping selected buffer labels on the theme defaults.
-	for _, name in ipairs({ "background", "buffer", "numbers", "duplicate", "hint", "info", "warning", "error" }) do
-		highlights[name] = { fg = inactive }
+	local function state_of(name)
+		if name:match("_selected$") then
+			return "selected"
+		elseif name:match("_visible$") then
+			return "visible"
+		end
+		return "inactive"
 	end
-	for _, name in ipairs({
-		"buffer_visible",
-		"numbers_visible",
-		"duplicate_visible",
-		"hint_visible",
-		"info_visible",
-		"warning_visible",
-		"error_visible",
-	}) do
-		highlights[name] = { fg = visible }
+	local text = { inactive = p.muted, visible = p.dim, selected = p.fg }
+	local function surface(state)
+		if transparent then
+			return { bg = "NONE", ctermbg = "NONE", underline = true, sp = p.line }
+		end
+		return { bg = state == "selected" and p.bg or p.sunken }
 	end
-	highlights.trunc_marker = { fg = visible }
-	for _, diagnostic in ipairs({
-		{ "hint", p.hint },
-		{ "info", p.info },
-		{ "warning", p.warn },
-		{ "error", p.error },
-	}) do
-		for _, suffix in ipairs({ "_diagnostic", "_diagnostic_visible", "_diagnostic_selected" }) do
-			highlights[diagnostic[1] .. suffix] = { fg = diagnostic[2] }
+	for name in pairs(defaults.highlights) do
+		local state = state_of(name)
+		local value = surface(state)
+		value.fg = text[state]
+		value.bold, value.italic = false, false
+		highlights[name] = value
+	end
+	-- The name takes the colour of its worst problem; counts are not shown.
+	for _, pair in ipairs({ { "error", p.error }, { "warning", p.warn } }) do
+		for _, suffix in ipairs({ "", "_visible", "_selected" }) do
+			highlights[pair[1] .. suffix].fg = pair[2]
 		end
 	end
-	for _, name in ipairs({
-		"buffer_selected",
-		"numbers_selected",
-		"duplicate_selected",
-		"diagnostic_selected",
-		"hint_selected",
-		"hint_diagnostic_selected",
-		"info_selected",
-		"info_diagnostic_selected",
-		"warning_selected",
-		"warning_diagnostic_selected",
-		"error_selected",
-		"error_diagnostic_selected",
-	}) do
-		highlights[name] = vim.tbl_extend("force", highlights[name] or {}, { italic = false })
+	for _, suffix in ipairs({ "", "_visible", "_selected" }) do
+		highlights["modified" .. suffix].fg = p.accent
+		highlights["pick" .. suffix].fg = p.accent
+		highlights["pick" .. suffix].bold = true
 	end
+	highlights.trunc_marker.fg = p.dim
+	highlights.fill = surface("inactive")
 
-	-- Sidebar offsets use a separate group, outside bufferline's own table.
-	-- Keep Directory's theme colours without changing that group globally.
-	local offset = palette.highlight("Directory")
+	-- The sidebar title and the divider cell above the file tree, and the
+	-- workspace name on the right. Both are plain groups outside bufferline's
+	-- table. The title heads the sidebar, not the tab list, so it carries no
+	-- underline; the workspace name does, as part of the bar.
+	local offset = { fg = palette.highlight("Directory").fg or p.fg }
+	local workspace = { fg = p.dim }
 	if transparent then
-		-- Cover every state, separator and filler in the public highlights table.
-		-- A continuous underline separates the bar without consuming another row;
-		-- icons created later inherit both the background and line from their state.
-		local surface = {
-			bg = "NONE",
-			ctermbg = "NONE",
-			underline = true,
-			sp = p.line,
-			default = false,
-		}
-		for name in pairs(defaults.highlights) do
-			highlights[name] = vim.tbl_extend("force", highlights[name] or {}, surface)
+		workspace = vim.tbl_extend("force", workspace, surface("inactive"))
+		highlights.offset_separator = { fg = p.line, bg = "NONE", ctermbg = "NONE" }
+	else
+		local sidebar = palette.highlight("NeoTreeNormal")
+		local divider = palette.highlight("NeoTreeWinSeparator")
+		if not next(divider) then
+			divider = palette.highlight("WinSeparator")
 		end
-		offset = vim.tbl_extend("force", offset, surface)
+		offset.bg = sidebar.bg or p.bg
+		workspace.bg = p.sunken
+		highlights.offset_separator = { fg = divider.fg or p.line, bg = divider.bg or p.bg }
 	end
 	vim.api.nvim_set_hl(0, "UserBufferlineOffset", offset)
-
+	vim.api.nvim_set_hl(0, "UserBufferlineWorkspace", workspace)
 	return highlights
 end
 
@@ -258,7 +253,7 @@ return function(profile)
 					wo = { winhighlight = "Normal:NormalFloat,NormalNC:NormalFloat" },
 				},
 				zen = {
-					backdrop = { transparent = true, blend = layout.backdrop() or 100 },
+					backdrop = { transparent = true, blend = layout.backdrop_blend },
 				},
 			},
 		},
@@ -559,83 +554,90 @@ return function(profile)
 		version = "*",
 		event = "VeryLazy",
 		dependencies = { "nvim-mini/mini.icons" },
-		opts = {
-			highlights = bufferline_highlights,
-			options = {
-				mode = "buffers",
-				themable = true,
-				numbers = "none",
-				close_command = function(bufnr)
-					require("user.core.buffers").close(bufnr)
-				end,
-				right_mouse_command = function(bufnr)
-					require("user.core.buffers").close(bufnr)
-				end,
-				left_mouse_command = "buffer %d",
-				middle_mouse_command = nil,
-				indicator = {
-					style = "none",
-				},
-				buffer_close_icon = "×",
-				close_icon = "×",
-				modified_icon = icons.modified,
-				left_trunc_marker = "",
-				right_trunc_marker = "",
-				max_name_length = 24,
-				max_prefix_length = 16,
-				truncate_names = true,
-				diagnostics = "nvim_lsp",
-				diagnostics_update_in_insert = false,
-				diagnostics_indicator = function(_, _, diagnostics_dict)
-					local symbols = icons.diagnostic_symbols()
-					local parts = {}
-					for _, severity in ipairs({
-						{ "error", "error" },
-						{ "warning", "warn" },
-						{ "info", "info" },
-						{ "hint", "hint" },
-					}) do
-						local count = diagnostics_dict[severity[1]]
-						if count then
-							table.insert(parts, symbols[severity[2]] .. count)
-						end
-					end
-
-					return #parts > 0 and " " .. table.concat(parts, " ") or ""
-				end,
-				offsets = {
-					{
-						filetype = "neo-tree",
-						text = "Explorer",
-						highlight = "UserBufferlineOffset",
-						text_align = "left",
-						separator = true,
+		opts = function()
+			return {
+				highlights = bufferline_highlights,
+				options = {
+					mode = "buffers",
+					-- themable sets every group with default = true, which lets a
+					-- theme that ships bufferline groups (vscode) override the two
+					-- designs above. Ours are the only source.
+					themable = false,
+					numbers = "none",
+					close_command = function(bufnr)
+						require("user.core.buffers").close(bufnr)
+					end,
+					right_mouse_command = function(bufnr)
+						require("user.core.buffers").close(bufnr)
+					end,
+					middle_mouse_command = function(bufnr)
+						require("user.core.buffers").close(bufnr)
+					end,
+					left_mouse_command = "buffer %d",
+					indicator = { style = "none" },
+					modified_icon = icons.modified,
+					left_trunc_marker = "",
+					right_trunc_marker = "",
+					max_name_length = 24,
+					max_prefix_length = 16,
+					-- Size each tab to its name; the default pads every tab to 18
+					-- cells and splits the padding unevenly.
+					tab_size = 0,
+					truncate_names = true,
+					-- A tab is icon, name and modified mark, and never changes width:
+					-- no close buttons (right or middle click and <leader>bd close),
+					-- no counts. Problems colour the name (see bufferline_highlights).
+					diagnostics = "nvim_lsp",
+					diagnostics_update_in_insert = false,
+					diagnostics_indicator = function()
+						return ""
+					end,
+					custom_filter = require("user.core.tabbar").belongs,
+					custom_areas = {
+						right = function()
+							return {
+								{
+									text = " " .. require("user.core.tabbar").label() .. " ",
+									link = "UserBufferlineWorkspace",
+								},
+							}
+						end,
+					},
+					offsets = {
+						{
+							filetype = "neo-tree",
+							text = "Explorer",
+							highlight = "UserBufferlineOffset",
+							text_align = "left",
+							separator = true,
+						},
+					},
+					show_buffer_close_icons = false,
+					show_close_icon = false,
+					show_duplicate_prefix = true,
+					-- One file needs no list; the bar (and the workspace label on its
+					-- right) appears once there is a choice to make. bufferline counts
+					-- every listed buffer for that, so the workspace-aware count in
+					-- the config below decides instead.
+					always_show_bufferline = false,
+					auto_toggle_bufferline = false,
+					-- New files open beside the one being read, not at the far end.
+					sort_by = "insert_after_current",
+					groups = {
+						items = {
+							require("bufferline.groups").builtin.pinned:with({ icon = icons.pinned }),
+						},
 					},
 				},
-				show_buffer_close_icons = false,
-				show_close_icon = false,
-				show_duplicate_prefix = true,
-				always_show_bufferline = false,
-				hover = {
-					enabled = true,
-					delay = 150,
-					reveal = { "close" },
-				},
-			},
-		},
+			}
+		end,
+		config = function(_, opts)
+			require("bufferline").setup(opts)
+			require("user.core.tabbar").setup()
+		end,
 		keys = {
 			{ "[b", "<cmd>BufferLineCyclePrev<cr>", desc = "Previous buffer" },
 			{ "]b", "<cmd>BufferLineCycleNext<cr>", desc = "Next buffer" },
-			{ "<M-1>", "<cmd>BufferLineGoToBuffer 1<cr>", desc = "Buffer 1" },
-			{ "<M-2>", "<cmd>BufferLineGoToBuffer 2<cr>", desc = "Buffer 2" },
-			{ "<M-3>", "<cmd>BufferLineGoToBuffer 3<cr>", desc = "Buffer 3" },
-			{ "<M-4>", "<cmd>BufferLineGoToBuffer 4<cr>", desc = "Buffer 4" },
-			{ "<M-5>", "<cmd>BufferLineGoToBuffer 5<cr>", desc = "Buffer 5" },
-			{ "<M-6>", "<cmd>BufferLineGoToBuffer 6<cr>", desc = "Buffer 6" },
-			{ "<M-7>", "<cmd>BufferLineGoToBuffer 7<cr>", desc = "Buffer 7" },
-			{ "<M-8>", "<cmd>BufferLineGoToBuffer 8<cr>", desc = "Buffer 8" },
-			{ "<M-9>", "<cmd>BufferLineGoToBuffer 9<cr>", desc = "Buffer 9" },
-			{ "<M-0>", "<cmd>BufferLineGoToBuffer -1<cr>", desc = "Last buffer" },
 			{ "[B", "<cmd>BufferLineMovePrev<cr>", desc = "Move buffer left" },
 			{ "]B", "<cmd>BufferLineMoveNext<cr>", desc = "Move buffer right" },
 			{ "<leader>bp", "<cmd>BufferLinePick<cr>", desc = "Pick buffer" },
@@ -648,6 +650,7 @@ return function(profile)
 			},
 			{ "<leader>bD", "<cmd>BufferLinePickClose<cr>", desc = "Pick buffer close" },
 			{ "<leader>bP", "<cmd>BufferLineTogglePin<cr>", desc = "Toggle buffer pin" },
+
 			{ "<leader>bo", "<cmd>BufferLineCloseOthers<cr>", desc = "Close other buffers" },
 			{ "<leader>bl", "<cmd>BufferLineCloseLeft<cr>", desc = "Close buffers left" },
 			{ "<leader>br", "<cmd>BufferLineCloseRight<cr>", desc = "Close buffers right" },

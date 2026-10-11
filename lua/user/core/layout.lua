@@ -7,8 +7,10 @@ local M = {
 	-- "shadow" preset here: FloatShadowThrough exposes/tints the underlying text
 	-- along its bottom and right edges, which looks like a leaking outer frame.
 	manager_border = "none",
-	-- The one dim level behind application floats (fzf-lua, Lazy, Mason and
-	-- user.core.backdrop all use it): 0 opaque, 100 invisible.
+	-- The one dim level behind application floats (fzf-lua, Lazy, Mason,
+	-- snacks and user.core.backdrop all use it): 0 opaque, 100 invisible. Each
+	-- of them skips the backdrop by itself while the editor has no fill, so
+	-- the value never depends on the transparency state.
 	backdrop_blend = 60,
 }
 M.manager_scale = M.float_scale
@@ -18,16 +20,6 @@ M.manager_scale = M.float_scale
 function M.float_border()
 	local border = vim.o.winborder
 	return border ~= "" and border or "rounded"
-end
-
----Backdrop opacity for plugin options, or nil when the editor is transparent:
----a blend over a colourless background only paints a dark sheet.
----@return integer|nil
-function M.backdrop()
-	if require("user.core.transparency").is_enabled() then
-		return nil
-	end
-	return M.backdrop_blend
 end
 
 local manager_filetypes = { lazy = true, mason = true }

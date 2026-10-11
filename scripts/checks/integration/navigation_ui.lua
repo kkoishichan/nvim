@@ -21,7 +21,7 @@ return function()
 		fzf_opts.winopts.width == layout.float_scale and fzf_opts.winopts.height == layout.float_scale,
 		"Fzf main window is not the shared application rectangle"
 	)
-	assert(fzf_opts.winopts.backdrop == (layout.backdrop() or false), "Fzf backdrop diverged from the shared level")
+	assert(fzf_opts.winopts.backdrop == layout.backdrop_blend, "Fzf backdrop diverged from the shared level")
 	do
 		-- The theme picker and other vim.ui.select callers use a compact popup,
 		-- while regular FzfLua commands retain the application-sized style above.
@@ -38,7 +38,7 @@ return function()
 		assert(type(registered_ui_select) == "function", "vim.ui.select was not registered with FzfLua")
 		local select_opts = registered_ui_select({ prompt = "Colorscheme" }, { "one", "two", "three", "four" })
 		assert(select_opts.winopts.border == nil, "Theme picker overrides the plugin border")
-		assert(select_opts.winopts.backdrop == (layout.backdrop() or false), "Theme picker backdrop diverged")
+		assert(select_opts.winopts.backdrop == layout.backdrop_blend, "Theme picker backdrop diverged")
 		assert(select_opts.fzf_opts["--no-scrollbar"], "Theme picker still reserves an extra right-hand cell")
 		assert(select_opts.hls == nil, "Theme picker overrides the plugin highlights")
 	end

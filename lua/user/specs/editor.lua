@@ -280,10 +280,18 @@ return function(profile)
 			require("treesitter-context").setup(opts)
 			require("user.core.highlights").on_colorscheme("treesitter-context", function()
 				local p = require("user.core.palette").get()
-				-- The context rows are part of the editor surface (the plugin links
-				-- them to NormalFloat), so they follow Normal in both backgrounds.
-				vim.api.nvim_set_hl(0, "TreesitterContext", { link = "Normal" })
+				-- The context rows sit one step below the editor when it has a fill
+				-- (text and gutter alike, whatever the theme's own integration does)
+				-- and have no fill over a transparent editor; the bottom line marks
+				-- them in both cases.
+				local fill = p.surface and p.sunken or nil
+				vim.api.nvim_set_hl(0, "TreesitterContext", { bg = fill })
+				vim.api.nvim_set_hl(0, "TreesitterContextLineNumber", {
+					fg = require("user.core.palette").highlight("LineNr").fg,
+					bg = fill,
+				})
 				vim.api.nvim_set_hl(0, "TreesitterContextBottom", { underline = true, sp = p.line })
+				vim.api.nvim_set_hl(0, "TreesitterContextLineNumberBottom", { link = "TreesitterContextBottom" })
 			end)
 		end,
 		keys = {

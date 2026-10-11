@@ -74,7 +74,7 @@ return function()
 							width = width,
 							row = 0.5,
 							col = 0.5,
-							backdrop = layout.backdrop() or false,
+							backdrop = layout.backdrop_blend,
 						},
 					}
 				end)
@@ -107,7 +107,7 @@ return function()
 					row = 0.5,
 					col = 0.5,
 					border = layout.float_border(),
-					backdrop = layout.backdrop() or false,
+					backdrop = layout.backdrop_blend,
 					preview = {
 						-- Moving the selection should not parse and highlight the
 						-- file under the cursor unless the mode asked for previews.

@@ -1,7 +1,7 @@
 -- A dimming backdrop behind an application float (lazygit, the floating
 -- terminal): a full-editor window in the palette's darkest shade at the
--- shared blend, sitting just below the float. fzf-lua, Lazy and Mason draw
--- the same backdrop themselves with `layout.backdrop()`.
+-- shared blend, sitting just below the float. fzf-lua, Lazy, Mason and snacks
+-- draw the same backdrop themselves at `layout.backdrop_blend`.
 
 local M = {}
 
@@ -19,8 +19,8 @@ function M.open(target, blend)
 		return
 	end
 	-- A transparent editor has nothing to dim; a blend over it only paints a
-	-- dark sheet, so no float gets a backdrop in that state (see layout).
-	if not require("user.core.layout").backdrop() then
+	-- dark sheet. Decided live, like the plugins' own backdrops.
+	if not vim.api.nvim_get_hl(0, { name = "Normal" }).bg then
 		return
 	end
 

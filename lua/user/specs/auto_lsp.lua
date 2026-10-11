@@ -127,6 +127,14 @@ return function(profile)
 					enable = true,
 					mode = "auto",
 				},
+				-- Opaque: two fills tell the peek apart. Transparent: there is no
+				-- fill, so lines mark its extent instead. Glance reads this option
+				-- on every open; the highlight owner below keeps it in step.
+				border = {
+					enable = require("user.core.transparency").is_enabled(),
+					top_char = "─",
+					bottom_char = "─",
+				},
 				folds = {
 					fold_closed = "",
 					fold_open = "",
@@ -155,6 +163,68 @@ return function(profile)
 				label = "Declarations",
 			})
 			glance.setup(opts)
+			-- A statuscolumn stops at the last result. A native left border
+			-- also covers the winbar and empty rows, without per-row callbacks.
+			local function update_separator()
+				if not require("user.core.transparency").is_enabled() then
+					return
+				end
+				for _, winid in ipairs(vim.api.nvim_list_wins()) do
+					local bufnr = vim.api.nvim_win_get_buf(winid)
+					local config = vim.api.nvim_win_get_config(winid)
+					local border = config.border
+					if vim.bo[bufnr].filetype == "Glance" and type(border) == "table" and border[8] == "" then
+						border[1] = { "┬", "GlanceListSeparator" }
+						border[7] = { "┴", "GlanceListSeparator" }
+						border[8] = { "│", "GlanceListSeparator" }
+						-- Reserve one column inside the existing footprint.
+						vim.api.nvim_win_set_config(winid, { border = border, width = math.max(1, config.width - 1) })
+					end
+				end
+			end
+			local group = vim.api.nvim_create_augroup("user_glance_separator", { clear = true })
+			vim.api.nvim_create_autocmd("FileType", {
+				group = group,
+				pattern = "Glance",
+				callback = function()
+					-- Includes :Glance resume, which bypasses before_open hooks.
+					vim.schedule(update_separator)
+				end,
+			})
+			vim.api.nvim_create_autocmd("WinResized", {
+				group = group,
+				-- Glance recomputes its borders and width when its parent resizes.
+				callback = update_separator,
+			})
+			-- The peek is an overlay inside the editor. Opaque: two shades (list
+			-- raised, preview on the editor colour), no lines. Transparent: no
+			-- fill, lines mark its extent. Glance defines its groups with
+			-- default = true, so these win; the chain re-applies them on every
+			-- colorscheme and transparency toggle, and flips the line option
+			-- with them so neither state leaks into the other.
+			require("user.core.highlights").on_colorscheme("glance", function()
+				local p = require("user.core.palette").get()
+				local opaque = p.surface ~= nil
+				local ok, glance_config = pcall(require, "glance.config")
+				if ok and type(glance_config.options) == "table" and type(glance_config.options.border) == "table" then
+					glance_config.options.border.enable = not opaque
+				end
+				local list_bg = opaque and p.raised or nil
+				local preview_bg = opaque and p.bg or nil
+				vim.api.nvim_set_hl(0, "GlanceListNormal", { fg = p.fg, bg = list_bg })
+				vim.api.nvim_set_hl(0, "GlancePreviewNormal", { fg = p.fg, bg = preview_bg })
+				vim.api.nvim_set_hl(0, "GlanceListCursorLine", { link = "PmenuSel" })
+				vim.api.nvim_set_hl(0, "GlancePreviewCursorLine", { link = "PmenuSel" })
+				vim.api.nvim_set_hl(0, "GlanceListEndOfBuffer", { fg = list_bg or p.bg, bg = list_bg })
+				vim.api.nvim_set_hl(0, "GlancePreviewEndOfBuffer", { fg = preview_bg or p.bg, bg = preview_bg })
+				vim.api.nvim_set_hl(0, "GlanceWinBarFilename", { fg = p.fg, bg = list_bg, bold = true })
+				vim.api.nvim_set_hl(0, "GlanceWinBarFilepath", { fg = p.muted, bg = list_bg })
+				vim.api.nvim_set_hl(0, "GlanceWinBarTitle", { fg = p.fg, bg = list_bg, bold = true })
+				vim.api.nvim_set_hl(0, "GlanceListSeparator", { fg = p.line, bg = list_bg })
+				vim.api.nvim_set_hl(0, "GlanceBorderTop", { fg = p.line, bg = list_bg })
+				vim.api.nvim_set_hl(0, "GlanceListBorderBottom", { fg = p.line, bg = list_bg })
+				vim.api.nvim_set_hl(0, "GlancePreviewBorderBottom", { fg = p.line, bg = preview_bg })
+			end)
 		end,
 	})
 	table.insert(plugins, {
@@ -172,7 +242,7 @@ return function(profile)
 				border = layout.manager_border,
 				width = layout.float_scale,
 				height = layout.float_scale,
-				backdrop = layout.backdrop() or 100,
+				backdrop = layout.backdrop_blend,
 			},
 		},
 	})
