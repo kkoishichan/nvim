@@ -165,7 +165,7 @@ return function(profile)
 				exclude = {
 					buftypes = { "terminal", "nofile", "quickfix", "prompt" },
 					filetypes = {
-						"dashboard",
+						"snacks_dashboard",
 						"fzf",
 						"gitcommit",
 						"help",
@@ -174,9 +174,7 @@ return function(profile)
 						"lspinfo",
 						"mason",
 						"neo-tree",
-						"snacks_notif",
-						"snacks_picker_input",
-						"snacks_picker_list",
+						"notify",
 						"terminal",
 					},
 				},
@@ -199,7 +197,7 @@ return function(profile)
 					"image",
 					"lazy",
 					"neo-tree",
-					"snacks_notif",
+					"notify",
 					"terminal",
 				},
 				large_file_cutoff = 2000,
@@ -269,9 +267,6 @@ return function(profile)
 					fzf = true,
 					["fzflua_backdrop"] = true,
 					["neo-tree"] = true,
-					["snacks_picker_input"] = true,
-					["snacks_picker_list"] = true,
-					["snacks_notif"] = true,
 					qf = true,
 				}
 
@@ -285,9 +280,10 @@ return function(profile)
 			require("treesitter-context").setup(opts)
 			require("user.core.highlights").on_colorscheme("treesitter-context", function()
 				local p = require("user.core.palette").get()
-				local bg = not require("user.core.transparency").is_enabled() and p.bg or nil
-				vim.api.nvim_set_hl(0, "TreesitterContext", { bg = bg })
-				vim.api.nvim_set_hl(0, "TreesitterContextBottom", { underline = true, sp = p.strong })
+				-- The context rows are part of the editor surface (the plugin links
+				-- them to NormalFloat), so they follow Normal in both backgrounds.
+				vim.api.nvim_set_hl(0, "TreesitterContext", { link = "Normal" })
+				vim.api.nvim_set_hl(0, "TreesitterContextBottom", { underline = true, sp = p.line })
 			end)
 		end,
 		keys = {

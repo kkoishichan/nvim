@@ -18,6 +18,7 @@ assert(
 		"statusline_refresh",
 		"scrollview_refresh",
 		"illuminate_refresh",
+		"signature_overloads",
 		"adapters",
 		"project_check",
 		"quiet",

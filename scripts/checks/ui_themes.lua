@@ -76,13 +76,8 @@ return function(tmp)
 		"NeoTreeWinSeparator",
 		"NeoTreeVertSplit",
 	}
-	-- Borderless popups retain their complete theme surface. Native framed
-	-- popups and editor panels still follow the transparency switch.
-	if require("user.core.float_style").is_enabled() then
-		vim.list_extend(solid_surfaces, popup_surfaces)
-	else
-		vim.list_extend(surfaces, popup_surfaces)
-	end
+	-- Framed popups and editor panels follow the transparency switch.
+	vim.list_extend(surfaces, popup_surfaces)
 	local all_surfaces = vim.list_extend(vim.deepcopy(surfaces), solid_surfaces)
 	local reports = {}
 	local function luminance(color)
@@ -112,6 +107,7 @@ return function(tmp)
 		assert(palette.highlight("NormalFloat").bg == float_bg, name .. " replaced the theme's float background")
 		assert(palette.highlight("TreesitterContext").bg == normal.bg, name .. " context adopted the popup background")
 		local menu_selection = palette.highlight("PmenuSel")
+		local opaque_statusline = palette.highlight("StatusLine")
 		local directory = palette.highlight("Directory")
 		local tree_selection = palette.highlight("NeoTreeCursorLine")
 		local opaque = {}
@@ -145,7 +141,7 @@ return function(tmp)
 		})
 		vim.wo[win].winhighlight = "Normal:Pmenu,NormalFloat:Pmenu"
 		assert(palette.get().bg == normal.bg, name .. " focused popup changed the base palette")
-		assert(palette.get().float == float_bg, name .. " focused popup changed the float palette")
+		assert(palette.get().surface == float_bg, name .. " focused popup changed the float palette")
 		local notify = vim.notify
 		vim.notify = function() end
 		transparency.toggle()
@@ -181,48 +177,40 @@ return function(tmp)
 			)
 			if group:match("^BufferLine") or group == "UserBufferlineOffset" then
 				assert(
-					value.underline and value.sp == palette.get().strong,
+					value.underline and value.sp == palette.get().line,
 					name .. " " .. group .. " lost its separator"
 				)
 			end
 		end
-		local separator = palette.highlight("WinSeparator")
-		result.separator = contrast(separator.fg, normal.bg)
-		local adjusted = name == "tokyonight" or name == "catppuccin"
-		if adjusted then
-			local colors = name == "tokyonight" and require("tokyonight.colors").setup()
-				or require("catppuccin.palettes").get_palette()
-			local native_color = name == "tokyonight" and colors.fg_gutter or colors.surface1
-			local previous_color = name == "tokyonight" and colors.dark3 or colors.surface2
-			assert(
-				separator.fg == tonumber(native_color:sub(2), 16),
-				name .. " transparent splits did not use the native palette colour"
-			)
-			assert(
-				result.separator > contrast(opaque.WinSeparator.fg, normal.bg),
-				name .. " transparent splits did not become more visible"
-			)
-			assert(
-				luminance(separator.fg) < luminance(tonumber(previous_color:sub(2), 16)),
-				name .. " transparent splits did not use a darker theme grey"
-			)
-		end
-		for _, group in ipairs({
-			"WinSeparator",
-			"VertSplit",
-			"NeoTreeWinSeparator",
-			"NeoTreeVertSplit",
-			"BufferLineOffsetSeparator",
-		}) do
+		-- Lines keep reading without a fill behind them, in every theme: the
+		-- separators and float borders take the palette's line colour and the
+		-- titles its dim text colour, all visibly lighter than the old fill.
+		local p = palette.get()
+		local lines_by_role = transparency.lines()
+		result.separator = contrast(p.line, normal.bg)
+		assert(result.separator >= 1.5, name .. " transparent lines are not visible against the old background")
+		for _, group in ipairs(lines_by_role.separators) do
 			local value = palette.highlight(group)
-			if adjusted and next(value) then
-				assert(value.fg == separator.fg, name .. " " .. group .. " does not match the window separator")
-			elseif not adjusted then
-				assert(
-					value.fg == opaque[group].fg and value.ctermfg == opaque[group].ctermfg,
-					name .. " " .. group .. " did not keep its original foreground"
-				)
+			if next(value) then
+				assert(value.fg == p.line, name .. " " .. group .. " does not use the palette line colour")
+				assert(value.bg == nil, name .. " " .. group .. " kept a fill")
 			end
+		end
+		for _, group in ipairs(lines_by_role.borders) do
+			local value = palette.highlight(group)
+			if next(value) then
+				assert(value.fg == p.line, name .. " " .. group .. " border does not use the palette line colour")
+			end
+		end
+		for _, group in ipairs(lines_by_role.titles) do
+			local value = palette.highlight(group)
+			if next(value) then
+				assert(value.fg == p.dim, name .. " " .. group .. " title does not use the palette dim colour")
+			end
+		end
+		-- The statusline anchors the picture and keeps its fill.
+		if opaque_statusline.bg then
+			assert(palette.highlight("StatusLine").bg == opaque_statusline.bg, name .. " statusline lost its fill")
 		end
 		assert(vim.deep_equal(palette.highlight("Directory"), directory), name .. " changed Directory globally")
 		assert(

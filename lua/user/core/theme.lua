@@ -62,7 +62,7 @@ end
 function M.set(name, persist)
 	local theme = M.themes[name]
 	if not theme then
-		vim.notify("Unknown theme: " .. tostring(name), vim.log.levels.WARN)
+		vim.notify("Unknown theme: " .. tostring(name), vim.log.levels.WARN, { title = "Theme" })
 		return
 	end
 	if theme.plugin then
@@ -70,16 +70,16 @@ function M.set(name, persist)
 			require("lazy").load({ plugins = { theme.plugin } })
 		end)
 		if not ok_load then
-			vim.notify("Theme " .. name .. " is not installed in this mode", vim.log.levels.WARN)
+			vim.notify("Theme " .. name .. " is not installed in this mode", vim.log.levels.WARN, { title = "Theme" })
 			return
 		end
 	end
+	-- ColorScheme runs the highlight chain, transparency included.
 	local ok, err = pcall(vim.cmd.colorscheme, theme.colorscheme)
 	if not ok then
-		vim.notify("Failed to apply theme " .. name .. ": " .. tostring(err), vim.log.levels.ERROR)
+		vim.notify("Failed to apply theme " .. name .. ": " .. tostring(err), vim.log.levels.ERROR, { title = "Theme" })
 		return
 	end
-	require("user.core.transparency").apply()
 	if persist then
 		save(name)
 	end
@@ -97,9 +97,10 @@ function M.bootstrap()
 		return
 	end
 	bootstrapped = true
+	-- Dark only; the palette blends every neutral from the theme's fg/bg.
 	vim.o.background = "dark"
-	require("user.core.ui_highlights").setup()
 	require("user.core.transparency").setup()
+	require("user.core.ui_highlights").setup()
 	M.apply_saved()
 end
 

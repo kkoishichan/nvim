@@ -14,7 +14,7 @@ usage() {
 Usage: ./scripts/check.sh [--group NAME | NAME] ...
 
 Groups: static, integration, performance, mode, standard, editing_cost, matchup_cache, matchup_highlights, matchup_input, lsp_progress, startup_loading, ui_runtime, scrolling_colors,
-        statusline_refresh, scrollview_refresh, illuminate_refresh, adapters, project_check, quiet, external_changes, ai, languages, projects,
+        statusline_refresh, scrollview_refresh, illuminate_refresh, signature_overloads, adapters, project_check, quiet, external_changes, ai, languages, projects,
         project_actions, toolchain, trust, terminals, workflow_actions, signature, lifecycle, pdf_lifecycle, image_scroll,
         windows, layout_session, ui_themes, offline_assets, deployment
 Optional real-tool groups: workflow_python_js, workflow_native, workflow_java_docs
@@ -28,7 +28,7 @@ groups=()
 add_group() {
 	local existing
 	case "$1" in
-	static | integration | performance | mode | standard | editing_cost | matchup_cache | matchup_highlights | matchup_input | lsp_progress | startup_loading | ui_runtime | scrolling_colors | statusline_refresh | scrollview_refresh | illuminate_refresh | adapters | project_check | quiet | external_changes | ai | languages | projects | project_actions | toolchain | trust | terminals | workflow_actions | signature | lifecycle | pdf_lifecycle | image_scroll | windows | layout_session | ui_themes | offline_assets | deployment | workflow_python_js | workflow_native | workflow_java_docs) ;;
+	static | integration | performance | mode | standard | editing_cost | matchup_cache | matchup_highlights | matchup_input | lsp_progress | startup_loading | ui_runtime | scrolling_colors | statusline_refresh | scrollview_refresh | illuminate_refresh | signature_overloads | adapters | project_check | quiet | external_changes | ai | languages | projects | project_actions | toolchain | trust | terminals | workflow_actions | signature | lifecycle | pdf_lifecycle | image_scroll | windows | layout_session | ui_themes | offline_assets | deployment | workflow_python_js | workflow_native | workflow_java_docs) ;;
 	*)
 		printf 'Unknown check group: %s\n' "$1" >&2
 		usage >&2
@@ -60,7 +60,7 @@ while [ $# -gt 0 ]; do
 	shift
 done
 if [ "${#groups[@]}" -eq 0 ]; then
-	groups=(static integration performance mode standard editing_cost matchup_cache matchup_highlights matchup_input lsp_progress startup_loading ui_runtime scrolling_colors statusline_refresh scrollview_refresh illuminate_refresh adapters project_check quiet external_changes ai languages projects project_actions toolchain trust terminals workflow_actions signature lifecycle pdf_lifecycle image_scroll windows layout_session ui_themes offline_assets deployment)
+	groups=(static integration performance mode standard editing_cost matchup_cache matchup_highlights matchup_input lsp_progress startup_loading ui_runtime scrolling_colors statusline_refresh scrollview_refresh illuminate_refresh signature_overloads adapters project_check quiet external_changes ai languages projects project_actions toolchain trust terminals workflow_actions signature lifecycle pdf_lifecycle image_scroll windows layout_session ui_themes offline_assets deployment)
 fi
 
 tool() {
@@ -101,6 +101,8 @@ PY
 	if command -v jq >/dev/null 2>&1; then
 		jq --exit-status 'type == "object"' "$ROOT/lazy-lock.json" >/dev/null
 	fi
+	# Colours only through the palette; every notification names its source.
+	python3 -I "$ROOT/scripts/lint-ui.py" "$ROOT"
 }
 
 TMP_ROOT=$(mktemp -d)

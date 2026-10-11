@@ -1,14 +1,34 @@
 local M = {
-	-- Shared by lazygit, the floating terminal, and the scratch buffer. 0.9 is fine
-	-- now that lazygit is nudged up a row (see git.lua) so its bottom border clears
-	-- the global statusline (laststatus=3); the terminal already self-corrects.
+	-- Every application-sized float (pickers, Oil, terminal, lazygit, scratch,
+	-- package managers) is the same centred 90% rectangle. lazygit is nudged
+	-- up a row (see git.lua) so its bottom border clears the global statusline.
 	float_scale = 0.9,
-	-- Package managers are the same 80% rectangle with no border. Do not use the
+	-- Package managers are the only borderless rectangle. Do not use the
 	-- "shadow" preset here: FloatShadowThrough exposes/tints the underlying text
 	-- along its bottom and right edges, which looks like a leaking outer frame.
-	manager_scale = 0.8,
 	manager_border = "none",
+	-- The one dim level behind application floats (fzf-lua, Lazy, Mason and
+	-- user.core.backdrop all use it): 0 opaque, 100 invisible.
+	backdrop_blend = 60,
 }
+M.manager_scale = M.float_scale
+
+---The border for plugins that do not read 'winborder' themselves. Everything
+---except package managers and in-editor peeks follows the global option.
+function M.float_border()
+	local border = vim.o.winborder
+	return border ~= "" and border or "rounded"
+end
+
+---Backdrop opacity for plugin options, or nil when the editor is transparent:
+---a blend over a colourless background only paints a dark sheet.
+---@return integer|nil
+function M.backdrop()
+	if require("user.core.transparency").is_enabled() then
+		return nil
+	end
+	return M.backdrop_blend
+end
 
 local manager_filetypes = { lazy = true, mason = true }
 local manager_backdrop_filetypes = { lazy_backdrop = true, mason_backdrop = true }

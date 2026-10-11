@@ -1,5 +1,4 @@
 local toolchain = require("user.toolchain")
-local float_style = require("user.core.float_style")
 local layout = require("user.core.layout")
 
 local function client_supports(client, method, bufnr)
@@ -20,10 +19,7 @@ local function setup_lsp_keymaps()
 				vim.keymap.set(mode, lhs, rhs, { buffer = bufnr, desc = desc })
 			end
 
-			map("n", "K", function()
-				local _, winid = vim.lsp.buf.hover(float_style.padded())
-				float_style.apply_padded(winid)
-			end, "Hover")
+			map("n", "K", vim.lsp.buf.hover, "Hover")
 			map("n", "gd", "<cmd>Glance definitions<cr>", "Peek definition")
 			map("n", "gD", "<cmd>Glance declarations<cr>", "Peek declaration")
 			map("n", "gi", "<cmd>Glance implementations<cr>", "Peek implementation")
@@ -52,7 +48,11 @@ local function setup_lsp_keymaps()
 							vim.lsp.codelens.run()
 						else
 							vim.lsp.codelens.enable(true, { bufnr = bufnr })
-							vim.notify("Code lenses shown for this buffer; press again to run one", vim.log.levels.INFO)
+							vim.notify(
+								"Code lenses shown for this buffer; press again to run one",
+								vim.log.levels.INFO,
+								{ title = "Code lens" }
+							)
 						end
 					end, "Show or run code lens")
 				end
@@ -95,7 +95,7 @@ return function(profile)
 				-- The plugin otherwise overwrites the global updatetime with its
 				-- own 200 ms default on first attach.
 				autocmd = { enabled = true, updatetime = -1 },
-				sign = { enabled = true, text = "󰌶", hl = "DiagnosticSignHint" },
+				sign = { enabled = true, text = require("user.core.icons").code_action, hl = "DiagnosticSignHint" },
 				virtual_text = { enabled = false },
 				float = { enabled = false },
 				status_text = { enabled = false },
@@ -114,7 +114,6 @@ return function(profile)
 				detached = function(winid)
 					return vim.api.nvim_win_get_width(winid) < 110
 				end,
-				border = float_style.is_enabled() and { enable = false } or nil,
 				list = {
 					position = "right",
 					width = 0.34,
@@ -156,43 +155,6 @@ return function(profile)
 				label = "Declarations",
 			})
 			glance.setup(opts)
-
-			if not float_style.is_enabled() then
-				return
-			end
-			-- Borderless peek panels keep two solid shades of the Pmenu surface.
-			-- glance sets its groups with default = true, so these explicit
-			-- overrides win; re-applied on every colorscheme switch.
-			require("user.core.highlights").on_colorscheme("glance", function()
-				local palette = require("user.core.palette")
-				local p = palette.get()
-				local fg, dim = p.fg, p.gray
-				-- Two shades: the Pmenu block and a step toward the editor bg. Assign
-				-- the darker to the preview and the lighter to the list, so the preview
-				-- is reliably the darker panel whichever way the theme's Pmenu leans
-				-- (gruvbox's Pmenu is lighter than the editor, tokyonight/catppuccin/vscode's
-				-- darker -- this picks correctly for each instead of a fixed order).
-				local function lum(c)
-					return 0.299 * (math.floor(c / 65536) % 256)
-						+ 0.587 * (math.floor(c / 256) % 256)
-						+ 0.114 * (c % 256)
-				end
-				local a = palette.highlight("Pmenu").bg or p.panel
-				local b = palette.blend(a, p.bg, 0.5)
-				local list_bg, preview_bg = a, b
-				if lum(a) < lum(b) then
-					list_bg, preview_bg = b, a
-				end
-				vim.api.nvim_set_hl(0, "GlanceListNormal", { fg = fg, bg = list_bg })
-				vim.api.nvim_set_hl(0, "GlancePreviewNormal", { fg = fg, bg = preview_bg })
-				vim.api.nvim_set_hl(0, "GlanceListCursorLine", { link = "PmenuSel" })
-				vim.api.nvim_set_hl(0, "GlancePreviewCursorLine", { link = "PmenuSel" })
-				vim.api.nvim_set_hl(0, "GlanceListEndOfBuffer", { fg = list_bg, bg = list_bg })
-				vim.api.nvim_set_hl(0, "GlancePreviewEndOfBuffer", { fg = preview_bg, bg = preview_bg })
-				vim.api.nvim_set_hl(0, "GlanceWinBarFilename", { fg = fg, bg = list_bg, bold = true })
-				vim.api.nvim_set_hl(0, "GlanceWinBarFilepath", { fg = dim, bg = list_bg })
-				vim.api.nvim_set_hl(0, "GlanceWinBarTitle", { fg = fg, bg = list_bg, bold = true })
-			end)
 		end,
 	})
 	table.insert(plugins, {
@@ -208,9 +170,9 @@ return function(profile)
 			PATH = "skip",
 			ui = {
 				border = layout.manager_border,
-				width = layout.manager_scale,
-				height = layout.manager_scale,
-				backdrop = 60,
+				width = layout.float_scale,
+				height = layout.float_scale,
+				backdrop = layout.backdrop() or 100,
 			},
 		},
 	})

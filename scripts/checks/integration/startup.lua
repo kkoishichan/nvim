@@ -1,10 +1,6 @@
 return function()
 	assert(require("user.core.theme").saved() == "vscode", "default theme is not vscode")
 	assert(vim.g.colors_name == "vscode", "vscode was not applied at startup")
-	assert(
-		vim.api.nvim_get_hl(0, { name = "Pmenu", link = false }).bg == 0x2d2d30,
-		"vscode popup background override was not applied"
-	)
 	do
 		local visual = vim.api.nvim_get_hl(0, { name = "Visual", link = false })
 		local snippet = vim.api.nvim_get_hl(0, { name = "SnippetTabstop", link = false })

@@ -202,12 +202,8 @@ local function populate_quickfix()
 end
 
 function M.setup()
-	apply_highlights()
+	require("user.core.highlights").on_colorscheme("conflicts", apply_highlights)
 	local group = vim.api.nvim_create_augroup("user_git_conflicts", { clear = true })
-	vim.api.nvim_create_autocmd("ColorScheme", {
-		group = group,
-		callback = apply_highlights,
-	})
 	vim.api.nvim_create_autocmd({ "BufReadPost", "BufNewFile", "BufWritePost", "FileChangedShellPost" }, {
 		group = group,
 		callback = function(event)

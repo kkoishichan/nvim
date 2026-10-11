@@ -114,7 +114,8 @@ function M.start(definition)
 	if vim.fn.executable(definition.cmd) ~= 1 then
 		vim.notify(
 			"Missing task executable: " .. definition.cmd .. "; install it, then :ToolsRefresh",
-			vim.log.levels.ERROR
+			vim.log.levels.ERROR,
+			{ title = "Project" }
 		)
 		return
 	end
@@ -128,7 +129,8 @@ function M.run(action)
 	if #definitions == 0 then
 		vim.notify(
 			"No " .. action .. " task found; use :OverseerRun or :OverseerShell for this project",
-			vim.log.levels.INFO
+			vim.log.levels.INFO,
+			{ title = "Project" }
 		)
 	elseif #definitions == 1 then
 		M.start(definitions[1])

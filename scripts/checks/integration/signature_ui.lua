@@ -5,7 +5,6 @@ return function()
 		return plugin.values(assert(plugins[name], "missing plugin: " .. name), "opts", false)
 	end
 	local completion_opts = opts("blink.cmp")
-	assert(completion_opts.completion.menu.border == "padded", "Completion menu lost its borderless style")
 	assert(completion_opts.keymap.preset == "super-tab", "Completion no longer uses IDE-style Tab acceptance")
 	assert(
 		type(completion_opts.keymap["<C-Space>"][1]) == "function"
@@ -72,13 +71,12 @@ return function()
 	local signature = require("blink.cmp.config").signature
 	assert(signature.enabled and signature.trigger.enabled, "Automatic signature help is disabled")
 	assert(signature.trigger.show_on_insert, "Signature help is not requested when entering an existing call")
-	assert(signature.window.border == "padded", "Signature window lost its shared style")
 	assert(signature.window.max_height == 6, "Signature popup no longer has a compact, multiline height limit")
 	assert(signature.window.treesitter_highlighting, "Signature syntax highlighting is disabled")
 	local active = vim.api.nvim_get_hl(0, { name = "BlinkCmpSignatureHelpActiveParameter", link = false })
 	local palette = require("user.core.palette")
 	assert(
-		active.fg == nil and active.bg == palette.blend(palette.get().fg, palette.highlight("Pmenu").bg, 0.16),
+		active.fg == nil and active.bg == palette.get().subtle,
 		"Active parameter highlighting no longer preserves syntax colours on a neutral background"
 	)
 end

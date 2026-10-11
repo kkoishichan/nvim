@@ -27,7 +27,7 @@ function M.toggle_terminal()
 			break
 		end
 	end
-	vim.cmd("botright 12split")
+	vim.cmd("botright " .. require("user.core.panels").budget(nil, nil, { bottom = true }).bottom .. "split")
 	if terminal then
 		vim.api.nvim_win_set_buf(0, terminal)
 	else

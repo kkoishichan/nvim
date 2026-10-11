@@ -1,5 +1,4 @@
 -- Shared leader help without importing the full UI plugin set in fast mode.
-local float_style = require("user.core.float_style")
 
 return function()
 	local mode = require("user.core.mode")
@@ -98,14 +97,7 @@ return function()
 						presets = { enabled = false },
 					} or nil,
 					spec = groups,
-					win = {
-						border = float_style.border(),
-						padding = float_style.is_enabled() and { 1, 1 } or nil,
-						wo = float_style.is_enabled() and {
-							winblend = 0,
-							winhighlight = "Normal:Pmenu,NormalFloat:Pmenu,FloatBorder:Pmenu,FloatTitle:Pmenu",
-						} or nil,
-					},
+					win = { border = require("user.core.layout").float_border() },
 					icons = {
 						-- which-key's default Space icon is "󱁐 " -- a glyph followed by a
 						-- trailing space, which makes the leader popup title read as the

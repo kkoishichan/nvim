@@ -34,12 +34,10 @@ return function(tmp)
 		assert(vim.deep_equal(question.items, { "Save", "Discard", "Cancel" }), "Close choices were not explicit")
 		question.callback(choice)
 	end
-	local function float(bufnr, width, height, padded)
+	local function float(bufnr, width, height, border)
 		local config =
 			{ relative = "editor", row = 1, col = 1, width = width or 20, height = height or 4, style = "minimal" }
-		if padded then
-			config = require("user.core.float_style").padded(config)
-		end
+		config.border = border
 		return api.nvim_open_win(bufnr, false, config)
 	end
 	local function reset()
@@ -220,7 +218,7 @@ return function(tmp)
 		reset()
 		local scratch = api.nvim_create_buf(false, true)
 		local small = float(scratch)
-		local padded = float(api.nvim_create_buf(false, true), 20, 4, true)
+		local borderless = float(api.nvim_create_buf(false, true), 20, 4, "none")
 		local modified_buf = api.nvim_create_buf(false, true)
 		api.nvim_buf_set_lines(modified_buf, 0, -1, false, { "unsaved notes" })
 		local modified = float(modified_buf)
@@ -231,7 +229,7 @@ return function(tmp)
 		api.nvim_buf_set_lines(locked_buf, 0, -1, false, { "edited before locking" })
 		vim.bo[locked_buf].modifiable = false
 		local locked = float(locked_buf)
-		for _, winid in ipairs({ small, padded, modified, named_win, locked }) do
+		for _, winid in ipairs({ small, borderless, modified, named_win, locked }) do
 			assert(roles.get(winid) == "editor_float", "An editing float was classified by size or border")
 		end
 		local native_buf, native = vim.lsp.util.open_floating_preview(
@@ -245,7 +243,7 @@ return function(tmp)
 		)
 		assert(require("user.core.popups").close(), "Escape did not find a native preview")
 		assert(not api.nvim_win_is_valid(native), "Escape did not close native hover")
-		for _, winid in ipairs({ small, padded, modified, named_win, locked }) do
+		for _, winid in ipairs({ small, borderless, modified, named_win, locked }) do
 			assert(api.nvim_win_is_valid(winid), "Escape closed an editing float")
 		end
 		assert(api.nvim_buf_get_lines(modified_buf, 0, -1, false)[1] == "unsaved notes", "Escape lost floating edits")

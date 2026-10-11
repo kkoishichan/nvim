@@ -23,6 +23,7 @@ end
 
 return function()
 	local capabilities = require("user.core.mode").capabilities()
+	local icons = require("user.core.icons")
 	return {
 		{
 			"nvim-lualine/lualine.nvim",
@@ -45,7 +46,11 @@ return function()
 						"branch",
 						{
 							"diff",
-							symbols = { added = "+", modified = "~", removed = "-" },
+							symbols = {
+								added = icons.git.added,
+								modified = icons.git.changed,
+								removed = icons.git.removed,
+							},
 						},
 					} or {},
 					lualine_c = {
@@ -65,6 +70,7 @@ return function()
 							sources = { "nvim_workspace_diagnostic" },
 							sections = { "error", "warn" },
 							update_in_insert = false,
+							symbols = icons.diagnostic_symbols(),
 							fmt = function(text)
 								return text ~= "" and ("ws " .. text) or ""
 							end,
@@ -75,6 +81,7 @@ return function()
 						{
 							"diagnostics",
 							sources = { "nvim_diagnostic" },
+							symbols = icons.diagnostic_symbols(),
 							update_in_insert = false,
 						},
 						{

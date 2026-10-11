@@ -3,6 +3,9 @@ local M = {}
 -- Left sidebar is reserved for the tree (neo-tree); oil is a buffer-style
 -- directory editor and opens full-window (in-place), not in a side panel.
 M.left_panel_width = 34
+-- Share of the editor the right dock (AI terminals) and the bottom dock take.
+M.right_ratio = 0.4
+M.bottom_ratio = 0.35
 local scheduled = false
 local applying = false
 local generation = 0
@@ -62,7 +65,7 @@ function M.budget(columns, lines, present, preferred)
 	local available = math.max(0, columns - minimum.min_editor_width - count)
 	local sizes = {
 		left = present.left and M.left_panel_width or 0,
-		right = present.right and math.floor(columns * 0.4) or 0,
+		right = present.right and math.floor(columns * M.right_ratio) or 0,
 	}
 	if count > 0 and available < count * 20 then
 		local keep = present[preferred] and (preferred == "left" or preferred == "right") and preferred
@@ -82,7 +85,7 @@ function M.budget(columns, lines, present, preferred)
 	local tabline = vim.o.showtabline == 2 or (vim.o.showtabline == 1 and #vim.api.nvim_list_tabpages() > 1)
 	local usable = lines - vim.o.cmdheight - (vim.o.laststatus > 0 and 1 or 0) - (tabline and 1 or 0)
 	local bottom_max = math.max(0, usable - minimum.min_editor_height - 2)
-	sizes.bottom = present.bottom and math.min(math.floor(lines * 0.35), bottom_max) or 0
+	sizes.bottom = present.bottom and math.min(math.floor(lines * M.bottom_ratio), bottom_max) or 0
 	return sizes
 end
 
@@ -176,7 +179,7 @@ function M.enforce()
 	end)
 	applying = false
 	if not ok then
-		vim.notify("Panel layout: " .. tostring(err), vim.log.levels.ERROR)
+		vim.notify("Panel layout: " .. tostring(err), vim.log.levels.ERROR, { title = "Panels" })
 	end
 end
 

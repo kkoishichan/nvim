@@ -1,13 +1,15 @@
 -- Semantic colours derived from the *active* colorscheme, so custom highlights
--- follow whatever theme is loaded instead of hard-coding gruvbox hex values.
+-- follow whatever theme is loaded instead of hard-coding one theme's values.
 -- Everything is pulled from standard highlight groups every theme defines
--- (Normal, Comment, Diagnostic*), with neutral bg shades blended from fg/bg.
+-- (Normal, Diagnostic*), with the neutral shades blended from fg/bg. Every
+-- custom highlight in the configuration names one of these keys; the blend
+-- ratios live here and nowhere else.
 
 local M = {}
 
 -- Resolve global links explicitly: get_hl(link=false) also follows the current
--- window's winhighlight. Opening a Pmenu-backed float must not turn its colours
--- into the base palette when a theme or transparency setting is changed there.
+-- window's winhighlight. Opening a float with its own Normal must not turn its
+-- colours into the base palette when a theme or transparency setting changes.
 function M.highlight(name)
 	local seen = {}
 	while not seen[name] do
@@ -42,31 +44,52 @@ function M.blend(a, b, alpha)
 	return mix(65536) * 65536 + mix(256) * 256 + mix(1)
 end
 
+-- Neutral fallbacks for a theme that leaves a standard group undefined.
+local fallback = {
+	fg = 0xd0d0d0,
+	bg = 0x1e1e1e,
+	error = 0xe06c75,
+	warn = 0xe5c07b,
+	info = 0x61afef,
+	hint = 0x98c379,
+}
+
+---The darkest shade, used by the dimming backdrop behind application floats.
+M.shade = 0x000000
+
 ---Snapshot of theme colours. Cheap; call it fresh each time the highlights are
 ---applied (startup + every ColorScheme) so it always reflects the live theme.
+---@return { fg: integer, bg: integer, surface: integer?, line: integer, muted: integer, dim: integer, subtle: integer, strong: integer, accent: integer, accent_soft: integer, warn_soft: integer, error: integer, warn: integer, info: integer, hint: integer }
 function M.get()
 	local transparency = require("user.core.transparency")
-	local fg = attr("Normal", "fg") or 0xebdbb2
-	local bg = attr("Normal", "bg") or transparency.background() or 0x1d2021
-	local panel = M.blend(fg, bg, 0.05)
+	local fg = attr("Normal", "fg") or fallback.fg
+	local bg = attr("Normal", "bg") or transparency.background() or fallback.bg
+	local accent = attr("DiagnosticInfo", "fg") or fallback.info
+	local warn = attr("DiagnosticWarn", "fg") or fallback.warn
 	return {
 		fg = fg,
 		bg = bg,
-		gray = attr("Comment", "fg") or 0x928374,
-		-- Float-border accent: a cyan/blue that stays in the same family across
-		-- themes (gruvbox aqua, tokyonight/catppuccin/vscode blue), unlike Function/Title
-		-- which go green in gruvbox.
-		accent = attr("DiagnosticInfo", "fg") or 0x83a598,
-		panel = panel,
-		-- Framed floats retain the theme's own popup surface when opaque.
-		-- Transparent framed floats have no fill; borderless popups use Pmenu.
-		float = not transparency.is_enabled() and (attr("NormalFloat", "bg") or bg) or nil,
-		subtle = M.blend(fg, bg, 0.15), -- soft highlight bg (word under cursor, folds)
-		strong = M.blend(fg, bg, 0.25), -- heavier highlight bg (write refs, matchparen)
-		error = attr("DiagnosticError", "fg") or 0xfb4934,
-		warn = attr("DiagnosticWarn", "fg") or 0xfabd2f,
-		info = attr("DiagnosticInfo", "fg") or 0x83a598,
-		hint = attr("DiagnosticHint", "fg") or 0x8ec07c,
+		-- Floats and notifications keep the theme's own popup fill when opaque
+		-- and have no fill at all when the background is transparent.
+		surface = not transparency.is_enabled() and (attr("NormalFloat", "bg") or bg) or nil,
+		-- Lines: window separators, tab underlines, transparent float borders.
+		line = M.blend(fg, bg, 0.20),
+		-- Secondary text: inactive tabs, hidden entries, overload markers.
+		muted = M.blend(fg, bg, 0.60),
+		-- Visible but receding text: visible tabs, low-priority icons, titles.
+		dim = M.blend(fg, bg, 0.72),
+		-- Soft and heavier highlight surfaces: word under cursor, folded line,
+		-- active parameter, snippet tabstop / write references, MatchParen.
+		subtle = M.blend(fg, bg, 0.15),
+		strong = M.blend(fg, bg, 0.25),
+		-- One accent, kept in the blue/cyan family across themes.
+		accent = accent,
+		accent_soft = M.blend(accent, bg, 0.38),
+		warn_soft = M.blend(warn, bg, 0.28),
+		error = attr("DiagnosticError", "fg") or fallback.error,
+		warn = warn,
+		info = attr("DiagnosticInfo", "fg") or fallback.info,
+		hint = attr("DiagnosticHint", "fg") or fallback.hint,
 	}
 end
 

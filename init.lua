@@ -22,7 +22,6 @@ if capabilities.conflicts then
 	require("user.core.conflicts").setup()
 end
 require("user.core.autocmds")
-require("user.core.float_style").setup()
 if capabilities.ui_panels then
 	-- Panel budgets and manager float geometry only matter once side panels and
 	-- docks exist; without them this would be per-window work for nothing.

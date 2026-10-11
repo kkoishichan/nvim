@@ -3,7 +3,6 @@ if not require("user.core.mode").capabilities().run then
 end
 
 local toolchain = require("user.toolchain")
-local float_style = require("user.core.float_style")
 
 local function executable(name)
 	return toolchain.executable(name)
@@ -293,9 +292,7 @@ return {
 		lazy = true,
 		dependencies = { "mfussenegger/nvim-dap", "nvim-neotest/nvim-nio" },
 		opts = {
-			floating = {
-				border = float_style.border(),
-			},
+			floating = { border = require("user.core.layout").float_border() },
 		},
 		keys = {
 			{

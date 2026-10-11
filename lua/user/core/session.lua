@@ -160,7 +160,7 @@ function M.save(path)
 	if not ok then
 		vim.fn.delete(temporary)
 		vim.fn.delete(metadata .. ".tmp")
-		vim.notify("Session save failed: " .. tostring(err), vim.log.levels.ERROR)
+		vim.notify("Session save failed: " .. tostring(err), vim.log.levels.ERROR, { title = "Session" })
 		return false
 	end
 	selected = path
@@ -238,7 +238,7 @@ function M.load(opts)
 	opts = opts or {}
 	local path = opts.path or (opts.last and M.list()[1]) or M.current()
 	if not path or vim.fn.filereadable(path) ~= 1 then
-		vim.notify("No saved workspace session found", vim.log.levels.INFO)
+		vim.notify("No saved workspace session found", vim.log.levels.INFO, { title = "Session" })
 		return false
 	end
 	for _, bufnr in ipairs(api.nvim_list_bufs()) do
@@ -246,7 +246,11 @@ function M.load(opts)
 			vim.bo[bufnr].modified
 			and (vim.bo[bufnr].buftype == "" or vim.bo[bufnr].buftype == "acwrite" or vim.bo[bufnr].modifiable)
 		then
-			vim.notify("Save or close modified files before restoring a workspace session", vim.log.levels.WARN)
+			vim.notify(
+				"Save or close modified files before restoring a workspace session",
+				vim.log.levels.WARN,
+				{ title = "Session" }
+			)
 			return false
 		end
 	end
@@ -281,7 +285,7 @@ function M.load(opts)
 	end
 	restore_terminals()
 	if not ok then
-		vim.notify("Session restore failed: " .. tostring(err), vim.log.levels.ERROR)
+		vim.notify("Session restore failed: " .. tostring(err), vim.log.levels.ERROR, { title = "Session" })
 		return false
 	end
 	emit("LoadPost")

@@ -1,5 +1,4 @@
 local panels = require("user.core.panels")
-local float_style = require("user.core.float_style")
 local mode = require("user.core.mode")
 
 local function toggle_explorer()
@@ -85,9 +84,8 @@ return function(profile)
 					{ source = "git_status", display_name = "Git" },
 				},
 			},
-			-- Neo-tree accepts only named border presets here; float_style's
-			-- neo-tree-popup FileType fallback replaces the created dialog border.
-			popup_border_style = "rounded",
+			-- "" follows 'winborder' for the input and confirmation dialogs.
+			popup_border_style = "",
 			default_component_configs = {
 				indent = {
 					with_expanders = true,
@@ -148,8 +146,8 @@ return function(profile)
 					-- way JetBrains keeps Structure and VSCode keeps Outline in the
 					-- explorer sidebar. edgy governs the final width/height.
 					position = "left",
-					width = 25,
-					relative_width = true,
+					width = require("user.core.panels").left_panel_width,
+					relative_width = false,
 					auto_close = false,
 					auto_jump = false,
 				},
@@ -163,11 +161,7 @@ return function(profile)
 				},
 				preview_window = {
 					auto_preview = false,
-					border = float_style.border(),
-					winhl = float_style.is_enabled()
-							and "Normal:Pmenu,NormalFloat:Pmenu,FloatBorder:Pmenu,FloatTitle:Pmenu,EndOfBuffer:Pmenu"
-						or nil,
-					winblend = float_style.is_enabled() and 0 or nil,
+					border = require("user.core.layout").float_border(),
 				},
 				providers = {
 					priority = { "lsp", "markdown", "norg", "treesitter" },

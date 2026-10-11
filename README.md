@@ -12,6 +12,7 @@ Neovim 打磨成接近 IDE 的日常工作流。
 - `blink.cmp` 负责补全、snippet 与签名帮助；`Tab` / `Enter` 确认候选，方向键选择，
 	`Alt-Space` 主动唤起（`Ctrl-Space` 留给输入法）。签名使用 Blink 内置浮窗，自动触发，
 	进入已有调用的插入模式时也会请求；长签名自动换行，最多显示 6 行，保留语法和当前参数高亮。
+	有重载时只显示服务器选中的那个并标注 `(n/m)`，`Ctrl-S` 切换重载，手动选择在同一调用内保留。
 	`Ctrl-K` 显示／隐藏签名，`Ctrl-B` / `Ctrl-F` 滚动签名；位置与补全菜单避让由 Blink 处理。
 - `nvim-lspconfig` + Mason 负责语言服务与外部工具安装。
 - `conform.nvim` 格式化，`nvim-lint` 静态检查；standard 保存时检查，也可手动；extra 另在读取和离开插入模式时检查。
@@ -20,12 +21,13 @@ Neovim 打磨成接近 IDE 的日常工作流。
 - extra 提供 `overseer.nvim` 任务运行、`neotest` 测试、`nvim-dap` + `dap-ui` 调试。
 - `snacks.nvim` 在 standard / extra 提供 input、zen 与 scratch；extra 另有 dashboard；通知由 `nvim-notify` 提供。
 - LSP 任务持续至少 500 ms 才显示进度，短检查静默完成；长任务按 250 ms 刷新，完成后提示保留 1.2 秒。
-- 除通知外，小型临时弹窗默认统一使用 Pmenu 配色的无边框 padding 设计，透明模式下也保留底色，可通过 `<leader>up`
-  持久切换为插件和主题样式（重启生效）；`Esc` 一次收起当前
+- 浮窗按角色统一：提示、对话框和应用浮窗都用全局 `winborder`（rounded），不读该选项的插件
+  通过 `layout.float_border()` 拿到同一个值；Lazy / Mason 是唯一的无边框矩形，Glance 用 winbar 分区。
+  应用浮窗一律 90% 居中，背景遮罩只有一种实现和一档透明度，`winblend` 一律 0。`Esc` 一次收起当前
   标签页内重叠的补全、签名、文档、提示与预览。通知按超时自动消失（`<leader>un` 可立即
   清空），Glance、Fzf、Lazy、Mason、Oil 等界面走各自关闭接口；终端、scratch、zen 等
   编辑工作区不会被误关。
-- `:Lazy` 与 `:Mason` 共用同一个 80% 纯无边框矩形，并校正两插件不同的高度计算方式。
+- `:Lazy` 与 `:Mason` 共用同一个 90% 纯无边框矩形，并校正两插件不同的高度计算方式。
 
 当前在 Neovim `0.12.x` 上验证，并使用了 0.12 的公开 API，因此要求 `0.12+`。
 
@@ -84,16 +86,17 @@ Selene、Stylelint、golangci-lint 仅在项目存在对应配置时运行，避
 │       │   ├── conflicts.lua  -- Git conflict 高亮、跳转与选择
 │       │   ├── diagnostics.lua -- 诊断 UI
 │       │   ├── dict.lua       -- ECDICT 离线词典浮窗
-│       │   ├── float_style.lua -- 无边框 padding 浮窗共享样式
 │       │   ├── format_policy.lua -- 保存预算、异步格式化与汇编边界
 │       │   ├── highlights.lua -- 具名高亮回调，重载时替换
 │       │   ├── java.lua       -- Java root / runtime / workspace 解析
 │       │   ├── keymaps.lua    -- 全局非插件键位
 │       │   ├── layout.lua     -- 窗口布局工具
 │       │   ├── lazy_bootstrap.lua -- 从同源锁文件启动 Lazy
+│       │   ├── highlights.lua -- 唯一的 ColorScheme 入口：透明处理后按序重算自定义高亮
+│       │   ├── icons.lua      -- 共享图形词汇（诊断、Git、折叠、代码操作）
 │       │   ├── lsp_progress.lua -- LSP 进度通知
 │       │   ├── options.lua    -- vim 选项
-│       │   ├── palette.lua    -- 从当前主题推导语义色
+│       │   ├── palette.lua    -- 从当前主题推导语义色，所有混合比例只在这里
 │       │   ├── panels.lua     -- 面板空间分配与正文保护
 │       │   ├── pdf.lua        -- PDF 状态栏数据
 │       │   ├── pdf_registration.lua -- PDF 轻量注册，首次使用再加载实现
@@ -142,6 +145,7 @@ Selene、Stylelint、golangci-lint 仅在项目存在对应配置时运行，避
 │   ├── check-workflows.sh     -- 显式执行真实语言工作流
 │   ├── run-check.lua          -- 独立进程中的行为回归加载器
 │   ├── checks/                -- 按主题分组的行为与集成回归
+│   ├── lint-ui.py             -- 色值只能来自 palette、通知必须带标题
 │   ├── prepare-checks.sh      -- 显式准备隔离的锁定依赖
 │   ├── verify-lock.lua        -- 依赖版本、修改状态与可加载性校验
 │   ├── benchmark.py           -- 可重复的启动测量
@@ -244,8 +248,10 @@ Python 高亮使用原生查询，保留原有颜色和范围；已撤除收益�
 十二种语言的带诊断样例及其 extra 基准见[诊断样例基准](docs/diagnostic-samples.md)。
 
 右侧滚动条采用单轨概览设计：滑块、诊断、搜索、mark、TODO、冲突和 Git 改动始终
-共用一列，同一高度只显示优先级最高的标记。诊断沿用左列的 `E/W/I/H`，FIX、TODO、
-HACK、WARN/XXX 也沿用对应图标；Git 使用粗实线 `┃`，搜索 `━`、冲突 `×`，mark 保留字母。
+共用一列，同一高度只显示优先级最高的标记。图形词汇在 `user.core.icons` 定义：密集单格的
+标记列和滚动条用字母 `E/W/I/H` 和粗实线 `┃`，带标签的状态栏、buffer 标签栏用同一组 Material
+图标和 `+ ~ -` 计数，代码操作灯泡与 hint 图标不同。FIX、TODO、HACK、WARN/XXX 沿用对应图标；
+搜索 `━`、冲突 `×`，mark 保留字母。
 左右两侧的 Git 新增/修改标记均使用居中的 `┃`；所有标记固定占用一个字符，并使用与
 左列一致的主题语义色。
 右侧发生位置碰撞时，诊断、冲突、搜索、mark 和关键词均优先于 Git；精确 Git 状态仍由
@@ -329,13 +335,12 @@ Claude 原生 IDE 集成在一个 Neovim 中只有一个终端：首次打开时
 ```json
 {
   "tools": { "prefer_mason": false },
-  "ui": { "float_style": true },
   "format": { "timeout_ms": 800 },
   "runtime": { "mode": "standard", "state_dir": "", "persistent_undo": false }
 }
 ```
 
-工具偏好修改后运行 `:ToolsRefresh`；直接编辑运行模式、恢复存储和弹窗样式后需重启。
+工具偏好修改后运行 `:ToolsRefresh`；直接编辑运行模式和恢复存储后需重启。
 无效值采用默认设置，并在健康报告中说明。
 项目自身的格式化和检查规则继续放在项目原生配置文件中。
 
@@ -456,9 +461,8 @@ Go 汇编仅在 `.s`、Go 项目和 Plan 9 指令特征同时匹配时使用 asm
 - `<M-1>` … `<M-9>` ：跳到第 N 个 buffer，`<M-0>` 跳到最后一个
 - `<C-/>` ：切换底部终端（兼容传统终端的 `<C-_>` 编码）
 - `<leader>k` ：standard / extra 的离线词典；`<leader>ut` ：选择并持久保存主题
-- `<leader>uT` / `:TransparentToggle` ：切换并持久保存透明背景，切换主题后仍生效。编辑区、行号栏、文件树、sticky context、buffer 标签栏、有边框的弹窗和 Trouble 面板跟随开关；统一无框样式的补全、签名、leader 菜单、悬停文档、诊断、输入框和预览（含 Glance）保留底色。候选选中行、当前参数、搜索匹配及编辑区选中行保留高亮；透明程度由终端设置决定。透明模式下，仅 TokyoNight（fg_gutter）和 Catppuccin（surface1）的窗口分隔线改用主题色板中的原生暗灰色，其他主题保留原色；buffer 标签栏（含 Explorer 标题）底部用连续细线分隔，不额外占一行，标签之间不显示竖分割线。切换时刷新当前主题及插件颜色缓存，关闭后恢复主题原色。状态保存在 `stdpath("state")/transparent.txt`，默认关闭。
-- `<leader>up` / `:FloatStyleToggle` ：切换并持久保存统一弹窗样式，默认开启。`:FloatStyle on` 开启，`:FloatStyle off` 恢复插件和主题提供的边框、背景及标题颜色；`:FloatStyle` 查看当前和已保存的选择。设置写入 `preferences.json` 的 `ui.float_style`，重启后统一生效，连续切换可撤销待生效的选择。三档均支持；通知样式、弹窗功能、快捷键和透明背景开关独立保留。
-- 无边框小弹窗始终保留菜单底色；有边框浮窗在非透明模式使用当前主题原本的弹窗底色（NormalFloat），透明模式不设置底色。关闭统一样式后，插件的有框弹窗同样遵循透明开关。通知的正文、空行、标题留白和行尾一起切换，避免只有文字带背景；淡入淡出及内容更新保持一致，通知修复不受弹窗样式开关影响。
+- `<leader>uT` / `:TransparentToggle` ：切换并持久保存透明背景，切换主题后仍生效。按角色清底色：编辑区、行号栏、文件树和所有侧栏、Edgy、标签栏、winbar、sticky context、Trouble、带边框浮窗及其边框和标题、fzf 全部表面、通知。只有原生候选菜单和状态栏保持实底，作为画面的锚。透明后所有主题的窗口分隔线、浮窗边框和 buffer 标签下划线统一改用色板的 `line` 色，标题用 `dim` 色，不再按主题名特判；候选选中行、当前参数、搜索匹配及编辑区选中行保留高亮；透明程度由终端设置决定。透明时不画背景遮罩。状态保存在 `stdpath("state")/transparent.txt`，默认关闭。
+- 所有自定义高亮从 `user.core.palette` 推导（`surface`、`line`、`muted`、`dim`、`subtle`、`strong`、`accent` 和四个严重度），配置里不出现色值；主题切换走 `user.core.highlights` 一条链：先透明处理，再按注册顺序重算每个模块的高亮。非透明模式浮窗使用当前主题的弹窗底色（NormalFloat），透明模式不设置底色。通知的正文、空行、标题留白和行尾一起切换，避免只有文字带背景；淡入淡出及内容更新保持一致。
 - `<leader>ghB` ：切换当前行 Git blame
 - `zR` / `zM` / `zr` / `zm` / `zK` ：折叠开关与预览
 
@@ -499,13 +503,15 @@ Go 汇编仅在 `.s`、Go 项目和 Plan 9 指令特征同时匹配时使用 asm
 - PDF PNG 缓存目录权限设为仅当前用户可访问，保留不超过 30 天且总量限制为 512 MiB。
 - PDF 渲染与缓存扫描按需启动；关闭文件和重载时取消该实例的进程与监听。
   无图形协议或缺少可选工具时显示原因与外部打开入口。
-- 签名提示只使用 Blink 的公开配置和快捷键，重载与当前参数采用 LSP 返回结果，
-  不再维护自定义调用解析、内联渲染和窗口补丁。
+- 签名提示的请求、触发、参数偏移和定位都由 Blink 负责，重载与当前参数采用 LSP 返回结果，
+  不维护自定义调用解析和内联渲染。
   AI 操作也按首次使用加载；主题回调使用具名替换，避免重载时重复注册。
-- 当前锁定的 Blink `1.10.2` 在某些非首位重载中存在参数高亮偏移问题，可能导致签名浮窗不显示。
-  例如 LSP 选择第二个重载，而它的当前参数位置超出第一个重载的长度时会触发。
-  遇到此情况可用 `:lua vim.lsp.buf.signature_help()` 查看 Neovim 原生签名；本配置不再接管 Blink 的渲染来绕过此限制。
-- 修改配置后运行 `./scripts/check.sh`，执行静态、部署故障检查及核心行为回归。
+- 锁定的 Blink `1.10.2` 把所有重载的标签堆在一起，却只按当前签名计算参数高亮并画在第一行：
+  服务器选中非首位重载时高亮落错位置，偏移超出首行长度时渲染报错、浮窗停留在旧内容。
+  `user.core.signature_overloads` 适配层只渲染选中的重载并提供 `Ctrl-S` 切换，哈希锁定插件源码，
+  插件更新后退回原生渲染并在 `:ModeInfo` 列出。服务器行为与设计见[签名重载](docs/signature-overloads.md)。
+- 修改配置后运行 `./scripts/check.sh`，执行静态、部署故障检查及核心行为回归。静态组包含
+  `scripts/lint-ui.py`：`lua/` 下不允许出现 palette 之外的色值字面量，每个 `vim.notify` 必须带 `title`。
   每个 Neovim 组使用独立进程与临时 config / cache / state / log，复用已安装的插件和工具；
   先核对版本锁与补全二进制，缺少依赖时失败并提示准备，不在检查中安装。
   可用 `./scripts/check.sh performance` 或 `./scripts/check.sh --group static --group ai` 仅运行指定组。

@@ -1,13 +1,8 @@
 return function()
 	local plugins = require("lazy.core.config").plugins
 	local plugin = require("lazy.core.plugin")
-	local float_style = require("user.core.float_style")
-	local shared_border = float_style.border()
 	local function opts(name)
 		return plugin.values(assert(plugins[name], "missing plugin: " .. name), "opts", false)
-	end
-	local function assert_shared_border(border, label)
-		assert(vim.deep_equal(border, shared_border), label .. " does not use the shared borderless style")
 	end
 
 	assert(plugins["lsp_signature.nvim"] == nil, "lsp_signature.nvim is still configured")
@@ -20,7 +15,13 @@ return function()
 	-- Other application-sized overlays deliberately keep their framed layouts.
 	local fzf_plugin = plugins["fzf-lua"]
 	local fzf_opts = opts("fzf-lua")
-	assert(fzf_opts.winopts.border == "rounded", "Fzf main window lost its panel border")
+	local layout = require("user.core.layout")
+	assert(fzf_opts.winopts.border == layout.float_border(), "Fzf main window does not follow the float border")
+	assert(
+		fzf_opts.winopts.width == layout.float_scale and fzf_opts.winopts.height == layout.float_scale,
+		"Fzf main window is not the shared application rectangle"
+	)
+	assert(fzf_opts.winopts.backdrop == (layout.backdrop() or false), "Fzf backdrop diverged from the shared level")
 	do
 		-- The theme picker and other vim.ui.select callers use a compact popup,
 		-- while regular FzfLua commands retain the application-sized style above.
@@ -36,22 +37,19 @@ return function()
 		package.loaded["fzf-lua"] = loaded_fzf
 		assert(type(registered_ui_select) == "function", "vim.ui.select was not registered with FzfLua")
 		local select_opts = registered_ui_select({ prompt = "Colorscheme" }, { "one", "two", "three", "four" })
-		assert_shared_border(select_opts.winopts.border, "Theme picker")
-		assert(select_opts.winopts.backdrop == 60, "Theme picker backdrop is disabled")
+		assert(select_opts.winopts.border == nil, "Theme picker overrides the plugin border")
+		assert(select_opts.winopts.backdrop == (layout.backdrop() or false), "Theme picker backdrop diverged")
 		assert(select_opts.fzf_opts["--no-scrollbar"], "Theme picker still reserves an extra right-hand cell")
-		assert(select_opts.hls.normal == "Pmenu", "Theme picker body does not use Pmenu")
-		assert(select_opts.hls.cursorline == "PmenuSel", "Theme picker selection does not use PmenuSel")
-		assert(
-			select_opts.hls.fzf.normal == "Pmenu" and select_opts.hls.fzf.gutter == "Pmenu",
-			"Theme picker terminal surface does not use Pmenu"
-		)
-		assert(select_opts.hls.fzf.cursorline == "PmenuSel", "Theme picker terminal selection does not use PmenuSel")
+		assert(select_opts.hls == nil, "Theme picker overrides the plugin highlights")
 	end
 	local oil_opts = opts("oil.nvim")
-	assert(oil_opts.float.border == "rounded", "Oil float lost its panel border")
+	assert(oil_opts.float.border == layout.float_border(), "Oil float does not follow the float border")
+	assert(oil_opts.float.max_width == layout.float_scale, "Oil float is not the shared application rectangle")
 	assert(type(oil_opts.keymaps["<Esc>"].callback) == "function", "Floating Oil cannot be closed with Escape")
-	assert(opts("toggleterm.nvim").float_opts.border == "rounded", "Float terminal lost its panel border")
-	local layout = require("user.core.layout")
+	assert(
+		opts("toggleterm.nvim").float_opts.border == layout.float_border(),
+		"Float terminal does not follow the float border"
+	)
 	local mason_ui = opts("mason.nvim").ui
 	local lazy_ui = require("lazy.core.config").options.ui
 	assert(layout.manager_border == "none", "package managers still have a border or transparent shadow")
@@ -60,11 +58,11 @@ return function()
 	local lazy_escape = vim.api.nvim_get_autocmds({ group = "user_lazy_escape", event = "FileType", pattern = "lazy" })
 	assert(#lazy_escape == 1, "Lazy manager cannot be closed with Escape")
 	assert(
-		mason_ui.width == layout.manager_scale and mason_ui.height == layout.manager_scale,
+		mason_ui.width == layout.float_scale and mason_ui.height == layout.float_scale,
 		"Mason manager size diverged"
 	)
 	assert(
-		lazy_ui.size.width == layout.manager_scale and lazy_ui.size.height == layout.manager_scale,
+		lazy_ui.size.width == layout.float_scale and lazy_ui.size.height == layout.float_scale,
 		"Lazy manager size diverged"
 	)
 	local scrollview_opts = opts("nvim-scrollview")
@@ -97,11 +95,11 @@ return function()
 			diagnostic_info = "I",
 			diagnostic_hint = "H",
 			search = "━",
-			keyword_fix = "",
-			keyword_todo = "",
-			keyword_hack = "",
-			keyword_warn = "",
-			keyword_xxx = "",
+			keyword_fix = vim.fn.nr2char(0xF188),
+			keyword_todo = vim.fn.nr2char(0xF00C),
+			keyword_hack = vim.fn.nr2char(0xF490),
+			keyword_warn = vim.fn.nr2char(0xF071),
+			keyword_xxx = vim.fn.nr2char(0xF071),
 			conflict = "×",
 		}),
 		"scrollview markers diverged from the left gutter vocabulary"
@@ -119,8 +117,7 @@ return function()
 	)
 	local p = require("user.core.palette").get()
 	assert(
-		vim.api.nvim_get_hl(0, { name = "ScrollView", link = false }).bg
-			== require("user.core.palette").blend(p.fg, p.bg, 0.13),
+		vim.api.nvim_get_hl(0, { name = "ScrollView", link = false }).bg == p.line,
 		"scrollview thumb is not using the quiet theme-derived colour"
 	)
 	assert(

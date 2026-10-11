@@ -1,6 +1,5 @@
 local M = {}
 local toolchain = require("user.toolchain")
-local float_style = require("user.core.float_style")
 
 local loaded = {}
 local configured = false
@@ -179,7 +178,6 @@ local function configure_once()
 	if not configured then
 		require("neotest").setup({
 			adapters = {},
-			floating = { border = float_style.border() },
 		})
 		configured = true
 		local group = vim.api.nvim_create_augroup("user_test_projects", { clear = true })
@@ -192,11 +190,15 @@ local function configure_once()
 		vim.api.nvim_create_user_command("TestAdapter", function(args)
 			local context = javascript_context(vim.api.nvim_buf_get_name(0))
 			if not context then
-				vim.notify("No Jest or Vitest project was found for this buffer", vim.log.levels.WARN)
+				vim.notify(
+					"No Jest or Vitest project was found for this buffer",
+					vim.log.levels.WARN,
+					{ title = "Tests" }
+				)
 				return
 			end
 			if args.args ~= "auto" and not context.frameworks[args.args] then
-				vim.notify("This project does not declare " .. args.args, vim.log.levels.WARN)
+				vim.notify("This project does not declare " .. args.args, vim.log.levels.WARN, { title = "Tests" })
 				return
 			end
 			javascript_choices[context.root] = args.args ~= "auto" and args.args or nil
@@ -328,7 +330,8 @@ local function ensure_adapter()
 			if context then
 				vim.notify(
 					"Both Jest and Vitest are declared here; choose :TestAdapter jest or :TestAdapter vitest",
-					vim.log.levels.WARN
+					vim.log.levels.WARN,
+					{ title = "Tests" }
 				)
 			end
 			return false

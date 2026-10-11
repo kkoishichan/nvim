@@ -1,77 +1,96 @@
--- Clear editor, framed popup and panel surfaces, keeping borderless popups solid.
--- Reload the active colorscheme on toggles so plugins can rebuild their cached
--- UI colours, including bufferline's dynamically created file icons.
+-- Transparent background, decided by surface role rather than by theme:
+--   * editor, gutters, panels, splits, tab bar, winbars, framed floats and
+--     notifications lose their fill;
+--   * the native completion menu and the statusline keep theirs, anchoring
+--     the picture;
+--   * every line that only read against the old fill (window separators,
+--     float borders, tab underlines) is redrawn in the palette's line colour,
+--     so the same rule holds for all themes.
+-- Runs first in the highlight chain (user.core.highlights) on every
+-- ColorScheme, so owners that derive colours afterwards already see the
+-- transparent state through the palette.
 local M = {}
 local file = vim.fn.stdpath("state") .. "/transparent.txt"
 local ok, lines = pcall(vim.fn.readfile, file)
 local enabled = ok and lines[1] == "1"
 local background
-local groups = {
-	"Normal",
-	"NormalNC",
-	"NormalFloat",
-	"FloatBorder",
-	"FloatTitle",
-	"TroubleNormal",
-	"TroubleNormalNC",
-	"EndOfBuffer",
-	"SignColumn",
-	"FoldColumn",
-	"LineNr",
-	"LineNrAbove",
-	"LineNrBelow",
-	"WinSeparator",
-	"VertSplit",
-	"WinBar",
-	"WinBarNC",
-	"TabLine",
-	"TabLineFill",
-	"TabLineSel",
-	"TreesitterContext",
-	"TreesitterContextLineNumber",
-	"TreesitterContextBottom",
-	"TreesitterContextLineNumberBottom",
-	"TreesitterContextSeparator",
-	"NormalSB",
-	"SignColumnSB",
-	"NeoTreeNormal",
-	"NeoTreeNormalNC",
-	"NeoTreeFloatNormal",
-	"NeoTreeFloatBorder",
-	"NeoTreeFloatTitle",
-	"NeoTreeTitleBar",
-	"NeoTreeTabInactive",
-	"NeoTreeTabSeparatorInactive",
-	"NeoTreeEndOfBuffer",
-	"NeoTreeSignColumn",
-	"NeoTreeWinSeparator",
-	"NeoTreeDimText",
-	"NeoTreeIndentMarker",
-	"NeoTreeExpander",
-	"EdgyNormal",
-	"EdgyWinBar",
-	"EdgyWinBarNC",
-	-- Fzf can supply its own theme groups when the unified popup style is off.
-	-- Its terminal palette must also inherit the transparent background.
-	"FzfLuaNormal",
-	"FzfLuaPreviewNormal",
-	"FzfLuaHelpNormal",
-	"FzfLuaBorder",
-	"FzfLuaPreviewBorder",
-	"FzfLuaHelpBorder",
-	"FzfLuaTitle",
-	"FzfLuaPreviewTitle",
-	"FzfLuaFzfNormal",
-	"FzfLuaFzfGutter",
-	"FzfLuaFzfQuery",
-	"FzfLuaScrollFloatEmpty",
-}
--- The unified style uses solid Pmenu-backed blocks instead of visible frames.
--- Only clear these plugin surfaces when using their native framed style.
--- Pmenu itself stays solid, including Neovim's built-in borderless menus.
--- float_style is fixed for the process; no per-window or per-frame checks.
-if not require("user.core.float_style").is_enabled() then
-	vim.list_extend(groups, {
+
+-- Surfaces whose fill goes, grouped by role. Plugin groups that link to a
+-- cleared group follow it; the ones listed here paint their own fill.
+local surfaces = {
+	editor = {
+		"Normal",
+		"NormalNC",
+		"EndOfBuffer",
+		"SignColumn",
+		"FoldColumn",
+		"LineNr",
+		"LineNrAbove",
+		"LineNrBelow",
+		"NormalSB",
+		"SignColumnSB",
+		"TreesitterContext",
+		"TreesitterContextLineNumber",
+		"TreesitterContextBottom",
+		"TreesitterContextLineNumberBottom",
+		"TreesitterContextSeparator",
+	},
+	chrome = {
+		"WinSeparator",
+		"VertSplit",
+		"WinBar",
+		"WinBarNC",
+		"TabLine",
+		"TabLineFill",
+		"TabLineSel",
+	},
+	panel = {
+		"TroubleNormal",
+		"TroubleNormalNC",
+		"NeoTreeNormal",
+		"NeoTreeNormalNC",
+		"NeoTreeFloatNormal",
+		"NeoTreeFloatBorder",
+		"NeoTreeFloatTitle",
+		"NeoTreeTitleBar",
+		"NeoTreeTabInactive",
+		"NeoTreeTabSeparatorInactive",
+		"NeoTreeEndOfBuffer",
+		"NeoTreeSignColumn",
+		"NeoTreeWinSeparator",
+		"NeoTreeDimText",
+		"NeoTreeIndentMarker",
+		"NeoTreeExpander",
+		"EdgyNormal",
+		"EdgyWinBar",
+		"EdgyWinBarNC",
+		"GlanceListNormal",
+		"GlancePreviewNormal",
+		"GlanceListEndOfBuffer",
+		"GlancePreviewEndOfBuffer",
+		"GlanceWinBarFilename",
+		"GlanceWinBarFilepath",
+		"GlanceWinBarTitle",
+		"GlanceBorderTop",
+		"GlanceListBorderBottom",
+		"GlancePreviewBorderBottom",
+	},
+	float = {
+		"NormalFloat",
+		"FloatBorder",
+		"FloatTitle",
+		"FzfLuaNormal",
+		"FzfLuaPreviewNormal",
+		"FzfLuaHelpNormal",
+		"FzfLuaBorder",
+		"FzfLuaPreviewBorder",
+		"FzfLuaHelpBorder",
+		"FzfLuaTitle",
+		"FzfLuaPreviewTitle",
+		"FzfLuaFzfNormal",
+		"FzfLuaFzfGutter",
+		"FzfLuaFzfQuery",
+		"FzfLuaScrollFloatEmpty",
 		"BlinkCmpMenu",
 		"BlinkCmpMenuBorder",
 		"BlinkCmpLabel",
@@ -99,24 +118,40 @@ if not require("user.core.float_style").is_enabled() then
 		"DapUIFloatNormal",
 		"DapUIFloatBorder",
 		"UfoPreviewWinBar",
-		"GlanceListNormal",
-		"GlancePreviewNormal",
-		"GlanceListEndOfBuffer",
-		"GlancePreviewEndOfBuffer",
-		"GlanceWinBarFilename",
-		"GlanceWinBarFilepath",
-		"GlanceWinBarTitle",
-		"GlanceBorderTop",
-		"GlanceListBorderBottom",
-		"GlancePreviewBorderBottom",
-	})
-end
+	},
+}
+local roles = { "editor", "chrome", "panel", "float" }
+
+-- Lines that must stay visible without a fill behind them.
 local separators = {
 	"WinSeparator",
 	"VertSplit",
 	"NeoTreeWinSeparator",
 	"NeoTreeVertSplit",
 	"BufferLineOffsetSeparator",
+}
+local borders = {
+	"FloatBorder",
+	"FzfLuaBorder",
+	"FzfLuaPreviewBorder",
+	"FzfLuaHelpBorder",
+	"BlinkCmpMenuBorder",
+	"BlinkCmpDocBorder",
+	"BlinkCmpSignatureHelpBorder",
+	"WhichKeyBorder",
+	"SnacksInputBorder",
+	"BqfPreviewBorder",
+	"DapUIFloatBorder",
+	"NeoTreeFloatBorder",
+}
+local titles = {
+	"FloatTitle",
+	"FzfLuaTitle",
+	"FzfLuaPreviewTitle",
+	"WhichKeyTitle",
+	"SnacksInputTitle",
+	"BqfPreviewTitle",
+	"NeoTreeFloatTitle",
 }
 
 function M.is_enabled()
@@ -128,44 +163,40 @@ function M.background()
 	return background
 end
 
-function M.apply()
-	if not enabled then
-		return
-	end
+---Group names by role, for checks.
+function M.surfaces(role)
+	return vim.deepcopy(role and surfaces[role] or surfaces)
+end
+
+function M.lines()
+	return { separators = vim.deepcopy(separators), borders = vim.deepcopy(borders), titles = vim.deepcopy(titles) }
+end
+
+local function clear_fill(name)
 	local palette = require("user.core.palette")
-	for _, name in ipairs(groups) do
-		local value = palette.highlight(name)
-		if value.bg or value.ctermbg or value.reverse or (value.cterm and value.cterm.reverse) then
-			if name == "Normal" then
-				background = value.bg
-			elseif name == "NeoTreeTitleBar" then
-				-- Some themes put dark title text on an accent-coloured block.
-				-- Use the ordinary float title foreground when removing that block.
-				value.fg = palette.highlight("FloatTitle").fg or palette.highlight("Normal").fg
-			end
-			value.bg, value.ctermbg = nil, nil
-			-- Inverse video can also paint a background in terminal themes.
-			value.reverse = nil
-			if value.cterm then
-				value.cterm.reverse = nil
-			end
-			vim.api.nvim_set_hl(0, name, value)
-		end
-	end
-	-- Only these themes need a lift from their near-background separators.
-	-- Keep the other themes' original foregrounds, including terminal colours.
-	local colors_name = vim.g.colors_name or ""
-	local foreground
-	if vim.startswith(colors_name, "tokyonight") then
-		-- LineNr already contains the active style's native fg_gutter colour.
-		foreground = palette.highlight("LineNr").fg
-	elseif vim.startswith(colors_name, "catppuccin") then
-		foreground = require("catppuccin.palettes").get_palette().surface1
-	end
-	if not foreground then
+	local value = palette.highlight(name)
+	if not (value.bg or value.ctermbg or value.reverse or (value.cterm and value.cterm.reverse)) then
 		return
 	end
-	for _, name in ipairs(separators) do
+	if name == "Normal" then
+		background = value.bg
+	elseif name == "NeoTreeTitleBar" then
+		-- Some themes put dark title text on an accent-coloured block. Use the
+		-- ordinary float title foreground when removing that block.
+		value.fg = palette.highlight("FloatTitle").fg or palette.highlight("Normal").fg
+	end
+	value.bg, value.ctermbg = nil, nil
+	-- Inverse video can also paint a background in terminal themes.
+	value.reverse = nil
+	if value.cterm then
+		value.cterm.reverse = nil
+	end
+	vim.api.nvim_set_hl(0, name, value)
+end
+
+local function recolour(names, foreground)
+	local palette = require("user.core.palette")
+	for _, name in ipairs(names) do
 		local value = palette.highlight(name)
 		if next(value) then
 			value.fg, value.ctermfg = foreground, 8 -- ANSI dark grey without true colour.
@@ -175,10 +206,28 @@ function M.apply()
 	end
 end
 
+function M.apply()
+	if not enabled then
+		return
+	end
+	local palette = require("user.core.palette")
+	-- Capture the theme's colours before any fill is removed.
+	local p = palette.get()
+	for _, role in ipairs(roles) do
+		for _, name in ipairs(surfaces[role]) do
+			clear_fill(name)
+		end
+	end
+	recolour(separators, p.line)
+	recolour(borders, p.line)
+	recolour(titles, p.dim)
+end
+
 function M.toggle()
 	enabled = not enabled
-	-- A normal theme refresh restores opaque colours and invalidates plugin
-	-- colour caches through their own ColorScheme handlers. No per-frame work.
+	-- Reloading the theme restores its opaque colours and runs the highlight
+	-- chain. Plugins repaint their own groups from their ColorScheme handlers
+	-- too, so apply once more after all of them finished. No per-frame work.
 	vim.cmd.colorscheme(vim.g.colors_name or "default")
 	M.apply()
 
@@ -189,25 +238,22 @@ function M.toggle()
 	if not saved then
 		vim.notify(
 			"Background changed for this session, but could not be saved: " .. tostring(err),
-			vim.log.levels.WARN
+			vim.log.levels.WARN,
+			{ title = "Transparency" }
 		)
 		return
 	end
-	vim.notify("Transparent background " .. (enabled and "enabled" or "disabled"), vim.log.levels.INFO)
+	vim.notify(
+		"Transparent background " .. (enabled and "enabled" or "disabled"),
+		vim.log.levels.INFO,
+		{ title = "Transparency" }
+	)
 end
 
 function M.setup()
 	local group = vim.api.nvim_create_augroup("user_transparency", { clear = true })
-	vim.api.nvim_create_autocmd("ColorScheme", {
-		group = group,
-		callback = function()
-			background = nil
-			if enabled then
-				-- Direct :colorscheme calls also run after every plugin's callback.
-				vim.schedule(M.apply)
-			end
-		end,
-	})
+	-- Plugins that define filled groups when they load are cleared as they
+	-- arrive; ColorScheme itself is handled by the highlight chain.
 	vim.api.nvim_create_autocmd("User", {
 		group = group,
 		pattern = "LazyLoad",

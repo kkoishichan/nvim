@@ -8,17 +8,25 @@ vim.api.nvim_create_user_command("ProjectTrust", function(command)
 	local trust = require("user.core.trust")
 	local action = command.args
 	if action == "status" then
-		vim.notify("Project trust: " .. trust.status(root) .. " (" .. root .. ")", vim.log.levels.INFO)
+		vim.notify(
+			"Project trust: " .. trust.status(root) .. " (" .. root .. ")",
+			vim.log.levels.INFO,
+			{ title = "Project trust" }
+		)
 		return
 	end
 	if not vim.tbl_contains({ "allow", "deny", "remove" }, action) then
-		vim.notify("Use :ProjectTrust allow|deny|remove|status", vim.log.levels.ERROR)
+		vim.notify("Use :ProjectTrust allow|deny|remove|status", vim.log.levels.ERROR, { title = "Project trust" })
 		return
 	end
 	local ok, message = vim.secure.trust({ action = action, path = vim.fs.joinpath(root, "package.json") })
 	trust.forget(root)
 	require("user.toolchain").clear_executable_cache()
-	vim.notify("Project trust " .. action .. ": " .. message, ok and vim.log.levels.INFO or vim.log.levels.ERROR)
+	vim.notify(
+		"Project trust " .. action .. ": " .. message,
+		ok and vim.log.levels.INFO or vim.log.levels.ERROR,
+		{ title = "Project trust" }
+	)
 end, {
 	nargs = 1,
 	complete = function()
@@ -62,38 +70,6 @@ vim.api.nvim_create_user_command("TransparentToggle", function()
 	require("user.core.transparency").toggle()
 end, { desc = "Toggle and save transparent background" })
 
-vim.api.nvim_create_user_command("FloatStyleToggle", function()
-	require("user.core.float_style").toggle()
-end, { desc = "Toggle saved popup style (restart required)" })
-
-vim.api.nvim_create_user_command("FloatStyle", function(command)
-	local style = require("user.core.float_style")
-	if command.args == "on" or command.args == "off" then
-		style.set_default(command.args == "on")
-	elseif command.args == "" then
-		local function label(value)
-			return value and "unified" or "plugin defaults"
-		end
-		vim.notify(
-			"Popup style: "
-				.. label(style.is_enabled())
-				.. "; saved: "
-				.. label(require("user.core.preferences").get("ui").float_style)
-				.. " (restart to apply).",
-			vim.log.levels.INFO,
-			{ title = "Popup style" }
-		)
-	else
-		vim.notify("Use :FloatStyle on|off", vim.log.levels.ERROR)
-	end
-end, {
-	nargs = "?",
-	complete = function()
-		return { "on", "off" }
-	end,
-	desc = "Show popup style or save it for the next launch",
-})
-
 vim.api.nvim_create_user_command("FastModeToggle", function()
 	mode.toggle()
 end, { desc = "Toggle and save fast mode, then restart" })
@@ -105,7 +81,7 @@ vim.api.nvim_create_user_command("FastMode", function(command)
 	elseif names[command.args] then
 		mode.set_default(names[command.args])
 	else
-		vim.notify("Use :FastMode on|off", vim.log.levels.ERROR)
+		vim.notify("Use :FastMode on|off", vim.log.levels.ERROR, { title = "Editor mode" })
 	end
 end, {
 	nargs = "?",
@@ -119,7 +95,7 @@ vim.api.nvim_create_user_command("EditorMode", function(command)
 	if vim.tbl_contains({ "fast", "standard", "extra", "full" }, command.args) then
 		mode.set_default(mode.canonical(command.args))
 	else
-		vim.notify("Use :EditorMode fast|standard|extra", vim.log.levels.ERROR)
+		vim.notify("Use :EditorMode fast|standard|extra", vim.log.levels.ERROR, { title = "Editor mode" })
 	end
 end, {
 	nargs = 1,

@@ -62,7 +62,7 @@ return function()
 	assert(writes == 1, "An unchanged manager float repeated its geometry update")
 	vim.o.columns = 160
 	layout.apply_manager_float(manager)
-	assert(writes == 2 and api.nvim_win_get_width(manager) == 128, "Manager resize stopped tracking the viewport")
+	assert(writes == 2 and api.nvim_win_get_width(manager) == 144, "Manager resize stopped tracking the viewport")
 	api.nvim_win_set_config = set_config
 
 	local schedule, queue = vim.schedule, {}

@@ -4,13 +4,13 @@
 -- messages from overflowing the window the way trailing virtual_text does, shows
 -- code and message together without occluding, and points at the exact column.
 -- Standard starts at "text", extra at "lines", and fast at "off".
-local float_style = require("user.core.float_style")
 local capabilities = require("user.core.mode").capabilities()
 
 -- Without automatic language servers there is nothing to draw until the user
 -- starts one explicitly, and drawing is exactly the part that costs redraws.
 -- Manual floats, jumps and the location list keep working either way.
 local live = capabilities.diagnostics_live
+local letters = require("user.core.icons").diagnostics.letters
 
 local base = {
 	underline = live,
@@ -18,15 +18,15 @@ local base = {
 	severity_sort = true,
 	signs = live and {
 		text = {
-			[vim.diagnostic.severity.ERROR] = "E",
-			[vim.diagnostic.severity.WARN] = "W",
-			[vim.diagnostic.severity.INFO] = "I",
-			[vim.diagnostic.severity.HINT] = "H",
+			[vim.diagnostic.severity.ERROR] = letters.error,
+			[vim.diagnostic.severity.WARN] = letters.warn,
+			[vim.diagnostic.severity.INFO] = letters.info,
+			[vim.diagnostic.severity.HINT] = letters.hint,
 		},
 	} or false,
-	float = float_style.padded({
+	float = {
 		source = true,
-	}),
+	},
 }
 
 -- Trailing inline text, used only in the "text" fallback mode. Collapse newlines
@@ -60,8 +60,7 @@ end
 apply_diagnostic_mode()
 
 local function open_diagnostic_float()
-	local _, winid = vim.diagnostic.open_float()
-	float_style.apply_padded(winid)
+	vim.diagnostic.open_float()
 end
 
 vim.keymap.set("n", "<leader>ud", function()

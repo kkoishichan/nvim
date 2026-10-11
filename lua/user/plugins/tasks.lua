@@ -38,7 +38,7 @@ local function restart_last_task()
 	})
 
 	if vim.tbl_isempty(tasks) then
-		vim.notify("No completed tasks in " .. vim.fn.fnamemodify(root, ":~"), vim.log.levels.WARN)
+		vim.notify("No completed tasks in " .. vim.fn.fnamemodify(root, ":~"), vim.log.levels.WARN, { title = "Tasks" })
 		return
 	end
 
@@ -53,14 +53,14 @@ local function run_workspace_task(command)
 		if overseer.TAG:contains(argument) then
 			table.insert(tags, argument)
 		elseif name then
-			vim.notify("Provide one task template name, or task tags", vim.log.levels.WARN)
+			vim.notify("Provide one task template name, or task tags", vim.log.levels.WARN, { title = "Tasks" })
 			return
 		else
 			name = argument
 		end
 	end
 	if name and #tags > 0 then
-		vim.notify("Choose a task template name or task tags", vim.log.levels.WARN)
+		vim.notify("Choose a task template name or task tags", vim.log.levels.WARN, { title = "Tasks" })
 		return
 	end
 	overseer.run_task({

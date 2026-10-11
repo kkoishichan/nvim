@@ -18,4 +18,4 @@
 
 2026-09-05 的真实 PTY 检查使用 `TERM=xterm-256color`，三个尺寸均验证了键盘触发保存、Ctrl-Left 调整宽度、Ctrl-/ 打开及切回终端、分两次 Escape 离开终端模式，以及 Alt-Space 派发。传统终端把 Ctrl-/ 编码为同一控制字节 `<C-_>`，已增加对应别名。缓冲区补全菜单实际出现的单次耗时依次为 20.5、13.7、11.6 ms；这些数字是本机样例观察值，不是延迟保证。
 
-`ui_themes` 检查四个现有主题的实际 Normal 与 Popup 颜色，正文对比度均达到 4.5。PTY 证据保留在本轮 `/tmp/nvim-ui-smoke-z2w6kwb5/results.json` 及各尺寸的 `terminal.log`、窗口 JSON；可用 `scripts/ui-smoke.py` 重新生成。真实 SSH 主机、输入法组合键、终端字体和所有图片协议仍超出这些自动检查的证明范围。
+`ui_themes` 检查五个现有主题（含内置 `default`）的实际 Normal 与 Popup 颜色，正文对比度均达到 4.5；透明模式下断言分隔线、浮窗边框和标签下划线统一为色板 `line` 色且与原底色对比度不低于 1.5，状态栏和候选菜单保持实底。PTY 证据保留在本轮 `/tmp/nvim-ui-smoke-z2w6kwb5/results.json` 及各尺寸的 `terminal.log`、窗口 JSON；可用 `scripts/ui-smoke.py` 重新生成。真实 SSH 主机、输入法组合键、终端字体和所有图片协议仍超出这些自动检查的证明范围。

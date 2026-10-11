@@ -14,7 +14,8 @@ local function state_for(root)
 end
 
 local function bottom_size()
-	return math.max(10, math.min(18, math.floor((vim.o.lines or 40) * 0.28)))
+	-- The bottom dock budget shared with every other bottom panel.
+	return math.max(1, require("user.core.panels").budget(nil, nil, { bottom = true }).bottom)
 end
 
 local function float_width()
@@ -23,6 +24,11 @@ end
 
 local function float_height()
 	return math.max(1, math.ceil((vim.o.lines or 40) * layout.float_scale) - 1)
+end
+
+-- One definition for the project float and the plugin default.
+local function float_opts()
+	return { border = layout.float_border(), width = float_width, height = float_height, title_pos = "center" }
 end
 
 local function Terminal()
@@ -246,7 +252,7 @@ function M.float()
 			on_exit = function()
 				state.float = nil
 			end,
-			float_opts = { border = "rounded", width = float_width, height = float_height, title_pos = "center" },
+			float_opts = float_opts(),
 		})
 	end
 	if not visible(state.float) then
@@ -309,20 +315,20 @@ return {
 			persist_size = true,
 			shade_terminals = false,
 			shell = vim.o.shell,
-			-- The application-sized float terminal keeps the shared accent frame.
+			-- The float terminal is an application float on the float surface.
 			highlights = {
 				FloatBorder = { link = "FloatBorder" },
 				NormalFloat = { link = "NormalFloat" },
 			},
-			size = bottom_size(),
+			size = function(term)
+				if term.direction == "horizontal" then
+					return bottom_size()
+				end
+				return require("user.core.panels").budget(nil, nil, { right = true }).right
+			end,
 			start_in_insert = true,
 			terminal_mappings = false,
-			float_opts = {
-				border = "rounded",
-				width = float_width,
-				height = float_height,
-				title_pos = "center",
-			},
+			float_opts = float_opts(),
 			on_open = set_terminal_keymaps,
 		},
 		config = function(_, opts)

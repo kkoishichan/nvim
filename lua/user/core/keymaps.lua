@@ -105,7 +105,11 @@ local function toggle_qf(kind)
 
 	local ok = pcall(vim.cmd, (kind == "loc" and "botright lopen" or "botright copen"))
 	if not ok then
-		vim.notify((kind == "loc" and "Location" or "Quickfix") .. " list is empty", vim.log.levels.INFO)
+		vim.notify(
+			(kind == "loc" and "Location" or "Quickfix") .. " list is empty",
+			vim.log.levels.INFO,
+			{ title = "Quickfix" }
+		)
 	end
 end
 
@@ -183,7 +187,7 @@ local function open_external_terminal(dir)
 	if configured and configured ~= "" then
 		local parsed = command_argv(configured)
 		if not parsed or #parsed == 0 then
-			vim.notify("Invalid $TERMINAL: " .. configured, vim.log.levels.ERROR)
+			vim.notify("Invalid $TERMINAL: " .. configured, vim.log.levels.ERROR, { title = "Terminal" })
 			return
 		end
 		argv = parsed
@@ -207,7 +211,11 @@ local function open_external_terminal(dir)
 	end
 
 	if not argv or vim.fn.executable(argv[1]) == 0 then
-		vim.notify("Terminal not found: " .. (argv and argv[1] or "no supported terminal"), vim.log.levels.ERROR)
+		vim.notify(
+			"Terminal not found: " .. (argv and argv[1] or "no supported terminal"),
+			vim.log.levels.ERROR,
+			{ title = "Terminal" }
+		)
 		return
 	end
 
@@ -238,7 +246,7 @@ local function open_external_terminal(dir)
 	-- for single-instance/server modes that may not inherit the child cwd.
 	local ok, job = pcall(vim.fn.jobstart, argv, { cwd = dir, detach = true })
 	if not ok or type(job) ~= "number" or job <= 0 then
-		vim.notify("Failed to start terminal: " .. argv[1], vim.log.levels.ERROR)
+		vim.notify("Failed to start terminal: " .. argv[1], vim.log.levels.ERROR, { title = "Terminal" })
 	end
 end
 
@@ -275,7 +283,6 @@ map("n", "<leader>ut", function()
 end, { desc = "Theme picker" })
 
 map("n", "<leader>uT", "<cmd>TransparentToggle<cr>", { desc = "Toggle transparent background" })
-map("n", "<leader>up", "<cmd>FloatStyleToggle<cr>", { desc = "Toggle saved popup style (restart)" })
 map("n", "<leader>umf", "<cmd>EditorMode fast<cr>", { desc = "Fast mode" })
 map("n", "<leader>ums", "<cmd>EditorMode standard<cr>", { desc = "Standard mode" })
 map("n", "<leader>ume", "<cmd>EditorMode extra<cr>", { desc = "Extra mode" })

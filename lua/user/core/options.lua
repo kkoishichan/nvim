@@ -93,8 +93,7 @@ opt.timeoutlen = 400
 opt.undofile = capabilities.undofile
 opt.updatetime = 250
 opt.virtualedit = "block"
--- Default for application-sized or third-party panels. Small transient floats
--- are restyled window-locally by user.core.float_style.
+-- Every floating window that does not choose its own border.
 opt.winborder = "rounded"
 opt.wrap = false
 
@@ -124,9 +123,9 @@ end
 opt.fillchars = {
 	eob = " ",
 	fold = " ",
-	foldclose = capabilities.icons and "" or ">",
+	foldclose = require("user.core.icons").fold.closed,
 	foldinner = " ",
-	foldopen = capabilities.icons and "" or "v",
+	foldopen = require("user.core.icons").fold.open,
 	foldsep = " ",
 }
 

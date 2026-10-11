@@ -68,9 +68,7 @@ local function close_transient_floats()
 		if api.nvim_win_is_valid(winid) then
 			local filetype = vim.bo[api.nvim_win_get_buf(winid)].filetype
 			-- Blink and notification APIs close asynchronously and own extra state.
-			local plugin_owned = vim.startswith(filetype, "blink-cmp-")
-				or filetype == "notify"
-				or filetype == "snacks_notif"
+			local plugin_owned = vim.startswith(filetype, "blink-cmp-") or filetype == "notify"
 			if
 				not plugin_owned
 				and window_roles.is_transient(winid)

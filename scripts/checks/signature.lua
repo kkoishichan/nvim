@@ -2,10 +2,12 @@ return function(tmp)
 	require("lazy").load({ plugins = { "blink.cmp" } })
 	local cmp = require("blink.cmp")
 	local api = vim.api
-	-- Blink installs its event listeners after checking the fuzzy binary.
+	-- Blink installs its event listeners after checking the fuzzy binary; the
+	-- handler loads its window module on the way, which the overload adapter's
+	-- early require of the handler module itself does not.
 	assert(
 		vim.wait(2000, function()
-			return package.loaded["blink.cmp.signature"] ~= nil
+			return package.loaded["blink.cmp.signature.window"] ~= nil
 		end),
 		"Blink signature setup did not finish"
 	)
@@ -140,8 +142,9 @@ return function(tmp)
 	assert(highlighted_parameter(win) == "值: str", "Server-selected keyword parameter was not highlighted")
 	hide()
 
-	-- Blink 1.10.2 has an upstream non-first-overload highlight bug (README).
-	-- Keep the ordinary server-selected-first case; do not patch its renderer.
+	-- Overloads: the selected one is shown with its own parameter highlight
+	-- and a position marker; the alternative is one <C-s> away (the
+	-- signature_overloads group covers cycling and the forwarded choice).
 	win = show({
 		activeSignature = 0,
 		activeParameter = 1,
@@ -154,7 +157,17 @@ return function(tmp)
 		},
 	}, "pick(1, 2)", "cpp")
 	assert(highlighted_parameter(win) == "int second", "LSP-selected overload lost its active parameter")
-	assert(api.nvim_buf_line_count(api.nvim_win_get_buf(win)) >= 2, "Alternative overload was discarded")
+	local shown_lines = api.nvim_buf_get_lines(api.nvim_win_get_buf(win), 0, -1, false)
+	assert(
+		#shown_lines == 1 and shown_lines[1] == "int pick(int first, int second)  (1/2)",
+		"Popup does not show the selected overload alone with its position: " .. vim.inspect(shown_lines)
+	)
+	assert(require("user.core.signature_overloads").cycle(1), "Alternative overload is not reachable")
+	shown_lines = api.nvim_buf_get_lines(api.nvim_win_get_buf(win), 0, -1, false)
+	assert(shown_lines[1] == "int pick(int first)  (2/2)", "Cycling did not show the alternative overload")
+	-- The cursor sits in the second argument, which this overload does not
+	-- have: no parameter is highlighted rather than a wrong one.
+	assert(highlighted_parameter(win) == nil, "A parameter outside the alternative overload was highlighted")
 	hide()
 
 	local parameters = {}

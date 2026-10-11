@@ -60,9 +60,9 @@ return function()
 				},
 				columns = extras and { "icon", "permissions", "size", "mtime" } or {},
 				float = {
-					border = "rounded",
-					max_width = 0.86,
-					max_height = 0.86,
+					border = require("user.core.layout").float_border(),
+					max_width = require("user.core.layout").float_scale,
+					max_height = require("user.core.layout").float_scale,
 				},
 				view_options = {
 					show_hidden = true,
@@ -75,13 +75,11 @@ return function()
 			config = function(_, opts)
 				require("oil").setup(opts)
 				require("user.core.highlights").on_colorscheme("oil", function()
-					local palette = require("user.core.palette")
-					local p = palette.get()
+					local p = require("user.core.palette").get()
 					-- Auxiliary file information should be quiet UI text, not inherit
 					-- the active theme's syntax comment colour (green in VS Code).
-					local muted = palette.blend(p.fg, p.bg, 0.60)
 					for _, group in ipairs({ "OilEmpty", "OilHidden", "OilLinkTarget", "OilTrashSourcePath" }) do
-						vim.api.nvim_set_hl(0, group, { fg = muted })
+						vim.api.nvim_set_hl(0, group, { fg = p.muted })
 					end
 				end)
 			end,

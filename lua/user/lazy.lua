@@ -32,7 +32,7 @@ require("lazy").setup({
 	},
 	install = {
 		missing = capabilities.plugin_manager_auto and vim.env.NVIM_CHECK_ONLY ~= "1",
-		colorscheme = { "vscode", "habamax" },
+		colorscheme = { "vscode", "default" },
 	},
 	checker = {
 		enabled = false,
@@ -45,9 +45,10 @@ require("lazy").setup({
 		notify = false,
 	},
 	ui = {
-		size = { width = layout.manager_scale, height = layout.manager_scale },
+		size = { width = layout.float_scale, height = layout.float_scale },
 		border = layout.manager_border,
-		backdrop = 60,
+		-- 100 is "no backdrop" for Lazy and Mason.
+		backdrop = layout.backdrop() or 100,
 	},
 	performance = {
 		rtp = {

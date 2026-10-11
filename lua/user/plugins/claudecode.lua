@@ -51,7 +51,7 @@ return {
 					return spawn_root
 				end,
 				split_side = "right",
-				split_width_percentage = 0.40,
+				split_width_percentage = require("user.core.panels").right_ratio,
 				show_native_term_exit_tip = false,
 			},
 		},

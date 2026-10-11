@@ -1,22 +1,17 @@
 local layout = require("user.core.layout")
-local float_style = require("user.core.float_style")
 local palette = require("user.core.palette")
 local lsp_progress = require("user.core.lsp_progress")
+local icons = require("user.core.icons")
 local scrollview_symbols = {
-	diagnostics = {
-		error = "E",
-		warn = "W",
-		info = "I",
-		hint = "H",
-	},
+	diagnostics = icons.diagnostics.letters,
 	search = "━",
-	git = "┃",
+	git = icons.git.bar,
 	keywords = {
-		fix = "",
-		todo = "",
-		hack = "",
-		warn = "",
-		xxx = "",
+		fix = vim.fn.nr2char(0xF188),
+		todo = vim.fn.nr2char(0xF00C),
+		hack = vim.fn.nr2char(0xF490),
+		warn = vim.fn.nr2char(0xF071),
+		xxx = vim.fn.nr2char(0xF071),
 	},
 	conflict = "×",
 }
@@ -54,8 +49,8 @@ local function bufferline_highlights(defaults)
 	-- Bufferline rebuilds these defaults on ColorScheme, including transparency
 	-- toggles. Use blank separators so the underline remains continuous.
 	defaults.options.separator_style = transparent and { " ", " " } or "thin"
-	local inactive = palette.blend(p.fg, p.bg, 0.60)
-	local visible = palette.blend(p.fg, p.bg, 0.72)
+	local inactive = p.muted
+	local visible = p.dim
 	local highlights = {}
 
 	-- Bufferline normally derives these foregrounds from Comment, which can be
@@ -114,7 +109,7 @@ local function bufferline_highlights(defaults)
 			bg = "NONE",
 			ctermbg = "NONE",
 			underline = true,
-			sp = p.strong,
+			sp = p.line,
 			default = false,
 		}
 		for name in pairs(defaults.highlights) do
@@ -247,30 +242,23 @@ return function(profile)
 			words = { enabled = false },
 			styles = {
 				input = {
-					border = float_style.border(),
 					keys = {
 						-- One Escape cancels the prompt; Snacks otherwise uses the
 						-- first press only to leave Insert mode.
 						i_esc = { "<Esc>", { "cmp_close", "cancel" }, mode = "i", expr = true },
 					},
-					wo = float_style.is_enabled() and {
-						winblend = 0,
-						winhighlight = "Normal:Pmenu,NormalFloat:Pmenu,FloatBorder:Pmenu,FloatTitle:Pmenu",
-					} or nil,
-				},
-				notification = {
-					border = "rounded",
 				},
 				dashboard = {
 					wo = { foldcolumn = "0" },
 				},
 				scratch = {
-					-- Scratch is an application-sized panel, so it keeps the shared
-					-- accent FloatBorder and NormalFloat's transparency setting.
-					-- Size tracks the shared float_scale so it matches lazygit/terminal.
+					-- An application float: the shared rectangle on the float surface.
 					width = layout.float_scale,
 					height = layout.float_scale,
 					wo = { winhighlight = "Normal:NormalFloat,NormalNC:NormalFloat" },
+				},
+				zen = {
+					backdrop = { transparent = true, blend = layout.backdrop() or 100 },
 				},
 			},
 		},
@@ -362,11 +350,7 @@ return function(profile)
 					"neo-tree",
 					"oil",
 					"snacks_dashboard",
-					"snacks_picker_input",
-					"snacks_picker_list",
-					"snacks_notif",
 					"notify",
-					"TelescopePrompt",
 					"fzf",
 					"qf",
 					"lazy",
@@ -537,7 +521,6 @@ return function(profile)
 			top_down = true,
 		},
 		config = function(_, opts)
-			require("user.core.ui_highlights").apply()
 			local notify = require("notify")
 			-- Tear down the previous generation while its nvim-notify service is
 			-- still current. notify.setup() replaces that service, after which its
@@ -595,7 +578,7 @@ return function(profile)
 				},
 				buffer_close_icon = "×",
 				close_icon = "×",
-				modified_icon = "●",
+				modified_icon = icons.modified,
 				left_trunc_marker = "",
 				right_trunc_marker = "",
 				max_name_length = 24,
@@ -604,18 +587,18 @@ return function(profile)
 				diagnostics = "nvim_lsp",
 				diagnostics_update_in_insert = false,
 				diagnostics_indicator = function(_, _, diagnostics_dict)
+					local symbols = icons.diagnostic_symbols()
 					local parts = {}
-					if diagnostics_dict.error then
-						table.insert(parts, " " .. diagnostics_dict.error)
-					end
-					if diagnostics_dict.warning then
-						table.insert(parts, " " .. diagnostics_dict.warning)
-					end
-					if diagnostics_dict.info then
-						table.insert(parts, " " .. diagnostics_dict.info)
-					end
-					if diagnostics_dict.hint then
-						table.insert(parts, "󰌵 " .. diagnostics_dict.hint)
+					for _, severity in ipairs({
+						{ "error", "error" },
+						{ "warning", "warn" },
+						{ "info", "info" },
+						{ "hint", "hint" },
+					}) do
+						local count = diagnostics_dict[severity[1]]
+						if count then
+							table.insert(parts, symbols[severity[2]] .. count)
+						end
 					end
 
 					return #parts > 0 and " " .. table.concat(parts, " ") or ""

@@ -1,5 +1,5 @@
 local layout = require("user.core.layout")
-local float_style = require("user.core.float_style")
+local icons = require("user.core.icons")
 
 local function toggle_diffview()
 	local ok, lib = pcall(require, "diffview.lib")
@@ -91,26 +91,26 @@ return {
 		opts = {
 			max_file_length = 20000,
 			update_debounce = 180,
-			preview_config = float_style.padded({
+			preview_config = {
 				relative = "cursor",
 				row = 1,
 				col = 0,
-			}),
+			},
 			signs = {
-				add = { text = "┃" },
-				change = { text = "┃" },
-				delete = { text = "" },
-				topdelete = { text = "" },
-				changedelete = { text = "┃" },
-				untracked = { text = "┆" },
+				add = { text = icons.git.bar },
+				change = { text = icons.git.bar },
+				delete = { text = icons.git.deleted },
+				topdelete = { text = icons.git.deleted },
+				changedelete = { text = icons.git.bar },
+				untracked = { text = icons.git.untracked },
 			},
 			signs_staged = {
-				add = { text = "┃" },
-				change = { text = "┃" },
-				delete = { text = "" },
-				topdelete = { text = "" },
-				changedelete = { text = "┃" },
-				untracked = { text = "┆" },
+				add = { text = icons.git.bar },
+				change = { text = icons.git.bar },
+				delete = { text = icons.git.deleted },
+				topdelete = { text = icons.git.deleted },
+				changedelete = { text = icons.git.bar },
+				untracked = { text = icons.git.untracked },
 			},
 			current_line_blame = require("user.core.mode").capabilities().decorations,
 			current_line_blame_opts = {
@@ -122,13 +122,6 @@ return {
 			current_line_blame_formatter = "  <author>, <author_time:%Y-%m-%d> · <summary>",
 			on_attach = function(bufnr)
 				local gs = package.loaded.gitsigns
-				local function style_preview()
-					for _, winid in ipairs(vim.api.nvim_list_wins()) do
-						if vim.w[winid].gitsigns_preview ~= nil then
-							float_style.apply_padded(winid)
-						end
-					end
-				end
 				local map = function(mode, lhs, rhs, desc)
 					vim.keymap.set(mode, lhs, rhs, { buffer = bufnr, desc = desc })
 				end
@@ -149,14 +142,9 @@ return {
 				end, "Reset hunk")
 				map("n", "<leader>ghS", gs.stage_buffer, "Stage buffer")
 				-- No undo_stage_hunk map: deprecated upstream; stage_hunk toggles.
-				map("n", "<leader>ghp", function()
-					gs.preview_hunk()
-					style_preview()
-				end, "Preview hunk")
+				map("n", "<leader>ghp", gs.preview_hunk, "Preview hunk")
 				map("n", "<leader>ghb", function()
-					gs.blame_line({ full = true }, function()
-						vim.schedule(style_preview)
-					end)
+					gs.blame_line({ full = true })
 				end, "Blame line")
 				map("n", "<leader>ghB", gs.toggle_current_line_blame, "Toggle line blame")
 				map("n", "<leader>ghd", gs.diffthis, "Diff buffer")

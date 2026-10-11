@@ -1,12 +1,6 @@
-local float_style = require("user.core.float_style")
-
 local disabled_filetypes = {
 	["fzflua_backdrop"] = true,
 	["neo-tree"] = true,
-	["snacks_picker_input"] = true,
-	["snacks_picker_list"] = true,
-	["snacks_notif"] = true,
-	["TelescopePrompt"] = true,
 	["fzf"] = true,
 	["qf"] = true,
 }
@@ -24,13 +18,12 @@ return {
 				default = false,
 			},
 			preview = {
-				win_config = float_style.padded({
-					winblend = float_style.is_enabled() and 0 or nil,
-					winhighlight = float_style.is_enabled()
-							and "Normal:Pmenu,NormalFloat:Pmenu,FloatBorder:Pmenu,CursorLine:PmenuSel"
-						or nil,
+				win_config = {
+					border = require("user.core.layout").float_border(),
+					winblend = 0,
+					winhighlight = "Normal:NormalFloat",
 					maxheight = 20,
-				}),
+				},
 				mappings = {
 					scrollU = "<C-u>",
 					scrollD = "<C-d>",
@@ -113,7 +106,7 @@ return {
 				function()
 					local winid = require("ufo").peekFoldedLinesUnderCursor()
 					if not winid then
-						vim.notify("No fold under cursor", vim.log.levels.INFO)
+						vim.notify("No fold under cursor", vim.log.levels.INFO, { title = "Folds" })
 					end
 				end,
 				desc = "Peek fold",
@@ -123,7 +116,7 @@ return {
 			require("ufo").setup(opts)
 			require("user.core.highlights").on_colorscheme("ufo", function()
 				local p = require("user.core.palette").get()
-				vim.api.nvim_set_hl(0, "UfoFoldedEllipsis", { fg = p.gray })
+				vim.api.nvim_set_hl(0, "UfoFoldedEllipsis", { fg = p.muted })
 				vim.api.nvim_set_hl(0, "UfoCursorFoldedLine", { bg = p.subtle })
 			end)
 		end,

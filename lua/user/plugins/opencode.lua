@@ -37,7 +37,11 @@ return {
 							if project.root() ~= root then
 								callback(nil)
 							elseif project.canonical(server.cwd) ~= root then
-								vim.notify("OpenCode server directory does not match " .. root, vim.log.levels.ERROR)
+								vim.notify(
+									"OpenCode server directory does not match " .. root,
+									vim.log.levels.ERROR,
+									{ title = "OpenCode" }
+								)
 								callback(nil)
 							else
 								callback(url)
@@ -51,7 +55,8 @@ return {
 							else
 								vim.notify(
 									"OpenCode did not become ready in " .. root .. ": " .. tostring(err),
-									vim.log.levels.ERROR
+									vim.log.levels.ERROR,
+									{ title = "OpenCode" }
 								)
 								callback(nil)
 							end

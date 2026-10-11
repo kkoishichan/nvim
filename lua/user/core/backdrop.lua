@@ -1,19 +1,13 @@
--- A dimming backdrop behind a float, matching the fzf-lua / snacks look (a
--- full-editor black window at winblend 60, sitting just below the float). Used
--- to give lazygit and the floating terminal the same modal dim that fzf-lua and
--- the scratch buffer get out of the box.
+-- A dimming backdrop behind an application float (lazygit, the floating
+-- terminal): a full-editor window in the palette's darkest shade at the
+-- shared blend, sitting just below the float. fzf-lua, Lazy and Mason draw
+-- the same backdrop themselves with `layout.backdrop()`.
 
 local M = {}
 
-local function define_highlight()
-	vim.api.nvim_set_hl(0, "UserBackdrop", { bg = "#000000" })
-end
-
-define_highlight()
-vim.api.nvim_create_autocmd("ColorScheme", {
-	group = vim.api.nvim_create_augroup("user_backdrop_highlight", { clear = true }),
-	callback = define_highlight,
-})
+require("user.core.highlights").on_colorscheme("backdrop", function()
+	vim.api.nvim_set_hl(0, "UserBackdrop", { bg = require("user.core.palette").shade })
+end)
 
 ---Open a backdrop behind `target`. It resizes with the editor and closes itself
 ---when `target` is closed, so callers don't have to track it.
@@ -24,8 +18,9 @@ function M.open(target, blend)
 	if not (target and vim.api.nvim_win_is_valid(target)) then
 		return
 	end
-	-- A blend over a colourless background renders oddly; skip if Normal has none.
-	if not vim.api.nvim_get_hl(0, { name = "Normal" }).bg then
+	-- A transparent editor has nothing to dim; a blend over it only paints a
+	-- dark sheet, so no float gets a backdrop in that state (see layout).
+	if not require("user.core.layout").backdrop() then
 		return
 	end
 
@@ -46,7 +41,7 @@ function M.open(target, blend)
 		noautocmd = true,
 	})
 	vim.wo[win].winhighlight = "Normal:UserBackdrop,NormalNC:UserBackdrop,EndOfBuffer:UserBackdrop"
-	vim.wo[win].winblend = blend or 60
+	vim.wo[win].winblend = blend or require("user.core.layout").backdrop_blend
 
 	local group = vim.api.nvim_create_augroup("user_backdrop_" .. win, { clear = true })
 	local function close()

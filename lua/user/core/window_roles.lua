@@ -69,10 +69,10 @@ function M.get(winid)
 	then
 		return "chrome"
 	end
-	if ft == "notify" or ft == "snacks_notif" then
+	if ft == "notify" then
 		return "notification"
 	end
-	if managers[ft] or ft:match("^snacks_picker_") then
+	if managers[ft] then
 		return "manager"
 	end
 	if bt == "terminal" or panels[ft] or ft:match("^dapui_") or vim.wo[winid].winhighlight:find("Glance", 1, true) then

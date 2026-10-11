@@ -9,7 +9,6 @@ local markview_filetypes = {
 }
 
 local toolchain = require("user.toolchain")
-local float_style = require("user.core.float_style")
 local mode = require("user.core.mode")
 
 local function refresh_markview(bufnr)
@@ -49,9 +48,6 @@ return function()
 			-- rustaceanvim manages rust_analyzer + DAP (codelldb) + neotest itself.
 			-- Settings migrated from the former manual rust_analyzer lsp config.
 			vim.g.rustaceanvim = {
-				tools = {
-					float_win_config = float_style.padded(),
-				},
 				server = {
 					on_init = require("user.core.buffer_policy").lsp_init(),
 					auto_attach = function(bufnr)
@@ -129,8 +125,7 @@ return function()
 			event = { "BufRead Cargo.toml", "BufNewFile Cargo.toml" },
 			opts = {
 				popup = {
-					border = float_style.border(),
-					padding = float_style.is_enabled() and 0 or nil,
+					border = require("user.core.layout").float_border(),
 				},
 				completion = {
 					crates = { enabled = true },

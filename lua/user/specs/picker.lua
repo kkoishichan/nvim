@@ -1,7 +1,7 @@
+local layout = require("user.core.layout")
 -- fzf-lua, the file and text search both modes share. It loads on its keys in
 -- either mode, so search processes only exist while a picker is open. Fast mode
 -- additionally drops icon lookups and leaves the preview closed.
-local float_style = require("user.core.float_style")
 local mode = require("user.core.mode")
 
 -- Every picker entry goes through here, so a host that never installed fzf
@@ -72,39 +72,14 @@ return function()
 						winopts = {
 							height = height,
 							width = width,
-							row = 0.4,
+							row = 0.5,
 							col = 0.5,
-							border = float_style.border(),
-							backdrop = 60,
+							backdrop = layout.backdrop() or false,
 						},
-						hls = float_style.is_enabled() and {
-							normal = "Pmenu",
-							border = "Pmenu",
-							title = "Pmenu",
-							cursorline = "PmenuSel",
-							-- fzf paints its terminal cells from this nested palette; setting
-							-- only `normal` leaves an editor-coloured rectangle inside the
-							-- Pmenu padding after recent fzf-lua updates.
-							fzf = {
-								normal = "Pmenu",
-								cursorline = "PmenuSel",
-								border = "Pmenu",
-								gutter = "Pmenu",
-								query = "Pmenu",
-							},
-						} or nil,
 					}
 				end)
 			end,
 			opts = {
-				-- The framed picker, preview and terminal cells share NormalFloat
-				-- so the entire surface follows the transparency setting.
-				hls = float_style.is_enabled() and {
-					normal = "NormalFloat",
-					preview_normal = "NormalFloat",
-					help_normal = "NormalFloat",
-					fzf = { normal = "NormalFloat", gutter = "NormalFloat", query = "NormalFloat" },
-				} or nil,
 				defaults = {
 					file_icons = extras and "mini" or false,
 					color_icons = extras,
@@ -127,17 +102,17 @@ return function()
 					["--layout"] = "reverse",
 				},
 				winopts = {
-					width = 0.86,
-					height = 0.86,
-					row = 0.48,
+					width = layout.float_scale,
+					height = layout.float_scale,
+					row = 0.5,
 					col = 0.5,
-					border = "rounded",
-					backdrop = 60,
+					border = layout.float_border(),
+					backdrop = layout.backdrop() or false,
 					preview = {
 						-- Moving the selection should not parse and highlight the
 						-- file under the cursor unless the mode asked for previews.
 						hidden = not extras,
-						border = "rounded",
+						border = layout.float_border(),
 						layout = "flex",
 						flip_columns = 120,
 						horizontal = "right:58%",

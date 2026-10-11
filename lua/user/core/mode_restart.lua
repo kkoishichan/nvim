@@ -7,7 +7,11 @@ function M.restart(opts)
 	local apply_mode = opts and opts.apply_mode
 	local notice = apply_mode and "Editor mode saved. " or ""
 	if #vim.api.nvim_list_uis() == 0 then
-		vim.notify(notice .. "Restart Neovim manually (no attached UI).", vim.log.levels.INFO)
+		vim.notify(
+			notice .. "Restart Neovim manually (no attached UI).",
+			vim.log.levels.INFO,
+			{ title = "Editor mode" }
+		)
 		return false
 	end
 	-- :qall may silently stop hidden terminal jobs. Ask before touching the
@@ -29,7 +33,11 @@ function M.restart(opts)
 			)
 			~= 1
 	then
-		vim.notify(notice .. "Restart canceled. Terminal tasks are still running.", vim.log.levels.INFO)
+		vim.notify(
+			notice .. "Restart canceled. Terminal tasks are still running.",
+			vim.log.levels.INFO,
+			{ title = "Editor mode" }
+		)
 		return false
 	end
 	local options, environment = vim.o.sessionoptions, vim.env.NVIM_MODE

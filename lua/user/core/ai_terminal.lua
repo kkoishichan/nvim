@@ -183,7 +183,7 @@ function M.new(options)
 				end
 			end
 		end
-		local width = math.max(24, math.floor((vim.o.columns or 80) * 0.40))
+		local width = math.max(24, require("user.core.panels").budget(nil, nil, { right = true }).right)
 		local opened = pcall(function()
 			if focus then
 				if not visible_buffer(terminal_buffer(term)) then
