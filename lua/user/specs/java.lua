@@ -161,7 +161,7 @@ end
 
 local function start_jdtls(bufnr)
 	if
-		not vim.api.nvim_buf_is_valid(bufnr)
+		not require("user.core.buffer_policy").is_file(bufnr)
 		or vim.bo[bufnr].filetype ~= "java"
 		or not require("user.core.buffer_policy").allow(bufnr)
 	then

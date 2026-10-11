@@ -10,6 +10,23 @@ local function toggle_diffview()
 	end
 end
 
+local function style_diff_window(_, winid, ctx)
+	-- A two-way diff has an old and a new side. Merge layouts keep their
+	-- native colours because their panes do not have that binary meaning.
+	if not ctx.layout_name:match("^diff2_") then
+		return
+	end
+	local prefix = ctx.symbol == "a" and "UserDiffviewDelete" or "UserDiffviewAdd"
+	vim.api.nvim_win_call(winid, function()
+		vim.opt_local.winhighlight:append({
+			DiffAdd = prefix,
+			DiffChange = prefix,
+			DiffText = prefix .. "Text",
+			DiffTextAdd = prefix .. "Text",
+		})
+	end)
+end
+
 return {
 	{
 		"kdheepak/lazygit.nvim",
@@ -73,12 +90,26 @@ return {
 		dependencies = { "nvim-lua/plenary.nvim" },
 		opts = {
 			enhanced_diff_hl = true,
+			hooks = {
+				diff_buf_win_enter = style_diff_window,
+			},
 			view = {
 				merge_tool = {
 					layout = "diff3_mixed",
 				},
 			},
 		},
+		config = function(_, opts)
+			require("diffview").setup(opts)
+			require("user.core.highlights").on_colorscheme("diffview", function()
+				local colours = require("user.core.palette").git_diff()
+				-- Background only: keep the file's syntax colours on both sides.
+				vim.api.nvim_set_hl(0, "UserDiffviewAdd", { bg = colours.add })
+				vim.api.nvim_set_hl(0, "UserDiffviewDelete", { bg = colours.delete })
+				vim.api.nvim_set_hl(0, "UserDiffviewAddText", { bg = colours.add_text })
+				vim.api.nvim_set_hl(0, "UserDiffviewDeleteText", { bg = colours.delete_text })
+			end)
+		end,
 		keys = {
 			{ "<leader>gd", toggle_diffview, desc = "Diffview toggle" },
 			{ "<leader>gf", "<cmd>DiffviewFileHistory %<cr>", desc = "File history" },

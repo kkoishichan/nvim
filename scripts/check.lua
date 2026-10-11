@@ -9,6 +9,7 @@ for _, topic in ipairs({
 	"sensitive",
 	"plugin_ui",
 	"git_ui",
+	"lint_buffers",
 	"signature_ui",
 	"navigation_ui",
 	"floats",

@@ -154,7 +154,10 @@ local function launch(name, bufnr, request)
 			return
 		end
 		pending[bufnr] = nil
-		if not require("user.core.buffer_policy").allow(bufnr) then
+		if
+			not require("user.core.buffer_policy").is_file(bufnr)
+			or not require("user.core.buffer_policy").allow(bufnr)
+		then
 			return
 		end
 		config.root_dir = root
@@ -203,8 +206,8 @@ end
 ---otherwise offer the installed primary servers for this filetype.
 function M.start(name)
 	local bufnr = vim.api.nvim_get_current_buf()
-	if vim.bo[bufnr].buftype ~= "" then
-		notify("Current buffer is not a normal file", vim.log.levels.WARN)
+	if not require("user.core.buffer_policy").is_file(bufnr) then
+		notify("Current buffer is not a normal local file", vim.log.levels.WARN)
 		return
 	end
 	if not require("user.core.buffer_policy").allow(bufnr) then

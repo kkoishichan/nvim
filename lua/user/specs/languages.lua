@@ -52,7 +52,7 @@ return function()
 					on_init = require("user.core.buffer_policy").lsp_init(),
 					auto_attach = function(bufnr)
 						return vim.api.nvim_buf_get_name(bufnr) ~= ""
-							and vim.bo[bufnr].buftype == ""
+							and require("user.core.buffer_policy").is_file(bufnr)
 							and toolchain.executable("rust-analyzer") ~= nil
 							and require("user.core.buffer_policy").allow(bufnr)
 					end,

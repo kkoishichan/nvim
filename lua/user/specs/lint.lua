@@ -225,12 +225,12 @@ return function()
 					return vim.api.nvim_buf_get_lines(bufnr, 0, 1, false)[1] == ""
 				end
 
+				local function is_lint_buffer(bufnr)
+					return require("user.core.buffer_policy").is_file(bufnr)
+				end
+
 				local function run_lint(bufnr, stdin_only, manual)
-					if
-						not vim.api.nvim_buf_is_valid(bufnr)
-						or not vim.api.nvim_buf_is_loaded(bufnr)
-						or not require("user.core.buffer_policy").allow(bufnr)
-					then
+					if not is_lint_buffer(bufnr) or not require("user.core.buffer_policy").allow(bufnr) then
 						return
 					end
 
@@ -287,7 +287,7 @@ return function()
 									local parser = linter.parser
 									linter.parser = function(...)
 										if
-											not vim.api.nvim_buf_is_valid(bufnr)
+											not is_lint_buffer(bufnr)
 											or vim.api.nvim_buf_get_changedtick(bufnr) ~= started_tick
 										then
 											return {}
@@ -310,7 +310,7 @@ return function()
 				-- libuv handles alive. Full and stdin-only runs are debounced separately.
 				local pending = {}
 				local function schedule_lint(bufnr, stdin_only, delay)
-					if not vim.api.nvim_buf_is_valid(bufnr) or not vim.api.nvim_buf_is_loaded(bufnr) then
+					if not is_lint_buffer(bufnr) then
 						return
 					end
 					local kind = stdin_only and "stdin" or "full"

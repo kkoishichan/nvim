@@ -37,6 +37,7 @@ return {
 			provider_selector = function(bufnr, filetype, buftype)
 				if
 					buftype ~= ""
+					or not require("user.core.buffer_policy").is_file(bufnr)
 					or not require("user.core.buffer_policy").allow(bufnr)
 					or disabled_filetypes[filetype]
 				then

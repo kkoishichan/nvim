@@ -97,4 +97,17 @@ function M.get()
 	}
 end
 
+---Two-way Git diffs: old text is red, new text is green, with stronger inline fills.
+function M.git_diff()
+	local p = M.get()
+	local added = attr("GitSignsAdd", "fg") or attr("Added", "fg") or fallback.hint
+	local deleted = attr("GitSignsDelete", "fg") or attr("Removed", "fg") or p.error
+	return {
+		add = M.blend(added, p.bg, 0.18),
+		delete = M.blend(deleted, p.bg, 0.18),
+		add_text = M.blend(added, p.bg, 0.36),
+		delete_text = M.blend(deleted, p.bg, 0.36),
+	}
+end
+
 return M

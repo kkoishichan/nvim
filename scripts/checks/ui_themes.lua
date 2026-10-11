@@ -132,6 +132,10 @@ return function(tmp)
 			"DiffDelete",
 			"DiffChange",
 			"DiffText",
+			"UserDiffviewAdd",
+			"UserDiffviewDelete",
+			"UserDiffviewAddText",
+			"UserDiffviewDeleteText",
 			"GitSignsAddPreview",
 			"GitSignsDeleteVirtLn",
 		}) do

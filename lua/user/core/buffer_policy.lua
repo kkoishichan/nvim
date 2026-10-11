@@ -186,6 +186,15 @@ function M.allow(bufnr)
 	return not M.inspect(bufnr or 0).heavy
 end
 
+---Whether a loaded buffer can use tools that expect local source files.
+---Unnamed/new files are allowed; revision URIs are not, even with buftype="".
+function M.is_file(bufnr)
+	return vim.api.nvim_buf_is_valid(bufnr)
+		and vim.api.nvim_buf_is_loaded(bufnr)
+		and vim.bo[bufnr].buftype == ""
+		and not vim.api.nvim_buf_get_name(bufnr):match("^%a[%w+.-]*://")
+end
+
 local function read_pre(bufnr, path)
 	local stat = vim.uv.fs_stat(path)
 	if not stat or stat.type ~= "file" then
@@ -223,7 +232,7 @@ function M.lsp_init(original)
 		-- Initialization may finish after a paste turns an ordinary document into
 		-- a costly one. on_init runs before Neovim sends the initial didOpen.
 		for bufnr in pairs(client.attached_buffers) do
-			if not M.allow(bufnr) then
+			if not M.is_file(bufnr) or not M.allow(bufnr) then
 				vim.lsp.buf_detach_client(bufnr, client.id)
 			end
 		end
@@ -236,11 +245,11 @@ end
 function M.lsp_root(config)
 	local original = config.root_dir
 	return function(bufnr, on_dir)
-		if not M.allow(bufnr) then
+		if not M.is_file(bufnr) or not M.allow(bufnr) then
 			return
 		end
 		local function accept(root)
-			if vim.api.nvim_buf_is_valid(bufnr) and M.allow(bufnr) then
+			if M.is_file(bufnr) and M.allow(bufnr) then
 				on_dir(root)
 			end
 		end
