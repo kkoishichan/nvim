@@ -9,6 +9,8 @@ end
 
 return function(tmp)
 	local root = assert(vim.env.NVIM_TEST_ROOT, "NVIM_TEST_ROOT is required")
+	local bare = vim.fs.joinpath(tmp, "empty-path")
+	vim.fn.mkdir(bare, "p")
 
 	local snapshot = [[
 local mode = require("user.core.mode")
@@ -178,6 +180,34 @@ vim.cmd("qa!")
 	assert(legacy.mode == "extra" and #legacy.disabled == 0, "Legacy full preference lost features")
 	local explicit_extra = run("explicit_extra", { mode = "extra" })
 	assert(explicit_extra.mode == "extra" and #explicit_extra.disabled == 0, "Extra mode is incomplete")
+	-- Input-method switching is conditional on the host even in extra mode.
+	-- Exercise both supported executables and their absence with real PATH
+	-- fixtures, so a developer's desktop cannot hide a headless CI failure.
+	for _, command in ipairs({ "none", "fcitx5-remote", "fcitx-remote" }) do
+		local bin = bare
+		if command ~= "none" then
+			bin = vim.fs.joinpath(tmp, "input-method", command)
+			vim.fn.mkdir(bin, "p")
+			local executable = vim.fs.joinpath(bin, command)
+			vim.fn.writefile({ "#!/bin/sh", "printf '1\\n'" }, executable)
+			assert(vim.uv.fs_chmod(executable, tonumber("755", 8)))
+		end
+		local input_method = run("input_method_" .. command, { mode = "extra", env = { PATH = bin } })
+		assert(
+			vim.tbl_contains(input_method.plugins, "fcitx.nvim") == (command ~= "none"),
+			"Extra mode did not respect input-method availability: " .. command
+		)
+		if command == "fcitx5-remote" then
+			for _, name in ipairs({ "fast", "standard" }) do
+				local disabled_method = run("input_method_" .. name, { mode = name, env = { PATH = bin } })
+				assert(
+					vim.tbl_contains(disabled_method.disabled, "automation")
+						and not vim.tbl_contains(disabled_method.plugins, "fcitx.nvim"),
+					name .. " mode enabled automatic input-method switching"
+				)
+			end
+		end
+	end
 	local selection = run("mode_selection", {
 		code = [[
 local preferences = require("user.core.preferences")
@@ -465,7 +495,6 @@ report.extra.function_object = vim.fn.getreg('"')
 	-- this session genuinely does not have, so the list is a verified claim
 	-- rather than a label.
 	local evidence = {
-		automation = "fcitx.nvim",
 		completion = "blink.cmp",
 		decorations = "vim-illuminate",
 		docking = "edgy.nvim",
@@ -489,6 +518,8 @@ report.extra.function_object = vim.fn.getreg('"')
 			capability .. " is reported off but " .. plugin .. " is installed"
 		)
 	end
+	assert(vim.tbl_contains(fast.disabled, "automation"), "Fast mode does not report automation as disabled")
+	assert(not vim.tbl_contains(fast.plugins, "fcitx.nvim"), "Fast mode enabled automatic input-method switching")
 	assert(vim.tbl_contains(fast.disabled, "diagnostics_text"), "Fast mode does not report diagnostic text as disabled")
 	assert(vim.tbl_contains(fast.disabled, "codelens"), "Fast mode does not report code lenses as disabled")
 	assert(
@@ -880,8 +911,6 @@ vim.lsp.get_client_by_id, vim.lsp.buf_detach_client = real.client, real.detach
 	assert(ownership.extra.stops == 1 and ownership.extra.detached, "Manual LSP ownership was not respected")
 
 	-- 9. Without a search stack the picker keys still open, complete and search.
-	local bare = vim.fs.joinpath(tmp, "empty-path")
-	vim.fn.mkdir(bare, "p")
 	local missing_servers = run("no_language_tools", {
 		mode = "fast",
 		env = {

@@ -88,3 +88,11 @@ CI 缓存键包含宿主平台、架构、Neovim 和 CLI 版本、插件锁、pa
 本机默认 **31 组**回归全部通过；最终手动 LSP 保护与检查依赖调整后，`static integration standard mode deployment` 再次通过。基准脚本的三项 Python 检查通过，覆盖样本副本隔离、独立 Git 项目边界和缺少重绘时拒绝成功结果。五轮交错测量另行执行，数据及其边界见[三档性能测量](editor-mode-measurements.md)。
 
 交付前再次运行 `static standard deployment` 和基准脚本三项检查，均通过。最终测量包含 120 个有效会话、每档每样本五轮；Rust/Markdown 的 standard/extra 以最终配置另行补测，前后 104 份运行源码哈希一致，其他样本保留原记录。
+
+## 2026-10-12 无输入法宿主回归
+
+[CI 运行 38186330263](https://github.com/kkoishichan/nvim/actions/runs/38186330263) 在 `mode` 组失败：测试把 extra 模式允许输入法自动切换，误认为所有宿主都会启用 `fcitx.nvim`。该插件原本就只在 `fcitx5-remote` 或 `fcitx-remote` 可用时启用；Ubuntu runner 不提供这些命令。
+
+模式检查改用独立 PATH 和可执行 fixture，分别验证两个受支持命令及命令缺失时的行为，并验证 fast / standard 即使有输入法命令也不启用自动切换。运行时配置保持不变。
+
+本机 `static mode` 通过；另外下载并核对 CI 固定的官方 Neovim 0.12.5 压缩包，在不含 fcitx 命令的 PATH 下运行默认 `./scripts/check.sh`，全部 **38 组**通过。插件、parser 和检查工具复用本机已核验的锁定依赖；这项本机结果不代替 Ubuntu runner 的远端结果。
