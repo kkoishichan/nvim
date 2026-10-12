@@ -49,7 +49,7 @@ standard 与 extra 的边界用五个动词判定，功能满足任何一条就�
 
 标准模式的白名单还包括 ts-comments、Tree-sitter 文本对象、lazydev 和 crates.nvim 的 Cargo.toml 检视与补全；不启用 faster.nvim 的事件屏蔽。扩展功能不会留下触发加载的快捷键、自动事件或后台定时器。三个模式复用配置工厂，standard 不先执行 extra 模块再过滤。
 
-以默认 VS Code 主题计算，选中的锁定插件数为 fast **13**、standard **50**、extra **83**，包含依赖及 headless 下条件禁用但仍需准备的插件。fast 选择内置 `default` 主题时为 12 个。standard/extra 保留完整 43 个 parser，fast 默认为 13 个，可显式追加。
+以默认 VS Code 主题计算，选中的锁定插件数为 fast **13**、standard **50**、extra **82**，包含依赖及 headless 下条件禁用但仍需准备的插件。fast 选择内置 `default` 主题时为 12 个。standard/extra 保留完整 43 个 parser，fast 默认为 13 个，可显式追加。
 
 ## 切换与兼容
 

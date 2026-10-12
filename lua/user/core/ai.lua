@@ -7,22 +7,20 @@ local providers = {
 		terminal = "codex",
 		count = 201,
 	},
+	pi = {
+		label = "Pi",
+		command = "pi",
+		count = 202,
+		interrupt = "\27",
+	},
 	claude = {
 		label = "Claude Code",
 		plugin = "claudecode.nvim",
 		executable = "claude",
 	},
-	opencode = {
-		label = "OpenCode",
-		plugin = "opencode.nvim",
-		command = "opencode",
-		-- Each workspace gets its own managed loopback server endpoint.
-		server = true,
-		count = 202,
-	},
 }
 
-local order = { "claude", "codex", "opencode" }
+local order = { "claude", "codex", "pi" }
 
 -- Persist the picked provider across restarts (same pattern as core/theme.lua:
 -- a one-line state file). vim.g still wins within a running session.
@@ -130,60 +128,6 @@ local terminals = require("user.core.ai_terminal").new({
 	load = load,
 })
 
-local function opencode_api()
-	load(providers.opencode.plugin)
-	local server = package.loaded["opencode.server"]
-	if server and server.connected then
-		-- The plugin otherwise prefers its globally connected server over URL config.
-		-- Disconnect only the event subscription; the other project's CLI survives.
-		server.connected:disconnect()
-	end
-	local ok, opencode = pcall(require, "opencode")
-	if ok then
-		return opencode
-	end
-	notify("opencode.nvim is not available", vim.log.levels.ERROR)
-	return nil
-end
-
-local function opencode_prompt(prompt)
-	local opencode = opencode_api()
-	if opencode then
-		-- Server discovery is asynchronous. Freeze file/range references before
-		-- it yields so another window or project cannot replace the source context.
-		if prompt == "@buffer " or prompt == "@this " then
-			local opts = { buf = vim.api.nvim_get_current_buf() }
-			if prompt == "@this " then
-				local mode = vim.fn.mode()
-				local visual = mode == "v" or mode == "V" or mode == "\22"
-				local from, to = vim.fn.getpos(visual and "v" or "."), vim.fn.getpos(".")
-				if from[2] > to[2] or (from[2] == to[2] and from[3] > to[3]) then
-					from, to = to, from
-				end
-				if mode == "\22" and from[3] > to[3] then
-					from[3], to[3] = to[3], from[3]
-				end
-				opts.from = { from[2], mode ~= "V" and from[3] or nil }
-				opts.to = { to[2], mode ~= "V" and to[3] or nil }
-			end
-			local reference = opencode.format(opts)
-			if not reference then
-				notify("No file context to send", vim.log.levels.WARN)
-				return
-			end
-			prompt = reference .. " "
-		end
-		opencode.prompt(prompt)
-	end
-end
-
-local function opencode_command(command)
-	local opencode = opencode_api()
-	if opencode then
-		opencode.command(command)
-	end
-end
-
 local function is_cli(id)
 	return providers[id] and providers[id].command ~= nil
 end
@@ -209,17 +153,21 @@ local function interrupt_claude()
 	return ok and sent == true
 end
 
+local function interrupt_cli(id)
+	local channel = terminals.channel(id)
+	if channel then
+		-- Pi uses Escape; Ctrl-C clears its input and can exit the process.
+		return pcall(vim.api.nvim_chan_send, channel, providers[id].interrupt or "\003")
+	end
+	return false
+end
+
 -- Best-effort interrupt of a provider's in-flight generation before switching.
 local function stop_generation(id)
 	if id == "claude" then
 		return interrupt_claude()
-	elseif id == "opencode" then
-		opencode_command("session.interrupt")
-	elseif id == "codex" then
-		local chan = terminals.channel(id)
-		if chan then
-			pcall(vim.api.nvim_chan_send, chan, "\003")
-		end
+	elseif is_cli(id) then
+		return interrupt_cli(id)
 	end
 end
 
@@ -380,39 +328,6 @@ local function cli_mention_file(id)
 	end)
 end
 
-local function opencode_mention_file()
-	local root = require("user.core.project").root()
-	local cwd = vim.fn.getcwd()
-	vim.ui.input({
-		prompt = "File for OpenCode: ",
-		default = vim.api.nvim_buf_get_name(0),
-		completion = "file",
-	}, function(path)
-		if not path or path == "" or not same_project(root) then
-			return
-		end
-
-		local opencode = opencode_api()
-		if opencode then
-			opencode.prompt(opencode.format({ path = input_path(path, cwd) }) .. " ")
-		end
-	end)
-end
-
-local function feed_buffer_keymap(lhs)
-	local keys = vim.api.nvim_replace_termcodes(lhs, true, false, true)
-	vim.api.nvim_feedkeys(keys, "m", false)
-end
-
-local function has_buffer_keymap(lhs)
-	for _, keymap in ipairs(vim.api.nvim_buf_get_keymap(0, "n")) do
-		if keymap.lhs == lhs then
-			return true
-		end
-	end
-	return false
-end
-
 function M.pick()
 	local active = provider()
 	local open_provider = active_chat_provider()
@@ -484,17 +399,9 @@ function M.open_cli(id, focus)
 	return terminals.open(id, focus ~= false)
 end
 
-function M.opencode_url()
-	return terminals.endpoint("opencode")
-end
-
 function M.add_buffer()
 	local id = provider()
 	if id == "claude" and not claude_project_matches() then
-		return
-	end
-	if id == "opencode" then
-		opencode_prompt("@buffer ")
 		return
 	end
 	if is_cli(id) then
@@ -534,8 +441,6 @@ function M.send_selection()
 		end
 		-- The plugin captures the active selection before leaving Visual mode.
 		vim.cmd("ClaudeCodeSend")
-	elseif id == "opencode" then
-		opencode_prompt("@this ")
 	elseif is_cli(id) then
 		cli_send_selection(id)
 	end
@@ -548,8 +453,6 @@ function M.attach_file()
 	end
 	if id == "claude" and tree_filetypes[vim.bo.filetype] then
 		vim.cmd("ClaudeCodeTreeAdd")
-	elseif id == "opencode" then
-		opencode_mention_file()
 	elseif is_cli(id) then
 		cli_mention_file(id)
 	else
@@ -566,13 +469,8 @@ function M.interrupt()
 		if not interrupt_claude() then
 			notify("No running Claude Code terminal to interrupt", vim.log.levels.WARN)
 		end
-	elseif id == "opencode" then
-		opencode_command("session.interrupt")
 	elseif is_cli(id) then
-		local channel = terminals.channel(id)
-		if channel then
-			vim.api.nvim_chan_send(channel, "\003")
-		end
+		interrupt_cli(id)
 	end
 end
 
@@ -583,8 +481,6 @@ function M.resume()
 	end
 	if id == "claude" then
 		vim.cmd("ClaudeCode --resume")
-	elseif id == "opencode" then
-		opencode_command("session.select")
 	elseif is_cli(id) then
 		terminals.send(id, "/resume\r")
 	end
@@ -609,11 +505,6 @@ function M.model()
 	end
 	if id == "claude" then
 		vim.cmd("ClaudeCodeSelectModel")
-	elseif id == "opencode" then
-		local opencode = opencode_api()
-		if opencode then
-			opencode.select()
-		end
 	elseif is_cli(id) then
 		terminals.send(id, "/model\r")
 	end
@@ -626,8 +517,6 @@ function M.accept()
 	end
 	if id == "claude" then
 		vim.cmd("ClaudeCodeDiffAccept")
-	elseif id == "opencode" and has_buffer_keymap("da") then
-		feed_buffer_keymap("da")
 	else
 		notify("Approve changes in the " .. providers[id].label .. " terminal", vim.log.levels.INFO)
 	end
@@ -640,8 +529,6 @@ function M.deny()
 	end
 	if id == "claude" then
 		vim.cmd("ClaudeCodeDiffDeny")
-	elseif id == "opencode" and has_buffer_keymap("dr") then
-		feed_buffer_keymap("dr")
 	else
 		notify("Reject changes in the " .. providers[id].label .. " terminal", vim.log.levels.INFO)
 	end

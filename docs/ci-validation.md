@@ -12,7 +12,7 @@ CI 使用 Ubuntu 24.04、Neovim 0.12.5、tree-sitter CLI 0.26.9。下载后分�
 | tree-sitter CLI | `v0.26.9`，Linux x64 压缩包 SHA256：`9ce82137caa65864e7ca8b869fd391cef88c9bd2a01c4371b9c4dd26c2585efb`；[官方发布资源](https://github.com/tree-sitter/tree-sitter/releases/expanded_assets/v0.26.9) |
 | checkout | `11bd71901bbe5b1630ceea73d27597364c9af683`，对应 v4.2.2；[官方提交](https://github.com/actions/checkout/commit/11bd71901bbe5b1630ceea73d27597364c9af683) |
 | cache | `5a3ec84eff668545956fd18022155c47e93e2684`，对应 v4.2.3；[官方提交](https://github.com/actions/cache/commit/5a3ec84eff668545956fd18022155c47e93e2684) |
-| 插件 | `lazy-lock.json` 的 83 个完整 Git SHA，包括当前平台条件禁用的插件 |
+| 插件 | `lazy-lock.json` 的 82 个完整 Git SHA，包括当前平台条件禁用的插件 |
 | Parser | 锁定的 nvim-treesitter 插件内的源码 revision；43 个显式语言，加 3 个查询依赖，安装过程报告 46 项 |
 | 检查工具 | StyLua `v2.5.2`、Selene `0.31.0`、Ruff `0.15.14`、ShellCheck `v0.11.0`，统一取 `user.toolchain` 的版本 |
 | 补全二进制 | 锁定 Blink 发布版本对应的原生 Rust 库，核验版本指向的 Git SHA、发布校验文件和实际可加载性 |

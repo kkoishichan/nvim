@@ -14,7 +14,7 @@ return {
 		init = function()
 			-- claudecode's native provider opens its terminal with `enew`, which
 			-- leaves the buffer `buflisted` — so it shows up in the bufferline
-			-- unlike the codex/opencode terminals. Ask the provider for its exact
+			-- unlike the Codex terminals. Ask the provider for its exact
 			-- managed buffer instead of matching a command-line substring (which
 			-- would also catch an unrelated `:term echo claude`).
 			vim.api.nvim_create_autocmd("TermOpen", {

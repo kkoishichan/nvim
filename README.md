@@ -52,6 +52,7 @@ Neovim 打磨成接近 IDE 的日常工作流。
   [`ecdict-ultimate-sqlite.zip`](https://github.com/skywind3000/ECDICT-ultimate/releases/download/1.0.0/ecdict-ultimate-sqlite.zip)
   解压到该目录，或用 `./scripts/deploy.sh --dict` 自动安装（解压后约 1.2GB）
 - 按项目准备对应的编译器、SDK、构建系统或运行时；完整对应关系见“语言支持”矩阵。
+- extra 的 AI 助手按需准备 `claude`、`codex` 或 `pi` 命令。
 
 普通文件不会加载 Mason、刷新 registry 或下载工具。`:MasonToolsInstall` 会显式恢复
 `lua/user/toolchain.lua` 中带版本的语言服务器、formatter、linter 与 DAP 适配器；
@@ -133,7 +134,6 @@ Selene、Stylelint、golangci-lint 仅在项目存在对应配置时运行，避
 │           ├── multicursor.lua
 │           ├── navigation.lua
 │           ├── neogen.lua
-│           ├── opencode.lua
 │           ├── performance.lua
 │           ├── picker.lua
 │           ├── tasks.lua
@@ -335,11 +335,6 @@ Jest/Vitest 根据文件所属项目识别；两者同处一个范围且无法�
 使用 `:TestAdapter jest` 或 `:TestAdapter vitest` 选择，`:TestAdapter auto` 恢复自动识别。
 重跑任务只选当前工作区最近完成的任务，模板已有的包级运行目录会保留。
 
-普通终端、Codex 和 OpenCode 按工作区保留进程，切换项目会选择该项目的会话。
-OpenCode 使用仅绑定本机的独立端口，并核对服务目录后再传递上下文。
-Claude 原生 IDE 集成在一个 Neovim 中只有一个终端：首次打开时绑定工作区，
-切到其他项目后会阻止误发；回到原项目继续使用，或另开 Neovim 为另一项目建立会话。
-
 机器偏好放在未跟踪的 `~/.config/nvim/preferences.json`，例如：
 
 ```json
@@ -353,6 +348,33 @@ Claude 原生 IDE 集成在一个 Neovim 中只有一个终端：首次打开时
 工具偏好修改后运行 `:ToolsRefresh`；直接编辑运行模式和恢复存储后需重启。
 无效值采用默认设置，并在健康报告中说明。
 项目自身的格式化和检查规则继续放在项目原生配置文件中。
+
+### AI 助手（extra）
+
+支持 Claude Code、Codex 和 Pi Coding Agent，需要对应的 `claude`、`codex` 或 `pi` 命令在 PATH 中。
+AI CLI 独立安装，不由 Mason 或部署工具组自动安装；Pi 的安装见[官方文档](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/quickstart.md)。
+fast / standard 不注册 AI 集成快捷键，需要时用 `<leader>ume` 切到 extra 并自动重启。
+
+| 操作 | 快捷键 | 说明 |
+| --- | --- | --- |
+| 选择 AI | `<leader>ap` | 持久保存；旧 OpenCode 选择自动回退到 Claude Code |
+| 打开/关闭、聚焦 | `<leader>aa`、`<leader>af` | 在右侧终端面板使用 |
+| 当前文件上下文 | `<leader>ab` / 普通模式 `<leader>as` | Codex / Pi 发送文件路径引用 |
+| 发送当前选区 | Visual 模式 `<leader>as` | Codex / Pi 发送实际选中文本，支持块选区和 Unicode |
+| 指定文件 | `<leader>at` | Codex / Pi 输入路径，Claude 另支持文件树选择 |
+| 选择模型 | `<leader>am` | 打开当前 AI 的模型选择器 |
+| 恢复历史会话 | `<leader>ar` | 打开当前 AI 的历史会话选择器 |
+| 中断当前响应 | `<leader>ai` | Pi / Claude 发送 Escape，Codex 发送 Ctrl-C |
+| 直接继续会话 | `<leader>ac` | 仅 Claude 支持；Pi 使用历史会话选择 |
+| 接受/拒绝 IDE diff | `<leader>ay` / `<leader>an` | 仅 Claude 集成；Codex / Pi 按各自终端交互处理 |
+
+Codex / Pi 的文件入口只发送路径；要发送尚未保存的内容，使用选区入口。文件树选区仅 Claude 支持。
+在终端内按两次 Escape 回到 Neovim 普通模式，再使用 leader 快捷键。
+
+普通终端、Codex 和 Pi 按工作区保留进程；隐藏面板不退出 CLI，切换项目会选择该项目的终端。
+Neovim 重启后需重新打开 CLI，历史对话用 `<leader>ar` 恢复。
+Claude 原生 IDE 集成在一个 Neovim 中只有一个终端：首次打开时绑定工作区，
+切到其他项目后会阻止误发；回到原项目继续使用，或另开 Neovim 为另一项目建立会话。
 
 ## 运行模式
 

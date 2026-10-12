@@ -28,7 +28,7 @@
 
 - 共享工作区、语言项目、仓库与实际 cwd；显式选择只影响当前 tab。嵌套仓库不继承外层语言环境，worktree、符号链接和 `..` 保持真实路径含义。
 - 搜索与任务使用共享工作区；任务保留模板包级目录，重跑仅限当前工作区；延迟输入捕获操作发起时的项目。
-- 普通终端、Codex 和 OpenCode 按项目管理进程。OpenCode 使用独立回环端口，校验实际服务目录，并在异步握手中防止串项目。Claude 保留原生单终端集成，绑定首个项目，阻止从其他项目误发。
+- 普通终端、Codex 和后续接入的 Pi 按项目管理进程。Claude 保留原生单终端集成，绑定首个项目，阻止从其他项目误发。
 - 工具解析返回路径、来源和原因；Node 项目工具优先，Python 目标解释器与 debugpy 宿主独立，Java 选择可追溯。缓存包含环境、根目录和偏好，支持安装事件与 `:ToolsRefresh`。
 - `:checkhealth user` 显示来源、版本、缺项及当前 LSP；`preferences.json` 提供经过类型校验的机器偏好。
 
@@ -79,3 +79,10 @@
 真实干净暂存链条在 `/tmp/nvim-deploy-real-u_6ceplm` 完成：83 个锁定插件、完整 parser、Blink 资产、Markdown 预编译版本 0.0.10 及 6 个 minimal Mason 包，构建、核验与安装均成功。失败回归涵盖启动错误、构建失败、意外锁改写与偏好保留。该验证没有替换当前用户配置入口。
 
 最终配置启动复测同样每项四次、丢弃首轮：空启动 **57.0 ms**、小 Lua **152.6 ms**、长行 JSON **176.5 ms**、大 JSON **152.8 ms**。日志与结果：`/tmp/nvim-benchmark-ylcifxo6/results.json`。原长行 JSON 基线为 **6282.8 ms**；这些是本机无头测量，不作为任意项目或机器的延迟保证。
+
+## 后续 AI 调整（2026-10-13）
+
+- 移除 OpenCode 插件、路由、端口分配和停靠配置；旧的持久化选择回退到 Claude Code。
+- 接入 Pi Coding Agent，复用 ToggleTerm 和项目归属管理；支持持久选择、文件引用、当前选区、模型和历史会话选择。Pi 中断及切出时发送 Escape。
+- 当前 extra 锁定插件数降至 82，standard / fast 仍为 50 / 13；此前的测量及部署验收保留当时的 83 个插件记录。
+- `static`、`ai`、`terminals`、`lifecycle`、`standard` 检查通过。Pi 1.1.0 的真实终端验收使用隔离配置和离线启动，核对 `/model`、Escape 和 `/resume`，没有发送模型请求。

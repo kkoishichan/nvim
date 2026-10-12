@@ -10,10 +10,6 @@ return function(tmp)
 		ai = package.loaded["user.core.ai"],
 		lazy = package.loaded.lazy,
 		claude = package.loaded["claudecode.terminal"],
-		opencode = package.loaded.opencode,
-		server = package.loaded["opencode.server"],
-		opencode_config = package.loaded["opencode.config"],
-		new_tcp = vim.uv.new_tcp,
 		executable = vim.fn.executable,
 		chan_send = vim.api.nvim_chan_send,
 		notify = vim.notify,
@@ -21,7 +17,6 @@ return function(tmp)
 		input = vim.ui.input,
 	}
 	local registry, writes, notices = {}, {}, {}
-	local port, closed_sockets = 41000, 0
 	local methods = {}
 	local fail_spawn = false
 	function methods:spawn()
@@ -111,22 +106,6 @@ return function(tmp)
 		vim.api.nvim_chan_send = function(channel, text)
 			table.insert(writes, { channel = channel, text = text })
 		end
-		vim.uv.new_tcp = function()
-			port = port + 1
-			local assigned = port
-			return {
-				bind = function(_, address, requested)
-					assert(address == "127.0.0.1" and requested == 0, "AI port probe must bind only loopback")
-					return 0
-				end,
-				getsockname = function()
-					return { port = assigned }
-				end,
-				close = function()
-					closed_sockets = closed_sockets + 1
-				end,
-			}
-		end
 		package.loaded["toggleterm.terminal"] = terminal
 		package.loaded.lazy = { load = function() end }
 		local spec = dofile(config_root .. "/lua/user/plugins/terminal.lua")[1]
@@ -160,7 +139,7 @@ return function(tmp)
 
 		local providers = {
 			codex = { label = "Codex", command = "codex", count = 201 },
-			opencode = { label = "OpenCode", command = "opencode", count = 202, server = true },
+			pi = { label = "Pi", command = "pi", count = 202 },
 		}
 		local function new_manager()
 			return require("user.core.ai_terminal").new({
@@ -193,144 +172,50 @@ return function(tmp)
 		codex_a.on_exit(codex_a, codex_a.job_id, 1)
 		assert(manager.channel("codex") == nil, "Exited AI terminal retained an active channel")
 
-		local url_a = manager.endpoint("opencode")
-		local source_window = vim.api.nvim_get_current_win()
-		project.set(roots[2])
-		local url_b = manager.endpoint("opencode")
-		assert(url_a ~= url_b and closed_sockets == 2, "OpenCode projects did not get separate closed port probes")
-		assert(vim.api.nvim_get_current_win() == source_window, "Background OpenCode startup changed context focus")
-		local open_b
-		for _, term in pairs(registry) do
-			if term.user_ai_terminal and term.user_ai_terminal.url == url_b then
-				open_b = term
-			end
-		end
-		assert(
-			open_b and open_b.cmd:find("--hostname 127.0.0.1 --mdns=false", 1, true),
-			"OpenCode must listen only on loopback"
-		)
-		assert(open_b.dir == roots[2], "OpenCode URL points to a process with the wrong project cwd")
-
-		local disconnected, prompts = 0, 0
-		local server = { connected = { url = url_a, cwd = roots[1] } }
-		vim.opt.rtp:append(require("lazy.core.config").plugins["opencode.nvim"].dir)
-		local Promise = require("opencode.promise")
-		server.new = function(url)
-			for _, term in pairs(registry) do
-				local marker = term.user_ai_terminal
-				if marker and marker.url == url then
-					return Promise.resolve({ cwd = marker.root })
-				end
-			end
-			return Promise.reject("Unknown managed URL")
-		end
-		server.connected.disconnect = function()
-			disconnected = disconnected + 1
-			server.connected = nil
-		end
-		package.loaded["opencode.server"] = server
-		local config = { opts = { server = {} } }
-		package.loaded["opencode.config"] = config
-		dofile(config_root .. "/lua/user/plugins/opencode.lua")[1].config()
-		assert(config.opts.server.connect == false, "OpenCode retained a global persistent server")
-		assert(config.opts.server.start == false, "OpenCode retained retries that can change project scope")
-		package.loaded.opencode = {
-			format = function(opts)
-				return opts.path or vim.api.nvim_buf_get_name(opts.buf)
-			end,
-			prompt = function(text)
-				assert(text ~= "@buffer ", "OpenCode deferred source-buffer lookup until after discovery")
-				assert(server.connected == nil, "OpenCode request reused another project's connected server")
-				config.opts.server.url(function(url)
-					assert(url == url_b, "OpenCode request targeted another project's URL")
-					prompts = prompts + 1
-				end)
-			end,
-		}
-		package.loaded["user.core.ai"] = nil
-		vim.g.user_ai_provider = "opencode"
-		local ai = require("user.core.ai")
-		ai.add_buffer()
-		assert(
-			vim.wait(500, function()
-				return prompts == 1
-			end),
-			"OpenCode did not resolve its verified project URL"
-		)
-		assert(
-			disconnected == 1 and prompts == 1,
-			"OpenCode routing did not disconnect stale subscription and send once"
-		)
-		local normal_new = server.new
-		server.new = function()
-			return Promise.resolve({ cwd = roots[1] })
-		end
-		local resolved
-		config.opts.server.url(function(url)
-			resolved = url or false
-		end)
-		assert(
-			vim.wait(500, function()
-				return resolved ~= nil
-			end),
-			"OpenCode directory validation did not complete"
-		)
-		assert(resolved == false, "OpenCode accepted a server with another project's cwd")
-		local pending
-		server.new = function()
-			return Promise.new(function(resolve)
-				pending = resolve
-			end)
-		end
-		resolved = nil
-		config.opts.server.url(function(url)
-			resolved = url or false
-		end)
-		project.set(roots[1])
-		pending({ cwd = roots[2] })
-		assert(
-			vim.wait(500, function()
-				return resolved ~= nil
-			end),
-			"Pending OpenCode lookup did not finish after project switch"
-		)
-		assert(resolved == false, "Pending OpenCode request followed a project switch")
-		server.new = normal_new
-		project.set(roots[2])
-		local unrelated = { url = url_a, cwd = roots[1] }
-		server.connected = unrelated
-		open_b.on_exit(open_b, open_b.job_id, 1)
-		assert(open_b.user_ai_terminal.url == nil, "Failed OpenCode process retained its stale endpoint")
-		assert(vim.b[open_b.bufnr].user_ai_terminal.url == nil, "Failed OpenCode buffer retained its stale endpoint")
-		assert(server.connected == unrelated, "Exiting B disconnected project A's server")
-		manager.endpoint("opencode")
-		local restarted_b
-		for _, term in pairs(registry) do
-			if term.user_ai_terminal and term.user_ai_terminal.root == roots[2] and term.user_ai_terminal.url then
-				restarted_b = term
-			end
-		end
-		server.connected = {
-			url = restarted_b.user_ai_terminal.url,
-			disconnect = function()
-				server.connected = nil
-			end,
-		}
-		restarted_b.on_exit(restarted_b, restarted_b.job_id, 1)
-		assert(server.connected == nil, "Exited OpenCode retained its matching event subscription")
 		fail_spawn = true
-		assert(manager.endpoint("opencode") == nil, "Failed startup reported a usable OpenCode URL")
-		assert(notices[#notices]:match("Could not start OpenCode"), "Failed OpenCode startup had no clear error")
+		assert(manager.open("codex", true) == nil, "Failed startup reported a usable Codex terminal")
+		assert(notices[#notices]:match("Could not open Codex"), "Failed Codex startup had no clear error")
 		fail_spawn = false
-		assert(manager.endpoint("opencode") ~= nil, "OpenCode could not retry after failed startup")
-		project.set(roots[1])
-		assert(manager.endpoint("opencode") == url_a, "Project B failure replaced project A's endpoint")
+		local restarted_a = manager.open("codex", true)
+		assert(restarted_a and restarted_a ~= codex_a, "Codex could not restart after failure")
+		assert(manager.channel("codex") == restarted_a.job_id, "Restarted Codex lost its channel")
 		project.set(roots[2])
+		assert(manager.channel("codex") == codex_b.job_id, "Project A failure replaced project B's terminal")
+
+		local pi_b = manager.open("pi", true)
+		assert(pi_b.cmd == "pi" and pi_b.dir == roots[2], "Pi launched the wrong CLI or project")
+		assert(pi_b.id ~= codex_b.id and not codex_b:is_open(), "Pi collided with Codex's terminal or panel")
+		assert(vim.b[pi_b.bufnr].user_ai_terminal.provider == "pi", "Pi terminal lost its docking marker")
+		local docks = dofile(config_root .. "/lua/user/plugins/edgy.lua")[1].opts
+		local pi_dock
+		for _, dock in ipairs(docks.right) do
+			if dock.title == "Pi" then
+				pi_dock = dock
+			end
+		end
+		assert(pi_dock and pi_dock.filter(pi_b.bufnr), "Pi was not recognized by the right dock")
+		assert(not pi_dock.filter(codex_b.bufnr), "Pi dock adopted another AI provider")
+		assert(not docks.bottom[1].filter(pi_b.bufnr, pi_b.window), "Pi was also docked as an ordinary terminal")
+		local pi_write_count = #writes
+		manager.send("pi", "B context")
+		project.set(roots[1])
+		local pi_a = manager.open("pi", true)
+		assert(pi_a ~= pi_b and pi_a.dir == roots[1], "Pi reused another project's process")
+		assert(
+			vim.wait(500, function()
+				return #writes == pi_write_count + 1
+			end),
+			"Deferred Pi context was not sent"
+		)
+		assert(writes[#writes].channel == pi_b.job_id, "Deferred Pi context crossed projects")
+		assert(new_manager().channel("pi") == pi_a.job_id, "AI reload lost Pi ownership")
+		project.set(roots[2])
+		assert(manager.open("pi", true) == pi_b, "Returning to Pi's project did not reuse its process")
 
 		project.set(roots[1])
 		package.loaded["user.core.ai"] = nil
 		vim.g.user_ai_provider = "codex"
-		ai = require("user.core.ai")
+		local ai = require("user.core.ai")
 		local input_callback, provider_callback
 		vim.ui.input = function(_, callback)
 			input_callback = callback
@@ -374,7 +259,6 @@ return function(tmp)
 		ai.interrupt()
 		assert(claude_sends == 1, "Returning to Claude's owner did not restore operation")
 	end, debug.traceback)
-	vim.uv.new_tcp = saved.new_tcp
 	vim.fn.executable = saved.executable
 	vim.api.nvim_chan_send = saved.chan_send
 	vim.notify = saved.notify
@@ -384,8 +268,5 @@ return function(tmp)
 	package.loaded["user.core.ai"] = saved.ai
 	package.loaded.lazy = saved.lazy
 	package.loaded["claudecode.terminal"] = saved.claude
-	package.loaded.opencode = saved.opencode
-	package.loaded["opencode.server"] = saved.server
-	package.loaded["opencode.config"] = saved.opencode_config
 	assert(ok, err)
 end

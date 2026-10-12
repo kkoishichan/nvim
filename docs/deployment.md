@@ -27,7 +27,7 @@
 
 所有配置组均包含 `minimal`。组只决定这次显式恢复哪些工具，不禁用其他语言配置，也不会卸载已有工具。正常启动与打开文件不会触发 Mason 安装；编辑器中的 `:MasonToolsInstall` 仍表示完整目录恢复。`--editor-mode fast` 未显式选择工具组时不恢复任何 Mason 工具，输出中会说明。
 
-standard 选中 50 个插件并保留完整 parser 目录，extra 选中 83 个插件，fast 默认 13 个插件和 13 个 parser（默认 VS Code 主题，包含共用的 lualine）。模式切换不卸载其他模式的已有资产。工具组独立于运行模式，`--editor-mode standard --profile full` 仍安装完整 Mason 工具清单。运行时 standard/fast 不下载插件；新主机先完成显式资源准备。完整取舍见[三档模式](editor-modes.md)。
+standard 选中 50 个插件并保留完整 parser 目录，extra 选中 82 个插件，fast 默认 13 个插件和 13 个 parser（默认 VS Code 主题，包含共用的 lualine）。模式切换不卸载其他模式的已有资产。工具组独立于运行模式，`--editor-mode standard --profile full` 仍安装完整 Mason 工具清单。运行时 standard/fast 不下载插件；新主机先完成显式资源准备。完整取舍见[三档模式](editor-modes.md)。
 
 ```sh
 ./scripts/deploy.sh --dry-run --editor-mode standard --profile python
@@ -65,6 +65,9 @@ standard 选中 50 个插件并保留完整 parser 目录，extra 选中 83 个�
 | `full` | `lua/user/toolchain.lua` 中全部固定版本，包括未归入某个语言组的工具 | 上述配置组依赖的合并。 |
 
 所有正常部署从锁定的 Tree-sitter 插件目录构建所选 parser；standard/extra 另准备、验证锁定 Blink 补全所需资产，fast 不需要 Blink。它们不随 Mason 配置组减少。tree-sitter CLI 使用官方 `0.26.9` 平台二进制，不要求为了安装 CLI 再安装 Rust。Neovim 和 tree-sitter 的发行资产来源分别为 [Neovim v0.12.5](https://github.com/neovim/neovim/releases/tag/v0.12.5) 与 [tree-sitter v0.26.9](https://github.com/tree-sitter/tree-sitter/releases/tag/v0.26.9)。Linux x86_64 的这两个资产带固定 SHA-256，下载后先校验再解压，与 CI 使用同一组值；其他平台或版本没有固定值时照常安装，但会给出未校验的警告。改变 Neovim 版本会同时传给准备步骤；其他版本不因默认准备版本硬编码而被拒绝，实际兼容性仍由检查结果决定。
+
+AI CLI 由用户独立安装，不属于 Mason、`--profile full` 或 `--with-extras` 的安装范围；
+extra 中的入口、快捷键和使用限制见 [AI 助手说明](../README.md#ai-助手extra)。
 
 ## 切换与失败恢复
 

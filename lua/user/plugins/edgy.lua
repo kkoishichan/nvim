@@ -104,6 +104,14 @@ return {
 			},
 			right = {
 				{
+					title = "Pi",
+					ft = "toggleterm",
+					filter = function(buf)
+						return ai_terminal(buf, "pi")
+					end,
+					size = { width = dock_size("right") },
+				},
+				{
 					title = "Codex",
 					ft = "toggleterm",
 					filter = function(buf)
@@ -116,14 +124,6 @@ return {
 					ft = "",
 					filter = function(buf)
 						return ai_terminal(buf, "claude")
-					end,
-					size = { width = dock_size("right") },
-				},
-				{
-					title = "OpenCode",
-					ft = "toggleterm",
-					filter = function(buf)
-						return ai_terminal(buf, "opencode")
 					end,
 					size = { width = dock_size("right") },
 				},

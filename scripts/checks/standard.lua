@@ -58,7 +58,6 @@ return function(tmp)
 	for _, name in ipairs({
 		"nvim-dap",
 		"neotest",
-		"opencode.nvim",
 		"claudecode.nvim",
 		"image.nvim",
 		"markview.nvim",
@@ -80,7 +79,7 @@ return function(tmp)
 	}) do
 		assert(not plugins[name], "Standard registered extra plugin " .. name)
 	end
-	for _, module in ipairs({ "dap", "test", "media", "tasks", "edgy", "opencode", "claudecode", "performance" }) do
+	for _, module in ipairs({ "dap", "test", "media", "tasks", "edgy", "claudecode", "performance" }) do
 		assert(not package.loaded["user.plugins." .. module], "Executed excluded module " .. module)
 	end
 	assert(not package.loaded["user.core.pdf"], "Statusline eagerly loaded PDF support")

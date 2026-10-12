@@ -38,20 +38,6 @@ local function channel_for(term)
 	return type(channel) == "number" and channel > 0 and channel or nil
 end
 
-local function local_endpoint()
-	local socket = assert(vim.uv.new_tcp())
-	local ok, err = socket:bind("127.0.0.1", 0)
-	if not ok then
-		socket:close()
-		error(err)
-	end
-	local port = socket:getsockname().port
-	-- The CLI binds the chosen port itself. Occupied ports fail the startup;
-	-- opencode.nvim validates the server's health before sending any requests.
-	socket:close()
-	return port, "http://127.0.0.1:" .. port
-end
-
 function M.new(options)
 	local providers, notify, load = options.providers, options.notify, options.load
 	local terms = {}
@@ -95,9 +81,6 @@ function M.new(options)
 		if term then
 			return term
 		end
-		if provider.plugin then
-			load(provider.plugin)
-		end
 		if vim.fn.executable(provider.command) == 0 then
 			notify(provider.command .. " is not executable", vim.log.levels.ERROR)
 			return nil
@@ -113,13 +96,7 @@ function M.new(options)
 			count = count + 1
 		end
 		local command = provider.terminal or provider.command
-		local url
-		if provider.server then
-			local port
-			port, url = local_endpoint()
-			command = provider.command .. " --hostname 127.0.0.1 --mdns=false --port " .. port
-		end
-		local marker = { provider = id, command = command, label = provider.label, root = project_root, url = url }
+		local marker = { provider = id, command = command, label = provider.label, root = project_root }
 		term = terminal.Terminal:new({
 			cmd = command,
 			count = count,
@@ -134,14 +111,6 @@ function M.new(options)
 			end,
 			on_exit = function(exited, _, exit_code)
 				exited.user_ai_exited = true
-				local server = package.loaded["opencode.server"]
-				if marker.url and server and server.connected and server.connected.url == marker.url then
-					server.connected:disconnect()
-				end
-				marker.url = nil
-				if buffer_valid(exited) then
-					vim.b[terminal_buffer(exited)].user_ai_terminal = marker
-				end
 				if terms[project_root] and terms[project_root][id] == exited then
 					terms[project_root][id] = nil
 				end
@@ -200,29 +169,6 @@ function M.new(options)
 			return nil
 		end
 		return term
-	end
-
-	function instance.endpoint(id)
-		local ok, term = pcall(ensure, id, root())
-		if not ok or not term then
-			if not ok then
-				notify("Could not prepare OpenCode: " .. tostring(term), vim.log.levels.ERROR)
-			end
-			return nil
-		end
-		if not buffer_valid(term) then
-			local spawned, err = pcall(term.spawn, term)
-			if not spawned or not channel_for(term) then
-				term.user_ai_exited = true
-				term.user_ai_terminal.url = nil
-				if buffer_valid(term) then
-					vim.b[terminal_buffer(term)].user_ai_terminal = term.user_ai_terminal
-				end
-				notify("Could not start OpenCode: " .. tostring(err), vim.log.levels.ERROR)
-				return nil
-			end
-		end
-		return term.user_ai_terminal.url
 	end
 
 	function instance.close(id)
