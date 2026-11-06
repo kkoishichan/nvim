@@ -68,6 +68,10 @@ local function bufferline_highlights(defaults)
 	local text = { inactive = p.muted, visible = p.dim, selected = p.fg }
 	local function surface(state)
 		if transparent then
+			-- The current tab breaks the baseline: only the rest of the bar has it.
+			if state == "selected" then
+				return { bg = "NONE", ctermbg = "NONE" }
+			end
 			return { bg = "NONE", ctermbg = "NONE", underline = true, sp = p.line }
 		end
 		return { bg = state == "selected" and p.bg or p.sunken }

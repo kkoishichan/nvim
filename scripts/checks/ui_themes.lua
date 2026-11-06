@@ -291,11 +291,18 @@ return function(tmp)
 			if group == "UserBufferlineOffset" or group == "BufferLineOffsetSeparator" then
 				-- The sidebar title heads the sidebar, not the tab list: no line.
 				assert(not value.underline, name .. " " .. group .. " underlines the sidebar title")
+			elseif group:match("^BufferLine.*Selected$") then
+				-- The current tab breaks the baseline.
+				assert(not value.underline, name .. " " .. group .. " underlines the current tab")
 			elseif group:match("^BufferLine") then
-				-- One underline colour for the whole bar, the current tab included.
+				-- One underline colour for the rest of the bar.
 				assert(value.underline and value.sp == palette.get().line, name .. " " .. group .. " lost its baseline")
 			end
 		end
+		assert(
+			not palette.highlight("BufferLineBufferSelected").underline,
+			name .. " transparent tab bar underlines the current tab"
+		)
 		-- Lines keep reading without a fill behind them, in every theme: the
 		-- separators and float borders take the palette's line colour and the
 		-- titles its dim text colour, all visibly lighter than the old fill.
