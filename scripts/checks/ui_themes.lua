@@ -91,6 +91,25 @@ return function(tmp)
 	vim.list_extend(surfaces, popup_surfaces)
 	local all_surfaces = vim.list_extend(vim.deepcopy(surfaces), solid_surfaces)
 	local reports = {}
+	local function check_picker(expected)
+		local marked = {}
+		local select = vim.ui.select
+		vim.ui.select = function(items, opts, on_choice)
+			for _, item in ipairs(items) do
+				if opts.format_item(item) == item .. "  (current)" then
+					table.insert(marked, item)
+				end
+			end
+			on_choice(nil)
+		end
+		local ok, err = pcall(theme.pick)
+		vim.ui.select = select
+		assert(ok, err)
+		assert(
+			#marked == 1 and marked[1] == expected,
+			("%s picker current markers: %s"):format(expected, vim.inspect(marked))
+		)
+	end
 	local function luminance(color)
 		local function channel(value)
 			value = value / 255
@@ -109,6 +128,7 @@ return function(tmp)
 		-- ColorScheme customisations. The normal path must preserve that surface.
 		theme.set(name, false)
 		assert(vim.startswith(vim.g.colors_name or "", theme.themes[name].colorscheme), name .. " was not applied")
+		check_picker(name)
 		vim.cmd.colorscheme({ theme.themes[name].colorscheme, mods = { noautocmd = true } })
 		local theme_fg = palette.highlight("Normal").fg
 		local float_bg = palette.highlight("NormalFloat").bg or palette.highlight("Normal").bg

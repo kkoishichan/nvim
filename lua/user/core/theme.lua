@@ -112,12 +112,24 @@ function M.pick()
 	if #names == 0 then
 		names = M.names()
 	end
+	local colorscheme = vim.g.colors_name or ""
+	local current
+	for _, name in ipairs(M.names()) do
+		local scheme = M.themes[name].colorscheme
+		if colorscheme == scheme then
+			current = name
+			break
+		end
+		-- Variants such as catppuccin-mocha belong to their registered theme.
+		-- Prefer the longest name so gruvbox-material cannot mark gruvbox too.
+		if vim.startswith(colorscheme, scheme .. "-") and (not current or #scheme > #M.themes[current].colorscheme) then
+			current = name
+		end
+	end
 	vim.ui.select(names, {
 		prompt = "Colorscheme",
 		format_item = function(name)
-			-- Prefix match: catppuccin reports colors_name as "catppuccin-mocha".
-			local active = vim.startswith(vim.g.colors_name or "", M.themes[name].colorscheme)
-			return active and (name .. "  (current)") or name
+			return name == current and (name .. "  (current)") or name
 		end,
 	}, function(choice)
 		if choice then
