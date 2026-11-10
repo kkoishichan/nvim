@@ -110,10 +110,12 @@ return function(tmp)
 		theme.set(name, false)
 		assert(vim.startswith(vim.g.colors_name or "", theme.themes[name].colorscheme), name .. " was not applied")
 		vim.cmd.colorscheme({ theme.themes[name].colorscheme, mods = { noautocmd = true } })
+		local theme_fg = palette.highlight("Normal").fg
 		local float_bg = palette.highlight("NormalFloat").bg or palette.highlight("Normal").bg
 		theme.set(name, false)
 		local normal = vim.api.nvim_get_hl(0, { name = "Normal", link = false })
 		assert(normal.fg and normal.bg, name .. " has no resolved normal text colors")
+		assert(normal.fg == theme_fg, name .. " normal text color was overridden")
 		assert(contrast(normal.fg, normal.bg) >= 4.5, name .. " normal text has insufficient contrast")
 		local result = { normal = contrast(normal.fg, normal.bg), popup = {} }
 		assert(palette.highlight("NormalFloat").bg == float_bg, name .. " replaced the theme's float background")

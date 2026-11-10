@@ -4,7 +4,7 @@
 Neovim 打磨成接近 IDE 的日常工作流。
 
 - 默认 standard，另有 fast 和 extra；`lazy.nvim` 管理插件，资源通过部署或显式维护准备。
-- 默认 `vscode` Dark+ 主题（可持久切换，主题选择器也提供内置 `default` 和暖色 `melange`），`<Space>` 作为 leader，`\` 作为 localleader。
+- 默认 `vscode` Dark+ 主题（可持久切换，主题选择器也提供内置 `default` 和暖色 `melange`、`gruvbox-material`），`<Space>` 作为 leader，`\` 作为 localleader。
 - `fzf-lua` 负责查找、搜索、符号 / 调用关系与 Git 列表，并接管 `vim.ui.select`。
 - `glance.nvim` 提供定义、声明、实现、类型与引用的双栏 Peek 界面。
 - standard / extra 提供 Outline 符号大纲、离线词典，以及 crates.nvim 的 Cargo.toml 检视与补全。

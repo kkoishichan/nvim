@@ -30,6 +30,20 @@ local function specs()
 				theme.bootstrap()
 			end,
 		},
+		["gruvbox-material"] = {
+			"sainnhe/gruvbox-material",
+			name = "gruvbox-material",
+			priority = 1000,
+			init = function()
+				vim.g.gruvbox_material_background = "medium"
+				vim.g.gruvbox_material_foreground = "material"
+				vim.g.gruvbox_material_enable_bold = 1
+				vim.g.gruvbox_material_enable_italic = 1
+			end,
+			config = function()
+				theme.bootstrap()
+			end,
+		},
 		tokyonight = {
 			"folke/tokyonight.nvim",
 			priority = 1000,

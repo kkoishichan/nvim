@@ -10,6 +10,7 @@ M.themes = {
 	-- `plugin` is the lazy.nvim plugin name (its `name`, or the repo basename
 	-- when no name is set), used for lazy.load.
 	gruvbox = { plugin = "gruvbox", colorscheme = "gruvbox" },
+	["gruvbox-material"] = { plugin = "gruvbox-material", colorscheme = "gruvbox-material" },
 	tokyonight = { plugin = "tokyonight.nvim", colorscheme = "tokyonight" },
 	catppuccin = { plugin = "catppuccin", colorscheme = "catppuccin" },
 	melange = { plugin = "melange", colorscheme = "melange" },
