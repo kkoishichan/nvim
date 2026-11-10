@@ -12,6 +12,7 @@ M.themes = {
 	gruvbox = { plugin = "gruvbox", colorscheme = "gruvbox" },
 	tokyonight = { plugin = "tokyonight.nvim", colorscheme = "tokyonight" },
 	catppuccin = { plugin = "catppuccin", colorscheme = "catppuccin" },
+	melange = { plugin = "melange", colorscheme = "melange" },
 	vscode = { plugin = "vscode.nvim", colorscheme = "vscode" },
 }
 

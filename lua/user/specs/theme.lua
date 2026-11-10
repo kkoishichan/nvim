@@ -49,6 +49,14 @@ local function specs()
 				theme.bootstrap()
 			end,
 		},
+		melange = {
+			"savq/melange-nvim",
+			name = "melange",
+			priority = 1000,
+			config = function()
+				theme.bootstrap()
+			end,
+		},
 		vscode = {
 			"Mofiqul/vscode.nvim",
 			priority = 1000,

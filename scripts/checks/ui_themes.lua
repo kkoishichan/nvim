@@ -108,6 +108,7 @@ return function(tmp)
 		-- Load the theme first, then capture its own float colour without our
 		-- ColorScheme customisations. The normal path must preserve that surface.
 		theme.set(name, false)
+		assert(vim.startswith(vim.g.colors_name or "", theme.themes[name].colorscheme), name .. " was not applied")
 		vim.cmd.colorscheme({ theme.themes[name].colorscheme, mods = { noautocmd = true } })
 		local float_bg = palette.highlight("NormalFloat").bg or palette.highlight("Normal").bg
 		theme.set(name, false)

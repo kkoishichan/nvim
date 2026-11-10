@@ -215,6 +215,24 @@ function M.apply()
 	local palette = require("user.core.palette")
 	-- Capture the theme's colours before any fill is removed.
 	local p = palette.get()
+	-- Themes such as Melange link the native menu and statusline to
+	-- NormalFloat. Resolve those links before clearing the floating surface,
+	-- so borderless UI keeps its opaque background in transparent mode.
+	for _, name in ipairs({
+		"Pmenu",
+		"PmenuBorder",
+		"PmenuKind",
+		"PmenuExtra",
+		"PmenuMatch",
+		"PmenuSbar",
+		"StatusLine",
+		"StatusLineNC",
+	}) do
+		local value = palette.highlight(name)
+		if next(value) then
+			vim.api.nvim_set_hl(0, name, value)
+		end
+	end
 	for _, role in ipairs(roles) do
 		for _, name in ipairs(surfaces[role]) do
 			clear_fill(name)
