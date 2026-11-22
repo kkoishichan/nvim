@@ -76,29 +76,35 @@ catppuccin（默认 mocha）· tokyonight · kanagawa · rose-pine · nightfox �
 
 | 语言 | LSP | 格式化 |
 |---|---|---|
-| Lua | lua_ls + lazydev | stylua |
-| Python | basedpyright + ruff | ruff（格式化 + 整理 import） |
-| JS/TS | vtsls | prettierd |
-| HTML/CSS | html · cssls | prettierd |
-| C/C++ | clangd | clang-format（由 clangd 提供） |
-| Bash | bashls | shfmt |
-| JSON/YAML | jsonls · yamlls（+ SchemaStore） | prettierd |
-| TOML | taplo | taplo |
-| Markdown | marksman | prettierd |
-| Go | gopls（系统） | gofumpt + goimports |
+| Lua | lua_ls（系统）+ lazydev | stylua（系统） |
+| Python | basedpyright + ruff（优先用项目 `.venv` 里的） | ruff（格式化 + 整理 import，优先用 `.venv` 里的） |
+| JS/TS | vtsls · eslint · biome（后两者只在有对应配置的项目里启动，用项目自己的版本） | 有 Biome 配置用 biome，否则 prettierd |
+| HTML/CSS | html · cssls | prettierd（CSS 在 Biome 项目里用 biome） |
+| C/C++ | clangd（系统） | clang-format（由 clangd 提供） |
+| Bash | bashls（系统） | shfmt（系统） |
+| JSON/YAML | jsonls · yamlls（系统）（+ SchemaStore） | prettierd（JSON 在 Biome 项目里用 biome） |
+| TOML | taplo（系统） | taplo |
+| Markdown | marksman（系统） | prettierd |
+| Go | gopls（系统） | gofumpt + goimports（系统） |
 | Rust | rust-analyzer（系统，clippy 检查） | rustfmt（系统） |
-| LaTeX | texlab | latexindent（系统） |
+| LaTeX | texlab（系统） | latexindent（系统） |
 | Typst | tinymist（系统） | typstyle（系统） |
+| Dockerfile | dockerls（系统；compose 文件由 yamlls 按 schema 校验） | — |
+| SQL | —（不连数据库） | sql-formatter（项目里的 `.sql-formatter.json` 可设方言） |
 
-- 系统里已装的语言服务优先用系统版本，其余由 mason 安装
+- 工具查找顺序：项目本地（`.venv` / `node_modules`）→ 系统 → mason（加在 PATH 末尾，只作后备）。编辑器、命令行、CI、AI agent 用同一个版本
+- 官方源（pacman）里有的工具用系统版本，跟随系统更新；mason 只装官方源没有的：basedpyright、vtsls、eslint/html/css/json 语言服务、prettierd、sql-formatter
+- Biome 项目缺少 biome（没装依赖）时只提示、不格式化，不会改用 Prettier
 - LaTeX：vimtex + latexmk + XeLaTeX；zathura 用 `zathura_simple` 模式（Wayland），支持 SyncTeX
 - Typst：typst-preview.nvim 浏览器实时预览（光标同步）· tinymist 导出 PDF · zathura 查看
+- SQL：关闭自带 SQL 插件插入模式下 `<C-c>` 开头的补全键（否则 `<C-c>` 退出插入模式会卡一下）
 - 其他语言打开时自动安装 treesitter parser
 
 ## 6. 行为默认值
 
 - 保存时格式化（`<leader>uf` 开关）；保存时删除行尾空格
 - 剪贴板与系统共用（启动后再设置）
+- 外部修改文件后自动重载：切回窗口、切换 buffer 时检查，普通模式下每秒检查一次（适配 AI agent 改代码）
 - 补全：`<CR>` 确认 · `<Tab>` 选下一个 · 不预选 · 文档窗口自动弹出 · 开启命令行补全
 - 诊断：tiny-inline 气泡，可切换为行下虚拟行；插入模式下不刷新
 - 折叠：LSP 优先 → treesitter → 缩进；打开文件时全部展开；折叠行带语法高亮并显示行数

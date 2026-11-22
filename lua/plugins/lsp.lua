@@ -1,27 +1,40 @@
 local icons = require("config.icons")
+local project = require("config.project")
+
+-- 工具查找顺序：项目本地（.venv / node_modules）→ 系统 → mason（PATH 末尾，作后备）
+
+-- 官方源（pacman）里有的用系统版本，跟随系统更新；只有 AUR 才有的由 mason 安装
 
 -- 由 mason 安装的语言服务（mason-lspconfig 会自动启用）
 local mason_servers = {
-  "lua_ls",
   "basedpyright",
-  "ruff",
   "vtsls",
+  "eslint", -- 只在有 ESLint 配置的项目里启动，加载项目自己的 ESLint
   "html",
   "cssls",
-  "clangd",
-  "bashls",
   "jsonls",
-  "yamlls",
-  "taplo",
-  "marksman",
-  "texlab",
 }
 
--- 使用系统已安装的语言服务
-local system_servers = { "gopls", "rust_analyzer", "tinymist" }
+-- 只用系统或项目里的语言服务：值为检测用的可执行文件；
+-- false 表示总是启用（服务自己判断项目是否适用，并优先用项目里的版本）
+local system_servers = {
+  lua_ls = "lua-language-server",
+  clangd = "clangd",
+  gopls = "gopls",
+  rust_analyzer = "rust-analyzer",
+  ruff = "ruff",
+  bashls = "bash-language-server",
+  yamlls = "yaml-language-server",
+  taplo = "taplo",
+  marksman = "marksman",
+  texlab = "texlab",
+  tinymist = "tinymist",
+  dockerls = "docker-langserver", -- Dockerfile（compose 文件由 yamlls 按 schema 校验）
+  biome = false, -- 只在有 Biome 配置的项目里启动
+}
 
--- 由 mason 安装的格式化工具
-local mason_tools = { "stylua", "prettierd", "shfmt", "gofumpt", "goimports" }
+-- 由 mason 安装的格式化工具（stylua、shfmt、gofumpt、goimports 等用系统的）
+local mason_tools = { "prettierd", "sql-formatter" }
 
 local function server_configs()
   return {
@@ -35,8 +48,13 @@ local function server_configs()
         },
       },
     },
+    -- Python 工具优先用项目虚拟环境里的版本
     basedpyright = {
+      cmd = project.venv_cmd("basedpyright-langserver", { "--stdio" }),
       settings = { basedpyright = { analysis = { typeCheckingMode = "standard" } } },
+    },
+    ruff = {
+      cmd = project.venv_cmd("ruff", { "server" }),
     },
     vtsls = {
       settings = {
@@ -188,6 +206,7 @@ return {
     cmd = { "Mason", "MasonInstall", "MasonUpdate" },
     build = ":MasonUpdate",
     opts = {
+      PATH = "append", -- 系统和项目里有的工具优先，mason 只作后备
       ui = {
         border = "rounded",
         icons = { package_installed = "\u{f00c}", package_pending = "\u{f110}", package_uninstalled = "\u{f00d}" },
@@ -258,12 +277,11 @@ return {
 
       require("mason-lspconfig").setup({
         ensure_installed = mason_servers,
-        automatic_enable = { exclude = { "stylua" } }, -- stylua 由 conform 调用
+        automatic_enable = mason_servers, -- 只启用列表里的，mason 里残留的其他包不会被自动启用
       })
 
-      for _, name in ipairs(system_servers) do
-        local cmd = vim.lsp.config[name] and vim.lsp.config[name].cmd
-        if type(cmd) == "table" and vim.fn.executable(cmd[1]) == 1 then
+      for name, bin in pairs(system_servers) do
+        if bin == false or vim.fn.executable(bin) == 1 then
           vim.lsp.enable(name)
         end
       end

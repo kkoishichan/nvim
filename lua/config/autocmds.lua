@@ -37,15 +37,26 @@ autocmd("VimResized", {
   end,
 })
 
--- 外部修改文件后自动重载
-autocmd({ "FocusGained", "TermClose", "TermLeave" }, {
+-- 外部修改文件（如 AI agent 改代码）后自动重载（未修改的 buffer 直接重载）
+local function checktime()
+  if vim.o.buftype ~= "nofile" and vim.fn.getcmdwintype() == "" then
+    vim.cmd("checktime")
+  end
+end
+autocmd({ "FocusGained", "TermClose", "TermLeave", "BufEnter" }, {
   group = augroup("checktime"),
-  callback = function()
-    if vim.o.buftype ~= "nofile" then
-      vim.cmd("checktime")
-    end
-  end,
+  callback = checktime,
 })
+-- 不切换焦点、只看着屏幕时也能刷新：普通模式下每秒检查一次（只比较文件时间戳，开销可忽略）
+vim.uv.new_timer():start(
+  1000,
+  1000,
+  vim.schedule_wrap(function()
+    if vim.api.nvim_get_mode().mode == "n" then
+      checktime()
+    end
+  end)
+)
 
 -- 这些辅助窗口按 q 关闭
 autocmd("FileType", {

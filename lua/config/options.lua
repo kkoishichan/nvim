@@ -33,6 +33,9 @@ opt.formatoptions = "jcroqlnt"
 opt.completeopt = "menu,menuone,noselect"
 opt.spelllang = { "en", "cjk" }
 
+-- 自带的 SQL 插件在插入模式注册了 <C-c> 开头的补全键，会让 <C-c> 退出插入模式卡一下
+vim.g.omni_sql_no_default_maps = 1
+
 -- 搜索
 opt.ignorecase = true
 opt.smartcase = true

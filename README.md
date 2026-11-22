@@ -120,7 +120,7 @@ diffview 里：`<Tab>` 切换文件，`]c` 下一个改动块，`]x` 下一个�
 ## 维护
 
 - `:Lazy`：插件管理（`<leader>l`）
-- `:Mason`：语言服务和格式化工具
+- `:Mason`：语言服务和格式化工具（后备；项目本地和系统里有的优先）
 - `:checkhealth vim.lsp`：LSP 状态
 - `:ConformInfo`：格式化工具状态
-- 新增语言：在 `lua/plugins/lsp.lua` 的 `mason_servers` 里加服务名；需要格式化的话在 `lua/plugins/format.lua` 里加
+- 新增语言：在 `lua/plugins/lsp.lua` 的 `mason_servers`（由 mason 安装）或 `system_servers`（用系统 / 项目里的）里加服务名；需要格式化的话在 `lua/plugins/format.lua` 里加
