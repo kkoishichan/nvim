@@ -4,10 +4,10 @@ local function palette()
   return require("ui").palette
 end
 
--- 由调色板生成 lualine 主题：圆角胶囊，模式块用实色，其余透明或与编辑区同色
+-- 由调色板生成 lualine 主题：圆角胶囊，模式块用实色，底色为外框色（透明模式下透明）
 local function lualine_theme()
   local p = palette()
-  local base = p.transparent and "NONE" or p.bg
+  local base = p.transparent and "NONE" or p.chrome
   local b = { fg = p.fg, bg = p.subtle }
   local c = { fg = p.muted, bg = base }
   local function mode(color)
@@ -75,7 +75,9 @@ return {
           center = center,
           footer = function()
             local stats = require("lazy").stats()
-            local ms = math.floor(stats.startuptime * 100 + 0.5) / 100
+            -- 启动页在 VimEnter 时打开，早于 lazy 在 UIEnter 记录启动时间，此时直接取当前耗时
+            local t = stats.startuptime > 0 and stats.startuptime or require("lazy.stats").cputime()
+            local ms = math.floor(t * 100 + 0.5) / 100
             return { "", "⚡ loaded " .. stats.loaded .. "/" .. stats.count .. " plugins in " .. ms .. "ms" }
           end,
         },
@@ -206,10 +208,11 @@ return {
         options = {
           close_command = bufremove,
           right_mouse_command = bufremove,
-          separator_style = "thin",
+          -- 卡片式：标签之间留一格外框色空隙，当前标签与编辑区同色，左侧强调色竖条
+          separator_style = { " ", " " },
           themable = false, -- 由 lua/ui 统一控制颜色，每次都覆盖已有高亮
 
-          indicator = { style = "underline" },
+          indicator = { style = "icon", icon = "▎" },
           always_show_bufferline = false, -- 只有一个 buffer 时隐藏
           show_buffer_close_icons = false,
           show_close_icon = false,
@@ -240,10 +243,12 @@ return {
     config = function(_, opts)
       local function highlights()
         local p = palette()
-        local bg = p.transparent and "NONE" or p.bg
+        local T = p.transparent
+        local chrome = T and "NONE" or p.chrome -- 标签栏底色和未选中标签：外框色
+        local active = T and "NONE" or p.bg -- 当前标签：编辑区底色
         local h = {}
         for _, k in ipairs(require("ui.bufferline_groups")) do
-          h[k] = { bg = bg }
+          h[k] = { bg = k:find("_selected$") and active or chrome }
         end
         local function set(keys, spec)
           for _, k in ipairs(keys) do
@@ -251,29 +256,26 @@ return {
           end
         end
         set({ "background", "buffer", "tab", "close_button", "numbers", "duplicate" }, { fg = p.muted })
-        set({ "buffer_visible", "close_button_visible", "numbers_visible", "duplicate_visible" }, { fg = p.muted })
+        set({ "buffer_visible", "close_button_visible", "numbers_visible", "duplicate_visible" }, {
+          fg = require("ui.color").blend(p.fg, p.muted, 0.4),
+        })
         set({ "buffer_selected", "numbers_selected", "close_button_selected", "tab_selected", "duplicate_selected" }, {
           fg = p.fg,
           bold = true,
           italic = false,
-          sp = p.accent,
         })
-        set({ "indicator_selected", "indicator_visible" }, { fg = p.accent, sp = p.accent })
-        set({
-          "separator",
-          "separator_visible",
-          "separator_selected",
-          "tab_separator",
-          "tab_separator_selected",
-          "offset_separator",
-        }, {
-          fg = p.border,
+        set({ "indicator_selected" }, { fg = p.accent })
+        set({ "indicator_visible" }, { fg = p.border }) -- 在其他分屏中显示的 buffer
+        -- 侧边栏标题右侧的分隔线与侧边栏的分隔线一致：不透明时融入侧边栏底色，透明时为细线
+        set({ "offset_separator" }, {
+          fg = p.transparent and p.border or p.sidebar,
+          bg = p.transparent and "NONE" or p.sidebar,
         })
         set({ "modified", "modified_visible", "modified_selected" }, { fg = p.warn })
         for _, kind in ipairs({ "error", "warning", "info", "hint" }) do
           local c = ({ error = p.error, warning = p.warn, info = p.info, hint = p.hint })[kind]
-          set({ kind, kind .. "_visible", kind .. "_diagnostic", kind .. "_diagnostic_visible" }, { fg = c, sp = c })
-          set({ kind .. "_selected", kind .. "_diagnostic_selected" }, { fg = c, sp = p.accent, bold = true })
+          set({ kind, kind .. "_visible", kind .. "_diagnostic", kind .. "_diagnostic_visible" }, { fg = c })
+          set({ kind .. "_selected", kind .. "_diagnostic_selected" }, { fg = c, bold = true })
         end
         set({ "pick", "pick_visible", "pick_selected" }, { fg = p.error, bold = true })
         return h

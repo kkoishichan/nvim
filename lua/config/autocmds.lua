@@ -235,10 +235,9 @@ autocmd("VimEnter", {
     if vim.fn.argc() > 0 or vim.g.started_with_stdin then
       return
     end
-    vim.schedule(function()
-      if vim.api.nvim_buf_get_name(0) == "" and vim.bo.buftype == "" and vim.api.nvim_buf_line_count(0) <= 1 then
-        vim.cmd("Dashboard")
-      end
-    end)
+    -- 直接在 VimEnter 里打开（不要 vim.schedule），否则第一帧会先画出空 buffer
+    if vim.api.nvim_buf_get_name(0) == "" and vim.bo.buftype == "" and vim.api.nvim_buf_line_count(0) <= 1 then
+      vim.cmd("Dashboard")
+    end
   end,
 })

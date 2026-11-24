@@ -31,6 +31,11 @@ function M.refresh()
   p.transparent = require("ui.themes").state.transparent
   M.palette = p
   require("ui.highlights").base(p)
+  -- 立刻做一次透明处理，否则启动时第一帧会先画出主题的不透明底色；
+  -- 插件高亮应用后，schedule_late 会再处理一遍
+  if p.transparent then
+    require("ui.transparent").apply(p)
+  end
   M.schedule_late(true)
 end
 

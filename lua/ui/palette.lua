@@ -29,6 +29,7 @@ function M.extract()
   -- 派生色（透明模式下仍以 bg 为基准计算）
   p.surface = C.blend(fg, bg, dark and 0.05 or 0.035) -- 浮窗、补全
   p.sidebar = C.blend("#000000", bg, dark and 0.22 or 0.05) -- 侧边栏略深
+  p.chrome = p.sidebar -- 外框：侧边栏、标签栏、状态栏、命令行同一层
   p.border = C.blend(fg, bg, 0.22)
   p.cursorline = C.blend(fg, bg, 0.065)
   p.subtle = C.blend(fg, bg, 0.12) -- 状态栏次级胶囊

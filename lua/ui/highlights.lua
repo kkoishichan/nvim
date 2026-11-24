@@ -2,8 +2,13 @@
 local C = require("ui.color")
 local M = {}
 
+---本层设置过的组：它们已按透明模式取色，透明层不再处理
+---@type table<string, true>
+M.owned = {}
+
 local function apply(groups)
   for name, spec in pairs(groups) do
+    M.owned[name] = true
     vim.api.nvim_set_hl(0, name, spec)
   end
 end
@@ -17,6 +22,9 @@ function M.base(p)
   local T = p.transparent
   local float_bg = T and "NONE" or p.surface
   local line_bg = T and "NONE" or p.bg
+  -- 外框（侧边栏、标签栏、状态栏、命令行）比编辑区深，浮层比编辑区浅
+  local chrome_bg = T and "NONE" or p.chrome
+  local sel_bg = tint(p.accent, p, 0.22)
 
   local comment = vim.api.nvim_get_hl(0, { name = "Comment", link = false })
   comment.italic = true
@@ -38,15 +46,16 @@ function M.base(p)
     Folded = { bg = tint(p.accent, p, 0.08) },
     UiFoldCount = { fg = p.accent, bg = tint(p.accent, p, 0.08), italic = true },
     Pmenu = { fg = p.fg, bg = float_bg },
-    PmenuSel = { bg = tint(p.accent, p, 0.22), bold = true },
+    PmenuSel = { bg = sel_bg, bold = true },
     PmenuSbar = { bg = float_bg },
     PmenuThumb = { bg = p.border },
     PmenuBorder = { fg = p.border, bg = float_bg },
-    StatusLine = { fg = p.fg, bg = line_bg },
-    StatusLineNC = { fg = p.muted, bg = line_bg },
-    TabLine = { fg = p.muted, bg = line_bg },
-    TabLineFill = { bg = line_bg },
-    TabLineSel = { fg = p.fg, bg = line_bg, bold = true },
+    StatusLine = { fg = p.fg, bg = chrome_bg },
+    StatusLineNC = { fg = p.muted, bg = chrome_bg },
+    MsgArea = { fg = C.hl("MsgArea", "fg"), bg = chrome_bg },
+    TabLine = { fg = p.muted, bg = chrome_bg },
+    TabLineFill = { bg = chrome_bg },
+    TabLineSel = { fg = p.fg, bg = line_bg, bold = true }, -- 当前标签与编辑区同色
     WinBar = { fg = p.fg, bg = line_bg },
     WinBarNC = { fg = p.muted, bg = line_bg },
     OilWinbarIcon = { fg = p.accent, bg = line_bg },
@@ -64,6 +73,14 @@ function M.base(p)
     UiSidebarCursorLine = { bg = C.blend(p.accent, p.sidebar, 0.15) },
     UiSidebarSeparator = { fg = T and p.border or p.sidebar, bg = T and "NONE" or p.sidebar },
   }
+
+  -- 原生补全菜单的类型、附加信息、匹配字符列：底色跟随 Pmenu / PmenuSel，前景保留主题的
+  for _, part in ipairs({ "Kind", "Extra", "Match" }) do
+    local fg = C.hl("Pmenu" .. part, "fg") or (part == "Match" and p.accent or nil)
+    local sel_fg = C.hl("Pmenu" .. part .. "Sel", "fg") or fg
+    g["Pmenu" .. part] = { fg = fg, bg = float_bg, bold = part == "Match" }
+    g["Pmenu" .. part .. "Sel"] = { fg = sel_fg, bg = sel_bg, bold = true }
+  end
 
   for name, color in pairs({ Error = p.error, Warn = p.warn, Info = p.info, Hint = p.hint, Ok = p.ok }) do
     g["Diagnostic" .. name] = { fg = color }
