@@ -167,7 +167,7 @@ return {
           lualine_y = { { "progress", padding = { left = 1, right = 1 } } },
           lualine_z = { { "location", separator = { left = "\u{e0b6}", right = "\u{e0b4}" } } },
         },
-        extensions = { "lazy", "mason", "man", "quickfix", "neo-tree", "trouble", "toggleterm", "aerial", "fzf" },
+        extensions = { "lazy", "mason", "man", "quickfix", "neo-tree", "trouble", "aerial", "fzf" },
       }
     end,
     config = function(_, opts)
@@ -379,54 +379,6 @@ return {
     },
   },
 
-  -- 缩进线
-  {
-    "lukas-reineke/indent-blankline.nvim",
-    main = "ibl",
-    event = "VeryLazy",
-    opts = {
-      indent = { char = "│", tab_char = "│", highlight = "UiIndent" },
-      scope = { show_start = false, show_end = false, highlight = "UiScope" },
-      exclude = {
-        filetypes = {
-          "dashboard",
-          "help",
-          "neo-tree",
-          "Trouble",
-          "trouble",
-          "lazy",
-          "mason",
-          "toggleterm",
-          "aerial",
-          "bigfile",
-        },
-      },
-    },
-  },
-
-  -- 左侧栏：git 标记 · 诊断 · 行号 · 折叠
-  {
-    "luukvbaal/statuscol.nvim",
-    event = { "BufReadPre", "BufNewFile" },
-    config = function()
-      local builtin = require("statuscol.builtin")
-      require("statuscol").setup({
-        relculright = true,
-        ft_ignore = { "dashboard", "neo-tree", "aerial", "Trouble", "trouble", "toggleterm", "help", "lazy", "mason" },
-        segments = {
-          { sign = { namespace = { "gitsigns" }, maxwidth = 1, colwidth = 1, auto = false }, click = "v:lua.ScSa" },
-          { sign = { namespace = { "diagnostic" }, maxwidth = 1, colwidth = 2, auto = false }, click = "v:lua.ScSa" },
-          {
-            sign = { name = { ".*" }, namespace = { ".*" }, maxwidth = 1, colwidth = 2, auto = true },
-            click = "v:lua.ScSa",
-          },
-          { text = { builtin.lnumfunc, " " }, click = "v:lua.ScLa" },
-          { text = { builtin.foldfunc, " " }, click = "v:lua.ScFa" },
-        },
-      })
-    end,
-  },
-
   -- Sticky context
   {
     "nvim-treesitter/nvim-treesitter-context",
@@ -496,5 +448,12 @@ return {
     "brenoprata10/nvim-highlight-colors",
     event = "VeryLazy",
     opts = { render = "virtual", virtual_symbol = "●", virtual_symbol_position = "inline", enable_tailwind = true },
+    config = function(_, opts)
+      require("nvim-highlight-colors").setup(opts)
+      -- 插件每次滚动都会对每个语言服务调用 vim.version()（0.12 下很慢）并重新请求 documentColor，
+      -- 滚轮滚动时占了一半以上的 Lua 耗时。LSP 颜色已由 0.12 内置的 vim.lsp.document_color 显示，
+      -- 这里只关掉插件的 LSP 部分，保留它对 #hex、rgb() 等文本的识别
+      require("nvim-highlight-colors.utils").highlight_with_lsp = function() end
+    end,
   },
 }

@@ -8,7 +8,7 @@
 - 能用 0.12 内置的就不用插件（`vim.lsp.config/enable`、`winborder`、`gc`、`:Undotree`、LSP 折叠）
 - 除主题、treesitter、启动页、状态栏外，全部插件按需加载；启动目标 < 40ms
 - 主题只提供配色，界面结构样式和透明处理由自建的 UI 层统一控制
-- 不使用 snacks.nvim
+- snacks.nvim 只启用部分模块（缩进线、界面开关、终端与 lazygit、大文件、Git 链接、图片），UI 风格不合的模块不用
 
 ## 2. 目录结构
 
@@ -65,16 +65,19 @@ catppuccin（默认 mocha）· tokyonight · kanagawa · rose-pine · nightfox �
 | 分组 | 插件 |
 |---|---|
 | 基础 | lazy.nvim |
-| 界面 | dashboard-nvim（居中样式）· lualine · bufferline · dropbar · which-key（helix 预设）· mini.icons · fidget · indent-blankline · statuscol · nvim-treesitter-context · neoscroll · nvim-highlight-colors |
+| 界面 | dashboard-nvim（居中样式）· lualine · bufferline · dropbar · which-key（helix 预设）· mini.icons · fidget · snacks.indent · nvim-treesitter-context · neoscroll · nvim-highlight-colors |
 | 导航 | fzf-lua · neo-tree（plenary、nui；只当侧边栏）· oil（接管所有目录 buffer，`-` 打开）· aerial · flash · glance（不兼容 0.12 时改用 goto-preview） |
 | 编辑 | mini.ai · mini.surround（gs 前缀）· mini.pairs · mini.bufremove · multicursor.nvim · grug-far · nvim-ts-autotag · ts-comments |
 | 语言 | nvim-treesitter（main 分支）+ textobjects · mason · mason-lspconfig · nvim-lspconfig · blink.cmp · friendly-snippets · conform · lazydev · SchemaStore · crates.nvim · vimtex · typst-preview · render-markdown · live-preview |
 | 诊断 | tiny-inline-diagnostic · trouble · todo-comments |
 | Git | gitsigns · diffview |
-| 工具 | toggleterm（浮动终端、lazygit）· persistence |
+| 工具 | snacks（terminal 浮动终端 · lazygit · toggle 界面开关 · bigfile · gitbrowse · image）· persistence |
 
-**不用插件实现**：fcitx5 输入法切换 · 自动切到 git 根目录 · 大文件保护 · LSP 同名词高亮 ·
-界面开关 · 复制路径和 GitHub 链接 · 保存时删除行尾空格
+**不用插件实现**：fcitx5 输入法切换 · 自动切到 git 根目录 · 状态列（`ui/statuscolumn.lua`）·
+LSP 同名词高亮与 `]]`/`[[` 跳转 · 复制路径 · 保存时删除行尾空格
+
+状态列和同名词高亮没用 statuscol / snacks：它们每次重绘或光标移动都要遍历整个 buffer 的标记或引用，
+LSP 语义高亮（如 clangd）会留下大量标记，快速滚动时明显卡顿；自写版本每行只查询这一行
 
 ## 5. 语言
 
@@ -135,7 +138,7 @@ catppuccin（默认 mocha）· tokyonight · kanagawa · rose-pine · nightfox �
 
 其他：`gd` `grr` `gI` `gy` `K` · `gpd` `gpr` `gpi` `gpy`（glance）· `s` `S`（flash）·
 `gsa` `gsd` `gsr` · `<C-n>` `<C-↑/↓>`（多光标）· `]f` `]c` `]h` `]d` `]e` `]x` `]t` ·
-`<C-/>` 终端 · `<C-s>` 保存 · `<A-j/k>` 移动行 · `<S-h/l>` 切 buffer · `<leader>zi` 折叠 import
+`<C-/>` 终端 · `]]`/`[[` 同名引用 · `<C-s>` 保存 · `<A-j/k>` 移动行 · `<S-h/l>` 切 buffer · `<leader>zi` 折叠 import
 
 ## 8. 实施步骤
 

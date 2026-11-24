@@ -40,6 +40,7 @@ function M.refresh()
 end
 
 function M.setup()
+  require("ui.statuscolumn").setup()
   local themes = require("ui.themes")
   themes.load_state()
   themes.create_commands()

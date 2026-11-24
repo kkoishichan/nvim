@@ -18,6 +18,7 @@ local ensure = {
   "javascript",
   "jsdoc",
   "json",
+  "latex", -- Markdown 中的公式（snacks.image）；.tex 文件仍用 vimtex 高亮
   "lua",
   "luadoc",
   "luap",

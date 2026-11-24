@@ -76,7 +76,7 @@ end, { desc = "Fold Imports" })
 -- 终端模式：双击 Esc 回到普通模式
 map("t", "<esc><esc>", "<c-\\><c-n>", { desc = "Enter Normal Mode" })
 
--- 复制路径 / Git 远程链接
+-- 复制路径（Git 远程链接见 plugins/snacks.lua 的 <leader>gy / <leader>gB）
 local function yank(text, what)
   vim.fn.setreg("+", text)
   vim.fn.setreg('"', text)
@@ -88,115 +88,80 @@ end, { desc = "Copy Relative Path" })
 map("n", "<leader>fY", function()
   yank(vim.fn.expand("%:p"), "absolute path")
 end, { desc = "Copy Absolute Path" })
-map({ "n", "x" }, "<leader>gy", function()
-  local file = vim.api.nvim_buf_get_name(0)
-  local root = vim.fs.root(0, ".git")
-  if not root or file == "" then
-    return vim.notify("Not in a git repository", vim.log.levels.WARN)
-  end
-  local function git(...)
-    local out = vim.system({ "git", "-C", root, ... }, { text = true }):wait()
-    return out.code == 0 and vim.trim(out.stdout) or nil
-  end
-  local remote, sha = git("remote", "get-url", "origin"), git("rev-parse", "HEAD")
-  if not remote or not sha then
-    return vim.notify("No remote 'origin' or commits", vim.log.levels.WARN)
-  end
-  local url = remote:gsub("%.git$", ""):gsub("^git@([^:]+):", "https://%1/"):gsub("^ssh://git@", "https://")
-  local l1, l2 = vim.fn.line("v"), vim.fn.line(".")
-  if l1 > l2 then
-    l1, l2 = l2, l1
-  end
-  local mode = vim.fn.mode()
-  local range = (mode == "v" or mode == "V") and ("#L" .. l1 .. "-L" .. l2) or ("#L" .. l2)
-  local blob = url:find("gitlab") and "/-/blob/" or "/blob/"
-  yank(url .. blob .. sha .. "/" .. vim.fs.relpath(root, file) .. range, "git link")
-end, { desc = "Copy Git Remote Link" })
 
--- 界面开关
-local function toggle(name, get, set)
-  return function()
-    local value = not get()
-    set(value)
-    vim.notify((value and "Enabled " or "Disabled ") .. name, vim.log.levels.INFO, { title = "Toggle" })
-  end
-end
-local function opt_toggle(option, name)
-  return toggle(name, function()
-    return vim.wo[option]
-  end, function(v)
-    vim.opt_local[option] = v
-  end)
-end
-map("n", "<leader>uw", opt_toggle("wrap", "Wrap"), { desc = "Toggle Wrap" })
-map("n", "<leader>us", opt_toggle("spell", "Spelling"), { desc = "Toggle Spelling" })
-map("n", "<leader>uL", opt_toggle("relativenumber", "Relative Number"), { desc = "Toggle Relative Number" })
-map("n", "<leader>ul", opt_toggle("number", "Line Number"), { desc = "Toggle Line Number" })
-map(
-  "n",
-  "<leader>uc",
-  toggle("Conceal", function()
-    return vim.wo.conceallevel > 0
-  end, function(v)
-    vim.wo.conceallevel = v and 2 or 0
-  end),
-  { desc = "Toggle Conceal" }
-)
-map(
-  "n",
-  "<leader>ud",
-  toggle("Diagnostics", function()
-    return vim.diagnostic.is_enabled()
-  end, function(v)
-    vim.diagnostic.enable(v)
-  end),
-  { desc = "Toggle Diagnostics" }
-)
-map(
-  "n",
-  "<leader>uh",
-  toggle("Inlay Hints", function()
-    return vim.lsp.inlay_hint.is_enabled({ bufnr = 0 })
-  end, function(v)
-    vim.lsp.inlay_hint.enable(v, { bufnr = 0 })
-  end),
-  { desc = "Toggle Inlay Hints" }
-)
-map(
-  "n",
-  "<leader>uf",
-  toggle("Auto Format (global)", function()
-    return vim.g.autoformat
-  end, function(v)
-    vim.g.autoformat = v
-  end),
-  { desc = "Toggle Auto Format (Global)" }
-)
-map(
-  "n",
-  "<leader>uF",
-  toggle("Auto Format (buffer)", function()
-    return vim.b.autoformat ~= false
-  end, function(v)
-    vim.b.autoformat = v
-  end),
-  { desc = "Toggle Auto Format (Buffer)" }
-)
-map(
-  "n",
-  "<leader>uS",
-  toggle("Smooth Scroll", function()
-    return vim.g.smooth_scroll
-  end, function(v)
-    vim.g.smooth_scroll = v
-  end),
-  { desc = "Toggle Smooth Scroll" }
-)
-map("n", "<leader>ug", "<cmd>IBLToggle<cr>", { desc = "Toggle Indent Guides" })
-map("n", "<leader>ux", "<cmd>TSContext toggle<cr>", { desc = "Toggle Sticky Context" })
+-- 界面开关（snacks.toggle：which-key 菜单中显示当前是开还是关）
+local toggle = Snacks.toggle
+toggle.option("wrap", { name = "Wrap" }):map("<leader>uw")
+toggle.option("spell", { name = "Spelling" }):map("<leader>us")
+toggle.option("relativenumber", { name = "Relative Number" }):map("<leader>uL")
+toggle.line_number():map("<leader>ul")
+toggle.option("conceallevel", { off = 0, on = 2, name = "Conceal" }):map("<leader>uc")
+toggle.diagnostics():map("<leader>ud")
+toggle.inlay_hints():map("<leader>uh")
+toggle.indent():map("<leader>ug")
+toggle
+  .new({
+    id = "autoformat",
+    name = "Auto Format (Global)",
+    get = function()
+      return vim.g.autoformat
+    end,
+    set = function(state)
+      vim.g.autoformat = state
+    end,
+  })
+  :map("<leader>uf")
+toggle
+  .new({
+    id = "autoformat_buffer",
+    name = "Auto Format (Buffer)",
+    get = function()
+      return vim.b.autoformat ~= false
+    end,
+    set = function(state)
+      vim.b.autoformat = state
+    end,
+  })
+  :map("<leader>uF")
+toggle
+  .new({
+    id = "smooth_scroll",
+    name = "Smooth Scroll",
+    get = function()
+      return vim.g.smooth_scroll
+    end,
+    set = function(state)
+      vim.g.smooth_scroll = state
+    end,
+  })
+  :map("<leader>uS")
+toggle
+  .new({
+    id = "treesitter_context",
+    name = "Sticky Context",
+    get = function()
+      return require("treesitter-context").enabled()
+    end,
+    set = function(state)
+      require("treesitter-context")[state and "enable" or "disable"]()
+    end,
+  })
+  :map("<leader>ux")
+toggle
+  .new({
+    id = "transparent",
+    name = "Transparent",
+    notify = false, -- toggle_transparent 自己会提示
+    get = function()
+      return require("ui.themes").state.transparent
+    end,
+    set = function(state)
+      if state ~= require("ui.themes").state.transparent then
+        require("ui.themes").toggle_transparent()
+      end
+    end,
+  })
+  :map("<leader>ut")
 map("n", "<leader>uC", function()
   require("ui.themes").pick()
 end, { desc = "Theme Picker" })
-map("n", "<leader>ut", function()
-  require("ui.themes").toggle_transparent()
-end, { desc = "Toggle Transparent" })

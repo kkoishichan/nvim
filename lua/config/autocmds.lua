@@ -112,47 +112,6 @@ autocmd("BufWritePre", {
   end,
 })
 
--- 大文件保护：超过 1.5MB 或平均行长超过 1000 的文件识别为 bigfile，关闭 treesitter、LSP 等
-vim.filetype.add({
-  pattern = {
-    [".*"] = {
-      function(path, buf)
-        if not path or not buf or vim.bo[buf].filetype == "bigfile" then
-          return
-        end
-        if path ~= vim.fs.normalize(vim.api.nvim_buf_get_name(buf)) then
-          return
-        end
-        local size = vim.fn.getfsize(path)
-        if size <= 0 then
-          return
-        end
-        if size > 1.5 * 1024 * 1024 then
-          return "bigfile"
-        end
-        local lines = vim.api.nvim_buf_line_count(buf)
-        return (size - lines) / lines > 1000 and "bigfile" or nil
-      end,
-      { priority = math.huge },
-    },
-  },
-})
-autocmd("FileType", {
-  group = augroup("bigfile"),
-  pattern = "bigfile",
-  callback = function(ev)
-    vim.b[ev.buf].bigfile = true
-    vim.opt_local.foldmethod = "manual"
-    vim.opt_local.statuscolumn = ""
-    vim.opt_local.conceallevel = 0
-    vim.schedule(function()
-      if vim.api.nvim_buf_is_valid(ev.buf) then
-        vim.bo[ev.buf].syntax = vim.filetype.match({ buf = ev.buf }) or ""
-      end
-    end)
-  end,
-})
-
 -- 自动切换工作目录到当前文件所在的 git 根目录
 autocmd("BufEnter", {
   group = augroup("auto_root"),

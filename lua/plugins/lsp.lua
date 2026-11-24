@@ -146,6 +146,34 @@ local function server_configs()
   }
 end
 
+---跳到当前高亮的第 count 个同名引用（负数向前）
+local function reference_jump(buf, count)
+  local ns = vim.api.nvim_get_namespaces()["nvim.lsp.references"]
+  local pos = {} ---@type {[1]:integer, [2]:integer}[]
+  for _, m in ipairs(ns and vim.api.nvim_buf_get_extmarks(buf, ns, 0, -1, {}) or {}) do
+    local last = pos[#pos]
+    if not (last and last[1] == m[2] and last[2] == m[3]) then -- 去重（按位置）
+      pos[#pos + 1] = { m[2], m[3] }
+    end
+  end
+  local cur = vim.api.nvim_win_get_cursor(0)
+  local row, col = cur[1] - 1, cur[2]
+  local idx = 0 -- 光标所在或之前的最后一个引用
+  for i, p in ipairs(pos) do
+    if p[1] < row or (p[1] == row and p[2] <= col) then
+      idx = i
+    end
+  end
+  local target = pos[idx + count]
+  if not target or (target[1] == row and target[2] == col) then
+    return
+  end
+  vim.cmd("normal! m'")
+  vim.b[buf].reference_jump = true -- 跳到的是同一个符号，下一次光标移动不清除高亮
+  vim.api.nvim_win_set_cursor(0, { target[1] + 1, target[2] })
+  vim.cmd("normal! zv")
+end
+
 local function on_attach(client, buf)
   local function map(lhs, rhs, desc, mode)
     vim.keymap.set(mode or "n", lhs, rhs, { buffer = buf, desc = desc })
@@ -175,19 +203,35 @@ local function on_attach(client, buf)
     client.server_capabilities.hoverProvider = false
   end
 
-  -- 光标下同名词高亮
+  -- 光标下同名词高亮：停下时高亮，移动时清除（不在每次移动时扫描引用列表，引用很多时滚动也不卡）
   if client:supports_method("textDocument/documentHighlight", buf) then
     local group = vim.api.nvim_create_augroup("user_lsp_highlight_" .. buf, { clear = true })
     vim.api.nvim_create_autocmd({ "CursorHold", "CursorHoldI" }, {
       group = group,
       buffer = buf,
-      callback = vim.lsp.buf.document_highlight,
+      callback = function()
+        vim.lsp.buf.clear_references() -- 先清除，避免新旧结果叠加
+        vim.lsp.buf.document_highlight()
+      end,
     })
     vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI", "BufLeave" }, {
       group = group,
       buffer = buf,
-      callback = vim.lsp.buf.clear_references,
+      callback = function()
+        -- ]] / [[ 跳到的仍是同一个符号，保留高亮以便连续跳转
+        if vim.b[buf].reference_jump then
+          vim.b[buf].reference_jump = false
+          return
+        end
+        vim.lsp.buf.clear_references()
+      end,
     })
+    map("]]", function()
+      reference_jump(buf, vim.v.count1)
+    end, "Next Reference")
+    map("[[", function()
+      reference_jump(buf, -vim.v.count1)
+    end, "Prev Reference")
   end
 
   -- 折叠优先使用 LSP
@@ -293,7 +337,10 @@ return {
     "folke/lazydev.nvim",
     ft = "lua",
     opts = {
-      library = { { path = "${3rd}/luv/library", words = { "vim%.uv" } } },
+      library = {
+        { path = "${3rd}/luv/library", words = { "vim%.uv" } },
+        { path = "snacks.nvim", words = { "Snacks" } },
+      },
     },
   },
 }

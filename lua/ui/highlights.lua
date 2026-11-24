@@ -241,9 +241,6 @@ function M.plugins(p)
     DropBarMenuHoverEntry = { bg = sel },
     DropBarMenuCurrentContext = { bg = p.cursorline },
     DropBarIconUISeparator = { fg = p.muted },
-    -- toggleterm
-    ToggleTermNormal = { link = "NormalFloat" },
-    ToggleTermBorder = { link = "FloatBorder" },
     -- render-markdown（代码块和标题保留淡色底）
     RenderMarkdownCode = { bg = tint(p.fg, p, 0.05) },
     RenderMarkdownCodeInline = { bg = tint(p.fg, p, 0.08) },

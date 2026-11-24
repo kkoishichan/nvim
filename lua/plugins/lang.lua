@@ -32,6 +32,7 @@ return {
       code = { sign = false, width = "block", right_pad = 1, border = "thin" },
       heading = { sign = false, position = "inline" },
       completions = { blink = { enabled = true } },
+      latex = { enabled = false }, -- 公式由 snacks.image 渲染成图片
     },
     keys = {
       {
